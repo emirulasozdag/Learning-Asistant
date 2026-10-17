@@ -1,0 +1,38 @@
+# --- Ortam / gizli bilgiler ---
+.env
+.env.*
+!.env.example
+
+# --- Ders materyalleri (public repoya girmez — sunum slayt 18) ---
+data/
+*.mp4
+*.mkv
+*.webm
+
+# --- Değerlendirme çıktıları ---
+evaluation/runs/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# --- Node / frontend ---
+node_modules/
+dist/
+*.tsbuildinfo
+playwright-report/
+test-results/
+
+# --- Editör / OS ---
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
