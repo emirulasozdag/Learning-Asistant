@@ -1,0 +1,45 @@
+name: Görev
+description: Iteration / iş paketi görevi
+title: "[Task] "
+labels: ["task"]
+body:
+  - type: dropdown
+    id: iteration
+    attributes:
+      label: Iteration
+      options:
+        - "Iteration 1 — Core MVP"
+        - "Iteration 2 — Visual video + 2. ders"
+        - "Iteration 3 — Speech"
+        - "Iteration 4 — Interactive material"
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Alan
+      options:
+        - ingestion
+        - retrieval
+        - generation
+        - verification
+        - routing / llm gateway
+        - frontend
+        - evaluation
+        - infra / CI
+        - docs
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Açıklama
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: Bitti tanımı (acceptance criteria)
+      description: Hangi test / metrik bu görevin bittiğini gösterir?
+    validations:
+      required: true

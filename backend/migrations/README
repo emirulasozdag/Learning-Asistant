@@ -1,0 +1,6 @@
+Alembic migration'ları.
+
+  alembic upgrade head                              # şemayı güncelle
+  alembic revision --autogenerate -m "açıklama"     # app/db/models.py değişince
+
+Bağlantı adresi DATABASE_URL ortam değişkeninden gelir.

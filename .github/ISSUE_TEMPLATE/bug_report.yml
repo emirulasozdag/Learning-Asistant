@@ -1,0 +1,51 @@
+name: Bug
+description: Hata veya hallucination vakası bildir
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Tür
+      options:
+        - Yazılım hatası
+        - Hallucination (kaynakta olmayan iddia)
+        - Yanlış / eksik alıntı (citation)
+        - Kapsam dışı soruya cevap verdi (decline etmedi)
+        - Gereksiz reddetme (over-refusal)
+    validations:
+      required: true
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      options: ["S1 - Kritik", "S2 - Yüksek", "S3 - Orta", "S4 - Düşük"]
+    validations:
+      required: true
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options: ["P1", "P2", "P3"]
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Tekrar üretme adımları
+      description: Ders, soru / istek, video zamanı (varsa)
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Beklenen davranış
+  - type: textarea
+    id: actual
+    attributes:
+      label: Gerçekleşen davranış
+      description: Hallucination ise desteklenmeyen iddiayı ve getirilen kaynak ID'lerini ekleyin. Ders materyalinin kendisini yapıştırmayın.
+  - type: input
+    id: run
+    attributes:
+      label: Değerlendirme koşusu / commit

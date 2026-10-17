@@ -1,0 +1,389 @@
+# Interactive Learning Assistant — Proje Analizi
+
+> Kaynak: *Interactive Learning Assistant — Field Research (v4)* sunumu, Engineering Design II · Project 8, Ekim 2026.
+> Ekip: Berke Akçay · Emir Ulaş Özdağ · Ceyda Yıldız · Nisanur İlhan · Mehmet Akif Kurt
+> Bu doküman sunumdaki kararları **uygulanabilir gereksinimlere, mimari bileşenlere ve bir iş planına** çevirir. Sunumda olmayan her öneri "öneri" veya "açık soru" olarak işaretlenmiştir.
+
+---
+
+## 1. Yönetici özeti
+
+Proje, **tek bir üniversite dersinin onaylı materyaline bağlı kalan** (course-grounded) bir RAG çalışma asistanıdır. Dört temel yetenek tek bir öğrenme döngüsünde birleşir:
+
+| # | Yetenek | Özü |
+|---|---|---|
+| 1 | **Grounded Q&A** | Yalnızca ders kaynaklarından cevap; sayfa / video-zaman alıntısı; kanıt yoksa **reddet** (cite-or-decline) |
+| 2 | **Pratik üretimi** | MCQ · kısa cevap · code tracing; her soru bir kaynak pasaja bağlı ve gösterilmeden önce otomatik kontrol edilir |
+| 3 | **Cevap değerlendirme** | Rubrik + referans cevaba göre skor, eksik kavram açıklaması, boşluğa yönelik takip sorusu |
+| 4 | **Hallucination kontrolü** | Cevaplar atomik iddialara bölünür, her iddia kaynakla karşılaştırılır, oran **ölçülür ve loglanır** |
+
+**Pilot / MVP:** Veri Yapıları ve Algoritmalar (DSA) dersi, eğitmen ve bölüm üzerinden.
+**Uzun vadeli hedef:** Herhangi bir ders. Ders-bağımsız ingestion, her ders için izole bir indeks ve aynı değerlendirme protokolü.
+
+**Özgün katkı yeni özellik eklemek değil.** Var olan parçaları (kaynaklı chat, video-zaman farkındalığı, soru üretimi, RAG'li notlandırma) tek bir ders üzerinde **ölçülebilir bir döngüde birleştirmek** ve otomatik kontrolleri insan yargısına karşı **doğrulamak**.
+
+---
+
+## 2. Problem ve motivasyon
+
+### 2.1 Problem
+- Ders bilgisi dağınık: notlar, slaytlar, geçmiş sınavlar, ders videoları.
+- Genel chatbotlar akıcı cevap veriyor ama **dersten** cevap vermiyor. Hallucination yapabiliyor, müfredat dışına kayabiliyor, sayfa ya da video anını gösteremiyor.
+- Öğrencinin **takıldığı anda** yardıma ve cevabı **derste anlatılanla karşılaştırma** imkânına ihtiyacı var.
+- Eğitmenin ihtiyacı ise dersin içinde kalan ve **hata oranı varsayılmayan, ölçülen** bir asistan.
+
+### 2.2 Sahadan kanıtlar (sunum slayt 3)
+
+| Bulgu | Kaynak | Tasarıma etkisi |
+|---|---|---|
+| Kullanımdaki bir ders-video chatbotuna gelen 833 öğrenci mesajının **%70,5'i** alıntı içeren cevap aldı. **En güçlü karşılanmamış ihtiyaç pratik üretimi + notlandırma** (4,59/5, n=22). | [2] Ahmed & Subhlok, 2026 | Pratik + değerlendirme Iteration 1'in parçası |
+| Üç üniversite dersinde öğrencilerin **%65–77,5'i** ders materyali RAG chatbotunu "oldukça" ya da "çok" faydalı buldu. Doğruluk ve güvenilirlik sorunları sürüyor. | [3] Takushima & Kakeshita, 2026 | Güvenilirlik ayrı bir metrik olarak ölçülmeli |
+| 4 ders / 118 öğrencilik bir RAG tutor pilotunda cevapların **%16,5'i** ders materyalinde olmayan iddia içeriyordu. Tamamen doğru oranı %70,3. | [4] Németh vd., 2025 | Hallucination hedefi: ≤ %10 (bu referansın altına inmek) |
+
+**Çıkarım:** Öğrenciler kaynaklı cevap ve pratik istiyor, ama güvenilirlik **varsayılamaz, ölçülmelidir**.
+
+---
+
+## 3. Hedef kullanıcılar ve ana senaryo
+
+### 3.1 Paydaşlar
+
+| Rol | İhtiyaç | Sistemle etkileşim |
+|---|---|---|
+| **Öğrenci** | Takıldığı anda dersten cevap, pratik, geri bildirim | Video oynatıcı + chat, kaynak görüntüleyici, pratik/geri bildirim panelleri |
+| **Eğitmen** | Dersin dışına çıkmayan, ölçülmüş bir asistan; sınıfın sık hataları | Materyal onayı, eğitmen görünümü (sık hatalar), cevapları onaylama / düzeltme, rubrik / referans cevap |
+| **TA / değerlendirici** | İnsan etiketleme | Pratik soru incelemesi, öğrenci cevabı notlandırma, iddia etiketleri |
+| **Bölüm** | Dağıtım kanalı, ders ders yayılma | Pilotun onayı, ikinci derse geçiş |
+
+### 3.2 Ana senaryo: binary search çalışma oturumu (slayt 5)
+
+1. **Durdur ve sor:** Öğrenci videoyu durdurup "Neden sağ yarıyı atabiliyoruz?" diye sorar.
+2. **Kaynaklı cevap:** Durdurulan an + ders notları → alıntılı açıklama.
+3. **Pratik:** "Bana bir pratik soru ver." → code tracing görevi.
+4. **Geri bildirim:** Skor → atlanan adım → takip sorusu.
+
+Bu senaryodaki karar kuralı:
+- **Ders kapsıyorsa:** Onaylı kaynaktan cevap ver ve nereden geldiğini göster.
+- **Kapsamıyorsa:** Materyalin bunu kapsamadığını söyle. **Cevap uydurma.**
+
+Bu senaryo uçtan uca kabul testinin (Playwright) temelidir: *sor → alıntıyı aç → pratik iste → cevap gönder*.
+
+---
+
+## 4. Kapsam
+
+### 4.1 Iteration 1: Core MVP (pilot ders)
+- Notlar, slaytlar, ders kitabı alıntıları, geçmiş sınavlar ve ders transkriptlerinin RAG ile indekslenmesi
+- Sayfa / zaman alıntılı grounded Q&A, takip soruları ve reddetme davranışı
+- "Bu adım" soruları için **transkript tabanlı** video-pozisyon bağlamı
+- Açıklamalı pratik üretimi (MCQ, kısa cevap, code tracing)
+- Cevap değerlendirme: rubrik skoru, yapıcı geri bildirim, takip pratiği
+- Öğrenme kaydı + eğitmen görünümü (sık hatalar; eğitmen cevapları onaylar ya da düzeltir)
+- Hallucination ölçümü, değerlendirme harness'i ve teknik rapor
+
+### 4.2 Sonraki iterasyonlar
+| Iteration | İçerik |
+|---|---|
+| 2 | Durdurulan karenin görsel olarak anlaşılması (VLM: diyagram, kod, formül, slayt metni) + **ikinci dersin** eklenmesi |
+| 3 | Konuşma: STT ile sesli soru, TTS ile dinleme. Metin her zaman kalır; tanıma hataları ayrıca ölçülür |
+| 4 | İnteraktif materyal: istek üzerine adım adım animasyon (ör. düzenlenebilir dizi üzerinde binary search). Sandbox'ta çalışır, ders kaynağına göre kontrol edilir |
+
+### 4.3 Bilinçli olarak kapsam dışı
+- Bir foundation model'i eğitmek veya fine-tune etmek
+- **Resmî notlandırma.** Skorlar yalnızca formatif pratik içindir.
+- Yayınlanmamış veya aktif sınav içeriği
+- Eğitmenin yerini almak veya resmî sınav kâğıdı üretmek
+- Üniversite çapında production rollout ve işletim. Tasarım yine de ders-bağımsız kalır.
+
+---
+
+## 5. Fonksiyonel gereksinimler
+
+Her gereksinim, iskeletteki ilgili modüle ve sunumdaki kaynağına eşlenmiştir. Bu gereksinimlerin hiçbiri **henüz uygulanmadı**.
+
+| ID | Gereksinim | Modül | Iter. | Kaynak |
+|---|---|---|---|---|
+| FR-01 | Ders materyalinin (PDF, PPTX, VTT/altyazı, geçmiş sınav) yüklenmesi ve parse edilmesi | `backend/app/ingestion` | 1 | sl. 11, 14 |
+| FR-02 | Temizleme + chunking. Her parça `course_id`, kaynak, **sayfa** ve **başlangıç/bitiş zamanı** metadata'sı taşır | `ingestion` | 1 | sl. 11 |
+| FR-03 | Altyazı yoksa faster-whisper ile transkript üretimi | `ingestion` | 1 | sl. 14 |
+| FR-04 | **Ders başına izole indeks.** Ders filtresi aramadan **önce** uygulanır | `retrieval`, `db` | 1 | sl. 11, 12 |
+| FR-05 | Hibrit arama: multilingual-e5 dense + PostgreSQL FTS, **RRF** ile birleştirme, opsiyonel cross-encoder rerank | `retrieval` | 1 | sl. 12, 14 |
+| FR-06 | Video-zaman farkında sıralama: durdurulan zamana yakın pasajlara yumuşak öncelik; tüm ders aranabilir kalır | `retrieval` | 1 | sl. 12 |
+| FR-07 | Görev yönlendirme: `ask` / `practice` / `evaluate`, ders filtresi, opsiyonel video penceresi | `routing` | 1 | sl. 11 |
+| FR-08 | Model gateway: kural tabanlı local / hosted seçimi. Tüm çıktılar **aynı JSON şemasında** | `llm` | 1 | sl. 11, 14 |
+| FR-09 | **Cite-or-decline cevap.** Kaynak ID'li yapılandırılmış çıktı; bilinmeyen ID reddedilir; yetersiz kanıtta reddet ve ilgili materyale yönlendir | `generation`, `verification` | 1 | sl. 12 |
+| FR-10 | Konuşma geçmişiyle takip soruları | `generation` | 1 | sl. 16 |
+| FR-11 | Tek pasajdan pratik üretimi (MCQ, kısa cevap, code tracing) + açıklama. Kaynak pasaj soruyla birlikte saklanır | `generation` | 1 | sl. 9, 12 |
+| FR-12 | Pratik otomatik kontrolleri: anahtar seçeneklerde mi, distraktörler farklı mı, yeniden çözümde aynı cevap çıkıyor mu. **Geçmeyen soru gösterilmez** | `verification` | 1 | sl. 4, 12 |
+| FR-13 | Cevap değerlendirme: soruyla birlikte referans cevap + rubrik getirilir → skor, eksik kavramlar, alıntılı açıklama, takip sorusu | `generation` | 1 | sl. 12 |
+| FR-14 | Claim-level kontrol: cevap atomik iddialara bölünür; **farklı sağlayıcıdan** bir judge her iddiayı supported / unsupported etiketler; sonuç loglanır | `verification` | 1 | sl. 12 |
+| FR-15 | Öğrenme kaydı: öğrenci denemeleri, kavram, hata türü (opt-in, anonim) | `db` | 1 | sl. 10, 16 |
+| FR-16 | Eğitmen görünümü: sık hatalar; eğitmen cevapları onaylar ya da düzeltir | `frontend`, `api` | 1 | sl. 16 |
+| FR-17 | Ders bazlı erişim kontrolü (öğrenci / eğitmen) | `api` | 1 | sl. 14 |
+| FR-18 | Öğrenci arayüzü: video + soru, chat, **sayfa/zamana atlayan** kaynak görüntüleyici, pratik + geri bildirim panelleri | `frontend` | 1 | sl. 11, 14 |
+| FR-19 | Değerlendirme harness'i: 4 koşul (no-RAG · basic RAG · full · full + video time), tekrar koşulabilir, run log | `evaluation` | 1 | sl. 13 |
+| FR-20 | Durdurulan karenin VLM ile okunması | `ingestion`, `retrieval` | 2 | sl. 17 |
+| FR-21 | STT / TTS | `frontend`, `llm` | 3 | sl. 17 |
+| FR-22 | Sandbox'ta çalışan, kaynağa göre kontrol edilen interaktif animasyon | `generation`, `frontend` | 4 | sl. 17 |
+
+---
+
+## 6. Fonksiyonel olmayan gereksinimler
+
+| Alan | Gereksinim |
+|---|---|
+| **Grounding** | Model belleğinden değil, getirilen kanıttan üretim. Alıntı tek başına yeterli sayılmaz, iddia düzeyinde desteklenmelidir. |
+| **Ders izolasyonu** | Bir dersin sorgusu başka bir dersin parçasını asla görmez (filtre aramadan önce uygulanır). |
+| **Gizlilik / KVKK** | Öğrenci verisi yalnızca **opt-in** onayla, anonimleştirilmiş ve KVKK uyumlu tutulur. **Ders materyali public repoya commit'lenmez**; repoda yalnızca şemalar, scriptler ve anonim değerlendirme verisi bulunur. |
+| **Hassas işler local'de** | Hassas veya rutin işler local LLM'de kalır; yalnızca karmaşık ya da düşük güvenli işler hosted API'ye gidebilir. |
+| **Dil** | Türkçe ve İngilizce ders metni (multilingual-e5). |
+| **Yapılandırılmış çıktı** | Tüm LLM çıktıları Pydantic / JSON şemasıyla doğrulanır. |
+| **Tekrarlanabilirlik** | Otomatik değerlendirme her koşuda yeniden çalıştırılabilir; insan etiketleri bir kez toplanır (~200). |
+| **Gerileme kapısı** | Yeni bir yetenek yalnızca **temel metrikler gerilemezse** yayınlanır (her iterasyon aynı değerlendirme koşusuyla biter). |
+| **Performans** | Locust ile p95 gecikme ölçülür. *Sunumda sayısal bir hedef yok; bkz. §13.* |
+| **Kalite süreci** | `main` korumalı; `feature/*` → PR, 1 review + yeşil CI. |
+| **Formatif kullanım** | Skorlar resmî not değildir. Arayüz bunu açıkça belirtmelidir. |
+
+---
+
+## 7. Mimari
+
+### 7.1 Bileşenler ve klasör eşlemesi (slayt 11, 18)
+
+| Bileşen (sunum) | Görev | İskelette karşılığı |
+|---|---|---|
+| Course materials | Notlar · slaytlar · geçmiş sınavlar · transkriptler | `data/` (**gitignore'da**, repoya girmez) |
+| Ingestion | Parse → clean → chunk; sayfa + zaman metadata | `backend/app/ingestion/` |
+| Course index | PostgreSQL + pgvector + full-text search | `backend/app/db/`, `docker/postgres/init.sql` |
+| Student UI | Video zamanı + soru, chat, kaynak görüntüleyici, pratik + geri bildirim | `frontend/` |
+| Task router | ask / practice / evaluate; ders filtresi; video penceresi | `backend/app/routing/` |
+| Hybrid retrieval | Retrieve → rerank; kaynak ID + pasajlar | `backend/app/retrieval/` |
+| Model gateway | Local LLM / hosted API; tek JSON şeması | `backend/app/llm/` |
+| Generation | answer · question · grade | `backend/app/generation/` |
+| Automatic checker | Şema + kaynak ID; iddia desteği; hallucination log | `backend/app/verification/` |
+| Evaluation store | Gold Q&A · rubrikler · insan etiketleri · run log | `evaluation/` |
+
+> Sunumdaki ağaçta `ingestion/`, `retrieval/` gibi klasörler doğrudan `backend/` altında. İskelette bunlar, Python paketi olarak import edilebilsinler diye `backend/app/` altına kondu. Başka bir sapma yok.
+
+### 7.2 İstek akışı (planlanan)
+
+```mermaid
+flowchart LR
+    UI[Student UI<br/>soru + video zamanı] --> R[Task router<br/>ask / practice / evaluate]
+    R --> HR[Hybrid retrieval<br/>ders filtresi → dense + FTS → RRF → rerank]
+    HR --> IDX[(Course index<br/>PostgreSQL + pgvector)]
+    HR --> GW[Model gateway<br/>local LLM / hosted API]
+    GW --> CK[Automatic checker<br/>şema · kaynak ID · iddia desteği]
+    CK -->|geçti| UI
+    CK -->|kanıt yetersiz| DEC[Decline + ilgili materyal] --> UI
+    CK --> LOG[(Evaluation store<br/>run log · hallucination)]
+    ING[Ingestion<br/>parse → clean → chunk] --> IDX
+```
+
+### 7.3 Model yönlendirme ilkesi
+- **Başlangıçta kural tabanlı.** Hassas veya rutin işler local'de kalır; karmaşık ya da düşük güvenli işler API'yi kullanabilir.
+- **Checker / judge, generator'dan farklı bir model ailesi** kullanır. Böylece modelin kendi hatasını onaylama (self-preference) yanlılığı azalır [16].
+
+---
+
+## 8. Kavramsal veri modeli (öneri)
+
+Sunumda tablo şeması yok. Aşağıdaki tablo, gereksinimlerin ihtiyaç duyduğu **asgari varlıkları** gösterir. Kod veya migration yazılmadı.
+
+| Varlık | Temel alanlar | Not |
+|---|---|---|
+| `Course` | id, kod, ad, dil | İzolasyon birimi |
+| `User` / `Enrollment` | id, rol (öğrenci / eğitmen / TA), course_id, opt-in onayı | Erişim kontrolü, KVKK |
+| `Document` | id, course_id, tür (not / slayt / kitap / sınav / transkript), başlık, onay durumu | Materyalin kendisi repoda değil, depolamada |
+| `Chunk` | id, document_id, course_id, metin, sayfa, t_start, t_end, `embedding vector(768)`, `tsvector` | e5-base = 768 boyut; dense + FTS aynı tabloda |
+| `Conversation` / `Message` | id, user_id, course_id, rol, içerik, video_t, alıntılanan chunk_id'ler | Takip soruları |
+| `PracticeItem` | id, course_id, tür (MCQ / kısa / code tracing), soru, seçenekler, anahtar, açıklama, **kaynak chunk_id**, kontrol sonuçları, durum | Kontrolden geçmeyen gösterilmez |
+| `Rubric` / `ReferenceAnswer` | id, item_id, kriterler, puanlar, eğitmen onayı | Değerlendirme girdisi |
+| `Attempt` | id, user_id, item_id, cevap, skor, eksik kavramlar, takip item_id | Öğrenme kaydı |
+| `Claim` / `ClaimCheck` | id, message_id, iddia metni, etiket (supported / unsupported), judge modeli | Hallucination oranı |
+| `InstructorReview` | id, hedef (message / item), karar (onay / düzeltme), düzeltme | Eğitmen görünümü + moat verisi |
+| `EvalRun` | id, commit, koşul, metrik değerleri, tarih | Gerileme kapısı |
+
+---
+
+## 9. Değerlendirme planı (slayt 13)
+
+| Boyut | Otomatik (her koşu) | İnsan (örneklem) | Hedef (hipotez) |
+|---|---|---|---|
+| Cevap doğruluğu | Judge LLM, **150 test sorusu × 4 koşul**da eğitmen referansıyla karşılaştırır (no RAG · basic RAG · full · full + video time) | 2 değerlendirici, ana koşul başına 40 cevap (0/1/2) | ≥ %80 tamamen doğru |
+| Hallucination oranı | Judge her atomik iddiayı getirilen pasajlara göre supported / unsupported etiketler | Aynı 40 cevap, iddia etiketleri → judge–insan uyumu | Desteklenmeyen iddia içeren cevap ≤ %10 |
+| Ders-kapsam uyumu | Kural + judge: 30 kapsam dışı soruda reddetme; cevaplanabilir sorularda aşırı reddetme | — | ≥ %90 / ≤ %10 |
+| Retrieval kalitesi | Gold kanıt pasajlarına göre Recall@5 | Gold pasajlar soru setiyle birlikte bir kez işaretlenir | ≥ 0,85 |
+| Pratik soru kalitesi | Her item'da: anahtar seçeneklerde, farklı distraktörler, yeniden çözüm uyumu | Eğitmen / TA rubrikle 40 item inceler | ≥ %85 kabul edilebilir |
+| Cevap-değerlendirme uyumu | Toplanan öğrenci cevaplarında asistan skorları | Eğitmen / TA aynı 60 cevabı notlandırır | QWK ≥ 0,70 |
+| Kullanılabilirlik | Loglar: görev süresi, alıntı tıklamaları | SUS + 5'li anket, gönüllü pilot (hedef 20) | SUS ≥ 70; ≥ 4,0 / 5 |
+
+**Tasarım gereği uygulanabilir:** Toplamda yaklaşık 200 insan etiketi gerekiyor; geri kalan her şey otomatik ve yeniden koşulabilir. Judge'a ancak insanla uyumu **κ ≥ 0,6** olursa güvenilir.
+
+**Literatür dayanağı:** RAG [1] · ALCE alıntı recall/precision [8] · RAGAs geliştirme-zamanı regresyon [9] · FActScore atomik iddia [10] · RAGTruth etiketleme şeması [11] · LLM-as-a-Judge yanlılıkları [16].
+
+---
+
+## 10. Teknoloji yığını (slayt 14–15)
+
+| Katman | Teknoloji | Gerekçe |
+|---|---|---|
+| Diller | Python 3.12, TypeScript, SQL | AI pipeline ekosistemi; tipli web istemcisi |
+| Frontend | React + Vite, HTML5 video, Tailwind CSS | Chat, sayfa/zaman atlamalı kaynak görüntüleyici, pratik panelleri |
+| Backend | FastAPI, Pydantic, SQLAlchemy | REST, görev yönlendirme, şema-doğrulamalı LLM çıktısı, erişim kontrolü |
+| Arama + depolama | PostgreSQL 16 + pgvector, FTS, RRF | Metadata + dense + lexical arama **tek veritabanında** [D1] |
+| Embedding / rerank | multilingual-e5 (sentence-transformers), opsiyonel cross-encoder | TR/EN metin; top-k precision [D2] |
+| Doküman işleme | PyMuPDF, python-pptx, webvtt-py, faster-whisper | Metin, sayfa ve zaman damgası çıkarımı |
+| LLM erişimi | Sağlayıcı-bağımsız adapter, JSON-schema çıktı | Maliyet / kalite için model değiştirilebilir |
+| Geliştirme | Git, GitHub, GitHub Actions; Docker Compose | CI her PR'da lint + test |
+| Test | pytest + httpx, Playwright, RAGAs + özel iddia harness'i, Locust, Ruff, ESLint, pre-commit | Birim/API, UI akışı, RAG kalitesi, p95 gecikme |
+| Proje yönetimi | GitHub Projects: Iterative Development (2 haftalık sprint), Kanban (Backlog → Ready → In progress → Review → Done), Bug Tracker (severity / priority; hallucination vakaları) | [G1] |
+
+---
+
+## 11. Rakip ve boşluk analizi (slayt 7–10)
+
+| Araç | Güçlü yanı | Sınırı (bizim hedefe göre) |
+|---|---|---|
+| **NotebookLM** | Yüklenen kaynaklardan alıntılı cevap, quiz/flashcard, salt-okunur paylaşım | YouTube'dan yalnızca transkript alınıyor; ekrandaki görseller ve izleme pozisyonu girdi değil; rubriğe göre açık uçlu notlandırma yok; 50 kaynak sınırı (ücretsiz katman) |
+| **Khanmigo** | İpucu-önce Sokratik tutoring, ses, kod geri bildirimi | Yalnızca Khan Academy içeriği; özel ders dosyası yok; ABD'de ikamet ve ödeme gerekiyor |
+| **DeepTutor** (açık kaynak) | RAG, alıntılı tutoring, zorluk ayarlı soru üretimi, ses | Varsayılan olarak tek kullanıcılı; değerlendirmesi LLM-simüle öğrencilerle yapılmış; gerçek bir derste değerlendirme ve LMS bağlantısı yok. **Yenilik iddiasını sınırlar.** |
+| **ChatGPT Projects** | Dosyalar + talimatlarla paylaşılan proje | Kanıtla sınırlı kalmak zorunlu bir kontrol değil, talimat; video bağlamı yok; ölçülmüş hallucination oranı yok |
+
+**Boşluk:** Grounded tutoring + video bağlamı + pratik + cevap değerlendirme + **ölçülmüş güvenilirlik**, tek döngüde ve tek bir gerçek ders üzerinde.
+
+**Katkılar (slayt 9):**
+1. Tek döngü, tek kanıt tabanı: sor → pratik → cevap → geri bildirim → takip
+2. Kaynağa bağlı ve otomatik kontrol edilen pratik
+3. Eğitmen skorlarıyla uyumu raporlanan grounded cevap değerlendirme
+4. No-RAG ve basic-RAG baseline'larına karşı ölçülen güvenilirlik; judge insan etiketleriyle doğrulanır
+
+**Kalıcılık (slayt 10):**
+- **Giriş noktası:** Tek eğitmenin dersi (DSA).
+- **Hendekler** (her pilotla güçlenen hipotezler): ders-özel hata verisi, eğitmenin iş akışı ve geçiş maliyeti, eğitmen/bölüm üzerinden dağıtım, fakülte onaylı güven, kişisel bağlam.
+
+> **Mimariye yansıması:** "Hangi kaynak hangi hatayı düzeltti" kaydı (`Attempt` + `InstructorReview` + kaynak chunk) bir yan ürün değil, **ürünün hendeği**. Veri modeli bunu baştan tutmalı.
+
+---
+
+## 12. Yol haritası ve Iteration 1 iş paketleri
+
+### 12.1 İterasyonlar
+Her iterasyon 2 haftalık sprintlerden oluşur ve **aynı değerlendirme koşusuyla** biter. Temel metrikler gerilerse yeni yetenek yayınlanmaz.
+
+| Iteration | Hedef | Çıkış kriteri |
+|---|---|---|
+| 1 — Core MVP | RAG + grounded Q&A + transkript video bağlamı + pratik + değerlendirme + hallucination ölçümü | §9 metriklerinin ilk tam koşusu ve teknik rapor |
+| 2 — Visual + 2. ders | VLM ile kare okuma; aynı pipeline'ın ikinci derse taşınması | 1. ders metrikleri gerilemiyor; 2. derste aynı protokol |
+| 3 — Speech | STT / TTS | Tanıma hataları ayrıca ölçülüyor |
+| 4 — Interactive | Sandbox'ta kontrol edilen animasyon | Kaynağa göre doğrulama |
+
+### 12.2 Iteration 1 iş paketleri (öneri, GitHub Projects'e girilebilir)
+
+| WP | İş paketi | Bağımlılık | Bitti tanımı |
+|---|---|---|---|
+| WP0 | **Altyapı iskeleti** (bu repo) | — | ✅ `docker compose up`, `/health`, CI yeşil |
+| WP1 | Veri anlaşması ve materyal toplama: eğitmenle onaylı materyal listesi, hangi geçmiş sınavlar kullanılabilir, video/transkript erişimi | — | Onaylı kaynak listesi |
+| WP2 | Gold set: 150 test sorusu + referans cevap + gold kanıt pasajları, 30 kapsam dışı soru | WP1 | `evaluation/gold_sets/` şeması dolu (anonim) |
+| WP3 | DB şeması + migration (Alembic), pgvector indeksi | WP0 | Migration CI'da çalışıyor |
+| WP4 | Ingestion: PDF / PPTX / VTT parse, chunking, metadata | WP1, WP3 | Pilot ders indekslendi; parse birim testleri |
+| WP5 | Hybrid retrieval + ders filtresi + video-zaman önceliği | WP4 | Recall@5 ölçülüyor |
+| WP6 | Model gateway + JSON şemaları | WP0 | Local ve hosted adapter aynı şemayı döndürüyor |
+| WP7 | Cite-or-decline Q&A + takip soruları | WP5, WP6 | Decline ve bilinmeyen ID testleri |
+| WP8 | Verification: iddia ayrıştırma + judge + hallucination log | WP6 | Oran her koşuda raporlanıyor |
+| WP9 | Pratik üretimi + otomatik kontroller | WP5, WP6 | Kontrolden geçmeyen item gösterilmiyor |
+| WP10 | Cevap değerlendirme (rubrik + referans) + takip item | WP9 | QWK hesaplanabiliyor |
+| WP11 | Öğrenci arayüzü: video + chat + kaynak görüntüleyici + pratik/geri bildirim | WP7 | Playwright: sor → alıntı aç → pratik → gönder |
+| WP12 | Eğitmen görünümü + öğrenme kaydı + erişim kontrolü | WP10, WP11 | Eğitmen onay / düzeltme yapabiliyor |
+| WP13 | Evaluation harness: 4 koşul, RAGAs + iddia harness'i, insan etiket sayfaları, κ | WP2, WP8 | Tek komutla yeniden koşulabiliyor |
+| WP14 | Pilot (≥ 20 gönüllü, opt-in), SUS + anket, Locust p95, teknik rapor | Hepsi | §9 tablosu dolu |
+
+**Kritik yol:** WP1 → WP2 / WP4 → WP5 → WP7 → WP13. Materyal ve gold set eğitmene bağlı olduğu için **WP1 hemen başlamalı**.
+
+---
+
+## 13. Riskler, tutarsızlıklar ve açık sorular
+
+### 13.1 Riskler
+
+| Risk | Etki | Azaltma |
+|---|---|---|
+| Video veya transkript erişimi yok, ya da altyazı kalitesi düşük | Video-pozisyon özelliği çalışmaz | faster-whisper; transkript kalitesini ayrıca örnekle |
+| Gold set üretimi eğitmen zamanına bağlı (150 soru + referans + rubrik) | Değerlendirme gecikir | Erken başla; TA'larla taslak, eğitmen onayı |
+| Judge–insan uyumu κ < 0,6 | Hallucination metriği güvenilmez | Judge modelini veya prompt'u değiştir; insan örneklemini büyüt |
+| e5'in 512 token limiti | Uzun chunk'lar kesilir | Chunk boyutunu < 512 token tut; e5'in `query:` / `passage:` öneklerini kullan |
+| Türkçe FTS kalitesi | Lexical arama zayıf kalır | PostgreSQL `turkish` text-search konfigürasyonunu `simple` ile karşılaştır |
+| Local LLM kalitesi düşük | Daha fazla iş API'ye kayar → maliyet ve gizlilik riski | Yönlendirme kurallarını loglarla ayarla; maliyeti izle |
+| KVKK: QWK için 60 öğrenci cevabı ve pilot logları | Yasal / etik risk | Opt-in onay formu, anonimleştirme, etik kurul / bölüm onayı |
+| Geçmiş sınav ile "aktif sınav içeriği" ayrımı | Kapsam ihlali | Eğitmen onaylı liste (WP1) |
+| DeepTutor ile özellik örtüşmesi | Yenilik iddiası zayıflar | Katkıyı "gerçek derste ölçülmüş döngü" olarak konumla (zaten öyle) |
+
+### 13.2 Sunumdaki tutarsızlıklar
+1. **Repo adı.** Sunumda `github.com/emirulasozdag/Learning-Asistent`, git remote'unda ise `emirulasozdag/Learning-Asistant` yazıyor. Hangisinin doğru olduğu netleştirilmeli; sunum, README ve remote aynı olmalı.
+2. **Materyal listesi.** Resmî proje tanımı (Project 08) ders kitaplarını açıkça kapsıyor ve slayt 16 da buna uyuyor. Ancak mimari slaytındaki (11) "Course materials" kutusunda kitap yok; diyagram güncellenmeli. Telif açısından hangi kitap bölümlerinin indekslenebileceği eğitmenle netleşmeli.
+3. **İnsan etiketi sayısı.** "Ana koşul başına 40 cevap" deniyor ama kaç ana koşul olduğu belirtilmemiş. Tek koşulla toplam 40 cevap + 40 pratik item + 60 öğrenci cevabı = 140 eder. ~200 toplamına neyin dahil olduğu (ikinci bir koşul mu, gold pasaj işaretlemesi mi) netleştirilmeli.
+4. **Performans hedefi yok.** Locust p95 ölçülecek, ama hedef değer belirtilmemiş.
+
+### 13.3 Açık sorular (ekip kararı gerekli)
+- Hangi local LLM ve hangi hosted sağlayıcı? Judge hangi model ailesinden olacak?
+- Videolar nerede barındırılıyor (LMS, YouTube, dosya)? Oynatıcıya nasıl gelecek?
+- Kimlik doğrulama: üniversite SSO mu, basit hesap mı?
+- Pilot takvimi: hangi hafta / hangi konu (ör. binary search) ile başlanacak?
+- Ders materyali nerede saklanacak (repo dışı; yerel disk mi, nesne depolama mı)?
+
+---
+
+## 14. İskeletin durumu
+
+| Parça | Durum |
+|---|---|
+| Klasör yapısı (slayt 18) | ✅ |
+| `docker compose up`: PostgreSQL 16 + pgvector, FastAPI, Vite | ✅ |
+| `GET /health` + test | ✅ |
+| Boş React sayfası (Tailwind) | ✅ |
+| CI: ruff + pytest, eslint + build | ✅ |
+| Issue şablonları (Bug, hallucination alanlarıyla birlikte; Görev) + PR şablonu | ✅ |
+| Özellik başına iskelet (aşağıdaki tablo) | ✅ İmzalar + `NotImplementedError`; endpoint'ler `501` döner |
+| Endpoint'lerin var olduğunu ve 501 döndüğünü doğrulayan testler | ✅ `backend/tests/test_api_skeleton.py` |
+| DB bağlantısı + oturum (`db/session.py`) + Alembic kurulumu | ✅ `alembic upgrade head` çalışıyor |
+| DB tabloları (ORM modelleri) + ilk migration | ⏳ WP3 |
+| Playwright UI testleri | ⏳ WP11 (test edilecek akış oluşunca) |
+| RAGAs / Locust | ⏳ WP13 / WP14 |
+| **Herhangi bir özellik mantığı** | ❌ Bilinçli olarak yok |
+
+### 14.1 Fonksiyonel gereksinim → iskelet dosyası
+
+| FR | Backend | Endpoint (şu an 501) | Frontend |
+|---|---|---|---|
+| FR-01 Yükleme / parse | `ingestion/parsers/{pdf,pptx,vtt}_parser.py`, `ingestion/pipeline.py` | `POST /courses/{id}/materials` | `features/instructor/MaterialUpload` |
+| FR-02 Temizleme + chunking | `ingestion/cleaning.py`, `ingestion/chunking.py`, `ingestion/types.py` | ↑ | — |
+| FR-03 Transkript (whisper) | `ingestion/transcribe.py` | ↑ | — |
+| FR-04 Ders izolasyonu | `retrieval/dense.py`, `retrieval/lexical.py` (`course_id` filtresi) | — | — |
+| FR-05 Hibrit arama + RRF + rerank | `retrieval/{dense,lexical,fusion,rerank,hybrid}.py` | — | — |
+| FR-06 Video-zaman önceliği | `retrieval/video_time.py` | `POST /ask` (`video_time_s`) | `features/video/VideoPlayer` |
+| FR-07 Task router | `routing/router.py` | — | — |
+| FR-08 Model gateway | `llm/{base,local,hosted,gateway}.py` | — | — |
+| FR-09 Cite-or-decline | `generation/answer.py`, `verification/citations.py` | `POST /ask` | `features/qa/ChatPanel` |
+| FR-10 Takip soruları | `generation/conversation.py` | `POST /ask` (`conversation_id`) | `features/qa/ChatPanel` |
+| FR-11 Pratik üretimi | `generation/question.py` | `POST /practice` | `features/practice/PracticePanel` |
+| FR-12 Pratik kontrolleri | `verification/practice_checks.py` | ↑ | — |
+| FR-13 Cevap değerlendirme | `generation/grade.py` | `POST /practice/{id}/answer` | `features/feedback/FeedbackPanel` |
+| FR-13 Rubrik + referans cevap girişi | `instructor/rubrics.py` | `GET/POST /instructor/courses/{id}/rubrics` | `features/instructor/RubricEditor` |
+| FR-14 Claim kontrolü + hallucination log | `verification/{claims,judge,hallucination}.py` | — | — |
+| FR-15 Öğrenme kaydı | `learning/record.py` | `GET /courses/{id}/learning-record` | `features/learning/LearningRecordPanel` |
+| FR-16 Eğitmen görünümü | `instructor/{mistakes,review}.py` | `GET /instructor/courses/{id}/mistakes`, `POST /instructor/reviews` | `features/instructor/{FrequentMistakes,ReviewQueue}` |
+| FR-17 Erişim kontrolü | `auth/dependencies.py` (henüz endpoint'lere bağlı değil) | — | — |
+| FR-18 Öğrenci arayüzü | — | — | `pages/StudentPage`, `api/client.ts` |
+| FR-18 Kaynak görüntüleyici | `sources/lookup.py` | `GET /sources/{source_id}` | `features/sources/SourceViewer` |
+| Ders seçimi (ders-bağımsız tasarım) | `courses/service.py` | `GET /courses` | `features/courses/CourseSelector` |
+| Veritabanı | `db/{base,session,models}.py`, `migrations/` (Alembic) | — | — |
+| FR-19 Değerlendirme harness'i | `evaluation/harness/{run,conditions,judge_agreement}.py`, `evaluation/harness/metrics/*.py` (7 boyut + hedefler) | — | — |
+| FR-20–22 (Iteration 2–4) | Bilinçli olarak iskelet yok | — | — |
+
+API sözleşmeleri `backend/app/schemas/` altında; frontend'deki karşılıkları `frontend/src/api/types.ts`.
+
+---
+
+## Kaynaklar
+
+Tam açıklamalı liste sunumun 19–23. slaytlarındadır: [1] Lewis 2020 · [2] Ahmed & Subhlok 2026 · [3] Takushima & Kakeshita 2026 · [4] Németh 2025 · [5] ALIVE · [6] LECTRA · [7] Intra-Video Temporal RAG · [8] ALCE · [9] RAGAs · [10] FActScore · [11] RAGTruth · [12] Olney 2023 · [13] Mucciaccia 2025 · [14] Chu 2025 · [15] TheoremExplainAgent · [16] LLM-as-a-Judge · [T1] NotebookLM · [T2] Khanmigo · [T3] DeepTutor · [T4] ChatGPT Projects · [D1] pgvector · [D2] multilingual-e5 · [G1] GitHub Projects.
