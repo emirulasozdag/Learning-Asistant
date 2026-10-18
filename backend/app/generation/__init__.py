@@ -5,5 +5,5 @@ Sorumluluk:
 - Tek pasajdan kaynak bağlantılı pratik soru üretimi (MCQ, kısa cevap, code tracing).
 - Rubrik + referans cevaba dayalı öğrenci cevabı değerlendirmesi ve takip sorusu.
 
-Henüz uygulanmadı.
+Durum: cite-or-decline cevap (`answer.py`) çalışıyor; pratik ve değerlendirme sonraki adım.
 """

@@ -2,8 +2,13 @@ import type {
   AnswerFeedback,
   AskRequest,
   AskResponse,
+  AskStreamEvent,
+  ChunkPreview,
+  CourseCreate,
   CourseSummary,
+  DocumentOut,
   LearningRecord,
+  MaterialType,
   MistakeSummary,
   PracticeItem,
   PracticeRequest,
@@ -22,13 +27,87 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     ...init,
   });
   if (!response.ok) {
-    throw new Error(`${response.status} ${response.statusText}`);
+    throw new Error(await errorMessage(response));
   }
   return response.json() as Promise<T>;
 }
 
+/** Backend'in `detail` mesajını (Türkçe) gösterir; yoksa HTTP durumunu. */
+async function errorMessage(response: Response): Promise<string> {
+  try {
+    const body = (await response.json()) as { detail?: unknown };
+    if (typeof body.detail === "string") return body.detail;
+  } catch {
+    // JSON olmayan hata gövdesi
+  }
+  return `İstek başarısız (${response.status})`;
+}
+
+/**
+ * /ask/stream: Server-Sent Events akışını okur, her olayı `onEvent` ile bildirir.
+ * `signal` ile iptal edilebilir.
+ */
+async function askStream(
+  body: AskRequest,
+  onEvent: (event: AskStreamEvent) => void,
+  signal?: AbortSignal,
+): Promise<void> {
+  const response = await fetch(`${BASE}/ask/stream`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    signal,
+  });
+  if (!response.ok || !response.body) {
+    throw new Error(await errorMessage(response));
+  }
+  const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+  let buffer = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += value;
+    let boundary = buffer.indexOf("\n\n");
+    while (boundary !== -1) {
+      const block = buffer.slice(0, boundary);
+      buffer = buffer.slice(boundary + 2);
+      const event = parseSseBlock(block);
+      if (event) onEvent(event);
+      boundary = buffer.indexOf("\n\n");
+    }
+  }
+}
+
+function parseSseBlock(block: string): AskStreamEvent | null {
+  let name = "";
+  let data = "";
+  for (const line of block.split("\n")) {
+    if (line.startsWith("event: ")) name = line.slice(7);
+    else if (line.startsWith("data: ")) data += line.slice(6);
+  }
+  if (!name || !data) return null;
+  const payload = JSON.parse(data);
+  switch (name) {
+    case "retrieval":
+      return { type: "retrieval", hits: payload };
+    case "delta":
+      return { type: "delta", text: payload.text };
+    case "done":
+      return { type: "done", response: payload };
+    case "error":
+      return { type: "error", detail: payload.detail };
+    default:
+      return null;
+  }
+}
+
 export const api = {
   courses: () => request<CourseSummary[]>("/courses"),
+
+  createCourse: (body: CourseCreate) =>
+    request<CourseSummary>("/courses", { method: "POST", body: JSON.stringify(body) }),
+
+  askStream,
 
   source: (sourceId: string) => request<SourceDetail>(`/sources/${encodeURIComponent(sourceId)}`),
 
@@ -61,13 +140,21 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
-  uploadMaterial: (courseId: number, materialType: string, file: File) => {
+  materials: (courseId: number) => request<DocumentOut[]>(`/courses/${courseId}/materials`),
+
+  documentChunks: (documentId: number) =>
+    request<ChunkPreview[]>(`/documents/${documentId}/chunks`),
+
+  deleteDocument: async (documentId: number) => {
+    const response = await fetch(`${BASE}/documents/${documentId}`, { method: "DELETE" });
+    if (!response.ok) throw new Error(await errorMessage(response));
+  },
+
+  uploadMaterial: (courseId: number, materialType: MaterialType, file: File, title?: string) => {
     const form = new FormData();
     form.append("material_type", materialType);
     form.append("file", file);
-    return request<{ document_id: number; chunk_count: number }>(
-      `/courses/${courseId}/materials`,
-      { method: "POST", body: form },
-    );
+    if (title) form.append("title", title);
+    return request<DocumentOut>(`/courses/${courseId}/materials`, { method: "POST", body: form });
   },
 };

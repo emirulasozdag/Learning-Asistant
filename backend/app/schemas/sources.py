@@ -3,6 +3,15 @@ from pydantic import BaseModel
 from app.schemas.materials import MaterialType
 
 
+class Highlight(BaseModel):
+    """Sayfa görüntüsü üzerinde alıntılanan satır; koordinatlar sayfaya oranla (0–1)."""
+
+    x: float
+    y: float
+    width: float
+    height: float
+
+
 class SourceDetail(BaseModel):
     """Kaynak görüntüleyicide açılacak alıntı: metin + sayfa veya video anı."""
 
@@ -15,3 +24,6 @@ class SourceDetail(BaseModel):
     t_start: float | None = None
     t_end: float | None = None
     media_url: str | None = None
+    # Yalnızca PDF: sayfanın görüntüsü ve alıntılanan satırların yeri.
+    page_image_url: str | None = None
+    highlights: list[Highlight] = []

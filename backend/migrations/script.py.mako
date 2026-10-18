@@ -8,6 +8,7 @@ Create Date: ${create_date}
 from typing import Sequence, Union
 
 from alembic import op
+import pgvector.sqlalchemy  # noqa: F401  (Vector sütunları için)
 import sqlalchemy as sa
 ${imports if imports else ""}
 
