@@ -6,5 +6,5 @@ class LocalLLMClient:
 
     name = "local"
 
-    def complete_json[T: BaseModel](self, prompt: str, schema: type[T]) -> T:
+    def complete_json[T: BaseModel](self, system: str, prompt: str, schema: type[T]) -> T:
         raise NotImplementedError

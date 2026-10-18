@@ -346,38 +346,40 @@ Her iterasyon 2 haftalık sprintlerden oluşur ve **aynı değerlendirme koşusu
 | Özellik başına iskelet (aşağıdaki tablo) | ✅ İmzalar + `NotImplementedError`; endpoint'ler `501` döner |
 | Endpoint'lerin var olduğunu ve 501 döndüğünü doğrulayan testler | ✅ `backend/tests/test_api_skeleton.py` |
 | DB bağlantısı + oturum (`db/session.py`) + Alembic kurulumu | ✅ `alembic upgrade head` çalışıyor |
-| DB tabloları (ORM modelleri) + ilk migration | ⏳ WP3 |
+| DB tabloları: Course, Document, Chunk + ilk migration | ✅ İlk demo (diğer varlıklar ilgili özelliklerle) |
 | Playwright UI testleri | ⏳ WP11 (test edilecek akış oluşunca) |
 | RAGAs / Locust | ⏳ WP13 / WP14 |
 | **Herhangi bir özellik mantığı** | ❌ Bilinçli olarak yok |
 
 ### 14.1 Fonksiyonel gereksinim → iskelet dosyası
 
-| FR | Backend | Endpoint (şu an 501) | Frontend |
-|---|---|---|---|
-| FR-01 Yükleme / parse | `ingestion/parsers/{pdf,pptx,vtt}_parser.py`, `ingestion/pipeline.py` | `POST /courses/{id}/materials` | `features/instructor/MaterialUpload` |
-| FR-02 Temizleme + chunking | `ingestion/cleaning.py`, `ingestion/chunking.py`, `ingestion/types.py` | ↑ | — |
-| FR-03 Transkript (whisper) | `ingestion/transcribe.py` | ↑ | — |
-| FR-04 Ders izolasyonu | `retrieval/dense.py`, `retrieval/lexical.py` (`course_id` filtresi) | — | — |
-| FR-05 Hibrit arama + RRF + rerank | `retrieval/{dense,lexical,fusion,rerank,hybrid}.py` | — | — |
-| FR-06 Video-zaman önceliği | `retrieval/video_time.py` | `POST /ask` (`video_time_s`) | `features/video/VideoPlayer` |
-| FR-07 Task router | `routing/router.py` | — | — |
-| FR-08 Model gateway | `llm/{base,local,hosted,gateway}.py` | — | — |
-| FR-09 Cite-or-decline | `generation/answer.py`, `verification/citations.py` | `POST /ask` | `features/qa/ChatPanel` |
-| FR-10 Takip soruları | `generation/conversation.py` | `POST /ask` (`conversation_id`) | `features/qa/ChatPanel` |
-| FR-11 Pratik üretimi | `generation/question.py` | `POST /practice` | `features/practice/PracticePanel` |
-| FR-12 Pratik kontrolleri | `verification/practice_checks.py` | ↑ | — |
-| FR-13 Cevap değerlendirme | `generation/grade.py` | `POST /practice/{id}/answer` | `features/feedback/FeedbackPanel` |
-| FR-13 Rubrik + referans cevap girişi | `instructor/rubrics.py` | `GET/POST /instructor/courses/{id}/rubrics` | `features/instructor/RubricEditor` |
-| FR-14 Claim kontrolü + hallucination log | `verification/{claims,judge,hallucination}.py` | — | — |
-| FR-15 Öğrenme kaydı | `learning/record.py` | `GET /courses/{id}/learning-record` | `features/learning/LearningRecordPanel` |
-| FR-16 Eğitmen görünümü | `instructor/{mistakes,review}.py` | `GET /instructor/courses/{id}/mistakes`, `POST /instructor/reviews` | `features/instructor/{FrequentMistakes,ReviewQueue}` |
-| FR-17 Erişim kontrolü | `auth/dependencies.py` (henüz endpoint'lere bağlı değil) | — | — |
-| FR-18 Öğrenci arayüzü | — | — | `pages/StudentPage`, `api/client.ts` |
-| FR-18 Kaynak görüntüleyici | `sources/lookup.py` | `GET /sources/{source_id}` | `features/sources/SourceViewer` |
-| Ders seçimi (ders-bağımsız tasarım) | `courses/service.py` | `GET /courses` | `features/courses/CourseSelector` |
-| Veritabanı | `db/{base,session,models}.py`, `migrations/` (Alembic) | — | — |
-| FR-19 Değerlendirme harness'i | `evaluation/harness/{run,conditions,judge_agreement}.py`, `evaluation/harness/metrics/*.py` (7 boyut + hedefler) | — | — |
+Durum (Sprint 1 sonu): ✅ çalışıyor · 🟡 basit ilk sürüm · ⬜ iskelet (501 / NotImplemented)
+
+| FR | Backend | Endpoint | Frontend | Durum |
+|---|---|---|---|---|
+| FR-01 Yükleme / parse | `ingestion/parsers/{pdf,pptx,vtt}_parser.py`, `ingestion/pipeline.py` | `POST /courses/{id}/materials` | `features/instructor/MaterialUpload` | ✅ PDF, PPTX · ⬜ VTT |
+| FR-02 Temizleme + chunking + embedding | `ingestion/{cleaning,chunking,pipeline}.py`, `embeddings/` | ↑ | `features/instructor/IngestionReportView` | ✅ |
+| FR-03 Transkript (whisper) | `ingestion/transcribe.py` | ↑ | — | ⬜ |
+| FR-04 Ders izolasyonu | `retrieval/dense.py`, `retrieval/lexical.py` (`course_id` filtresi) | — | — | ✅ |
+| FR-05 Hibrit arama + RRF + rerank | `retrieval/{dense,lexical,fusion,rerank,hybrid}.py` | — | — | ✅ e5 + pgvector + FTS + RRF; rerank ⬜ |
+| FR-06 Video-zaman önceliği | `retrieval/video_time.py` | `POST /ask` (`video_time_s`) | `features/video/VideoPlayer` | ⬜ |
+| FR-07 Task router | `routing/router.py` | — | — | ⬜ |
+| FR-08 Model gateway | `llm/{base,openrouter,hosted,local,gateway}.py` | — | — | 🟡 OpenRouter / Claude; kural tabanlı seçim ⬜ |
+| FR-09 Cite-or-decline | `generation/answer.py`, `verification/citations.py`, `qa/service.py` | `POST /ask`, `POST /ask/stream` | `features/qa/ChatPanel` | ✅ akışlı (SSE) |
+| FR-10 Takip soruları | `qa/service.py` (Conversation, Message tabloları) | `POST /ask` (`conversation_id`) | `features/qa/ChatPanel` | ✅ |
+| FR-11 Pratik üretimi | `generation/question.py` | `POST /practice` | `features/practice/PracticePanel` | ⬜ |
+| FR-12 Pratik kontrolleri | `verification/practice_checks.py` | ↑ | — | ⬜ |
+| FR-13 Cevap değerlendirme | `generation/grade.py` | `POST /practice/{id}/answer` | `features/feedback/FeedbackPanel` | ⬜ |
+| FR-13 Rubrik + referans cevap girişi | `instructor/rubrics.py` | `GET/POST /instructor/courses/{id}/rubrics` | `features/instructor/RubricEditor` | ⬜ |
+| FR-14 Claim kontrolü + hallucination log | `verification/{claims,judge,hallucination}.py` | — | — | ⬜ |
+| FR-15 Öğrenme kaydı | `learning/record.py` | `GET /courses/{id}/learning-record` | `features/learning/LearningRecordPanel` | ⬜ |
+| FR-16 Eğitmen görünümü | `instructor/{mistakes,review}.py` | `GET /instructor/courses/{id}/mistakes`, `POST /instructor/reviews` | `features/instructor/{FrequentMistakes,ReviewQueue}` | 🟡 doküman listesi, parça önizleme, yükleme raporu |
+| FR-17 Erişim kontrolü | `auth/dependencies.py` (henüz endpoint'lere bağlı değil) | — | — | ⬜ |
+| FR-18 Öğrenci arayüzü | — | — | `pages/StudentPage`, `api/client.ts` | 🟡 chat, kaynak, "Nasıl bulundu"; video ⬜ |
+| FR-18 Kaynak görüntüleyici | `sources/lookup.py`, `ingestion/rendering.py` (PDF sayfa görüntüsü + işaret) | `GET /sources/{source_id}` | `features/sources/SourceViewer` | ✅ |
+| Ders seçimi (ders-bağımsız tasarım) | `courses/service.py` | `GET/POST /courses` | `features/courses/{CourseSelector,NewCourseButton}` | ✅ |
+| Veritabanı | `db/{base,session,models}.py`, `migrations/` (Alembic) | — | — | ✅ |
+| FR-19 Değerlendirme harness'i | `evaluation/harness/{run,conditions,judge_agreement}.py`, `evaluation/harness/metrics/*.py` (7 boyut + hedefler) | — | — | ⬜ |
 | FR-20–22 (Iteration 2–4) | Bilinçli olarak iskelet yok | — | — |
 
 API sözleşmeleri `backend/app/schemas/` altında; frontend'deki karşılıkları `frontend/src/api/types.ts`.

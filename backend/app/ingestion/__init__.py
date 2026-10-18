@@ -2,7 +2,8 @@
 
 Sorumluluk: parse → clean → chunk; her parçaya sayfa / video-zaman metadata'sı.
 Kaynaklar: ders notu, slayt, ders kitabı alıntısı, geçmiş sınav, ders transkripti.
-Planlanan araçlar: PyMuPDF, python-pptx, webvtt-py, faster-whisper (altyazı yoksa).
+Araçlar: PyMuPDF (PDF), python-pptx (PPTX). Sonraki adım: webvtt-py ve faster-whisper
+ile transkriptler; embedding (dense arama için).
 
-Henüz uygulanmadı.
+Giriş noktası: `pipeline.ingest_document`.
 """

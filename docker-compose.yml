@@ -21,10 +21,30 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-learning}:${POSTGRES_PASSWORD:-learning}@db:5432/${POSTGRES_DB:-learning_assistant}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
+      LLM_PROVIDER: ${LLM_PROVIDER:-openrouter}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-anthropic/claude-opus-5.5}
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://openrouter.ai/api/v1}
+      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-e5}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-intfloat/multilingual-e5-base}
+      RETRIEVAL_MIN_SIMILARITY: ${RETRIEVAL_MIN_SIMILARITY:-0.78}
+    # Açılışta (hepsi tekrar çalıştırılabilir): şemayı güncelle, demo dersini oluştur,
+    # embedding modelini hazırla (ilk seferde ~1 GB indirir), vektörü eksik parçaları tamamla.
+    # Model indirildikten sonra internet gerekmez (HF_HUB_OFFLINE): sunumda bağlantı olmasa da açılır.
+    command: >
+      sh -c "alembic upgrade head && python -m app.scripts.seed_demo &&
+             (python -m app.scripts.download_models || echo 'Model indirilemedi; önbellek kullanılacak') &&
+             export HF_HUB_OFFLINE=1 && python -m app.scripts.reembed &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
     ports:
       - "${API_PORT:-8000}:8000"
     volumes:
       - ./backend/app:/code/app
+      - ./backend/migrations:/code/migrations
+      # Yüklenen ders materyalleri ve sayfa görüntüleri (git'e girmez)
+      - ./data:/code/data
+      # Embedding modeli: bir kez indirilir, sonra internetsiz kullanılır
+      - models:/models
     depends_on:
       db:
         condition: service_healthy
@@ -42,3 +62,4 @@ services:
 
 volumes:
   pgdata:
+  models:
