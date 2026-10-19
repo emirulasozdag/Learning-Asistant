@@ -6,6 +6,7 @@ import type { DocumentOut } from "../../api/types";
 import { useCourse, useCourses } from "../../features/courses/context";
 import AnswerBlock from "../../features/tutor/AnswerBlock";
 import Composer from "../../features/tutor/Composer";
+import { classifyFailure } from "../../features/tutor/outcome";
 import SourcePanel from "../../features/tutor/SourcePanel";
 import type { Turn } from "../../features/tutor/types";
 import { materialLabel } from "../../labels";
@@ -80,16 +81,20 @@ export default function TutorPage() {
             setConversationId(event.response.conversation_id);
             const first = event.response.citations[0];
             if (first) setSourceId(first.source_id);
-          } else updateTurn(id, (t) => ({ ...t, error: event.detail }));
+          } else {
+            // Akıştaki `error` olayı kod taşımıyor: veritabanı, arama ya da üretim hatasını
+            // ayıramayız. Hepsi "geçici sorun" olarak gösterilir, asla "konu derste yok" olarak değil.
+            updateTurn(id, (t) => ({ ...t, failure: { kind: "temporary" } }));
+          }
         },
         controller.signal,
       );
       updateTurn(id, (t) =>
-        t.response || t.error ? t : { ...t, error: "Bağlantı kesildi; tekrar dene." },
+        t.response || t.failure ? t : { ...t, failure: { kind: "unavailable" } },
       );
     } catch (reason) {
       if (!controller.signal.aborted) {
-        updateTurn(id, (t) => ({ ...t, error: reason instanceof Error ? reason.message : String(reason) }));
+        updateTurn(id, (t) => ({ ...t, failure: classifyFailure(reason) }));
       }
     } finally {
       setBusy(false);
@@ -102,6 +107,13 @@ export default function TutorPage() {
     setConversationId(null);
     setSourceId(null);
     setBusy(false);
+  }
+
+  /** Başarısız ya da üretilemeyen soruyu aynı metinle yeniden sorar; eski deneme listeden çıkar. */
+  function retry(turn: Turn) {
+    if (busy) return;
+    setTurns((list) => list.filter((item) => item.id !== turn.id));
+    void ask(turn.question);
   }
 
   function quickAction(action: QuickAction) {
@@ -174,6 +186,7 @@ export default function TutorPage() {
                       isLatest={index === turns.length - 1}
                       onQuickAction={quickAction}
                       onPractice={() => practice(turn.question)}
+                      onRetry={() => retry(turn)}
                       selectedSourceId={sourceId}
                       onSelectSource={setSourceId}
                     />
