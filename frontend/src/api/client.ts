@@ -21,13 +21,46 @@ import type {
 // Vite proxy /api önekini backend'e yönlendirir (vite.config.ts).
 const BASE = "/api";
 
+/**
+ * API hatası. `message` eskisi gibi okunur (backend'in `detail` metni ya da tarayıcının
+ * hata metni); `kind` hatanın nereden geldiğini ayırt eder:
+ * - "network": istek sunucuya ulaşmadı,
+ * - "http": sunucu hata koduyla cevap verdi (`status`),
+ * - "stream": cevap akışı bozuldu ya da yarıda kesildi.
+ */
+export class ApiError extends Error {
+  readonly kind: "network" | "http" | "stream";
+  readonly status?: number;
+
+  constructor(message: string, kind: "network" | "http" | "stream", status?: number) {
+    super(message);
+    this.name = "ApiError";
+    this.kind = kind;
+    this.status = status;
+  }
+}
+
+/** `fetch` ile aynı; ağ hatasını `ApiError("network")` yapar. İptal (abort) olduğu gibi geçer. */
+async function send(input: string, init?: RequestInit): Promise<Response> {
+  try {
+    return await fetch(input, init);
+  } catch (reason) {
+    if (init?.signal?.aborted) throw reason;
+    throw new ApiError(reason instanceof Error ? reason.message : String(reason), "network");
+  }
+}
+
+async function httpError(response: Response): Promise<ApiError> {
+  return new ApiError(await errorMessage(response), "http", response.status);
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${BASE}${path}`, {
+  const response = await send(`${BASE}${path}`, {
     headers: init?.body instanceof FormData ? undefined : { "Content-Type": "application/json" },
     ...init,
   });
   if (!response.ok) {
-    throw new Error(await errorMessage(response));
+    throw await httpError(response);
   }
   return response.json() as Promise<T>;
 }
@@ -52,29 +85,35 @@ async function askStream(
   onEvent: (event: AskStreamEvent) => void,
   signal?: AbortSignal,
 ): Promise<void> {
-  const response = await fetch(`${BASE}/ask/stream`, {
+  const response = await send(`${BASE}/ask/stream`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
     signal,
   });
   if (!response.ok || !response.body) {
-    throw new Error(await errorMessage(response));
+    throw await httpError(response);
   }
   const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
   let buffer = "";
-  for (;;) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buffer += value;
-    let boundary = buffer.indexOf("\n\n");
-    while (boundary !== -1) {
-      const block = buffer.slice(0, boundary);
-      buffer = buffer.slice(boundary + 2);
-      const event = parseSseBlock(block);
-      if (event) onEvent(event);
-      boundary = buffer.indexOf("\n\n");
+  try {
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += value;
+      let boundary = buffer.indexOf("\n\n");
+      while (boundary !== -1) {
+        const block = buffer.slice(0, boundary);
+        buffer = buffer.slice(boundary + 2);
+        const event = parseSseBlock(block);
+        if (event) onEvent(event);
+        boundary = buffer.indexOf("\n\n");
+      }
     }
+  } catch (reason) {
+    if (signal?.aborted || reason instanceof ApiError) throw reason;
+    // Akış yarıda koptu (bağlantı düştü, sunucu kapandı).
+    throw new ApiError(reason instanceof Error ? reason.message : String(reason), "stream");
   }
 }
 
@@ -86,7 +125,12 @@ function parseSseBlock(block: string): AskStreamEvent | null {
     else if (line.startsWith("data: ")) data += line.slice(6);
   }
   if (!name || !data) return null;
-  const payload = JSON.parse(data);
+  let payload;
+  try {
+    payload = JSON.parse(data);
+  } catch {
+    throw new ApiError("Cevap akışı okunamadı", "stream");
+  }
   switch (name) {
     case "retrieval":
       return { type: "retrieval", hits: payload };
@@ -109,7 +153,8 @@ export const api = {
 
   askStream,
 
-  source: (sourceId: string) => request<SourceDetail>(`/sources/${encodeURIComponent(sourceId)}`),
+  source: (sourceId: string, signal?: AbortSignal) =>
+    request<SourceDetail>(`/sources/${encodeURIComponent(sourceId)}`, { signal }),
 
   ask: (body: AskRequest) =>
     request<AskResponse>("/ask", { method: "POST", body: JSON.stringify(body) }),
@@ -140,14 +185,15 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
-  materials: (courseId: number) => request<DocumentOut[]>(`/courses/${courseId}/materials`),
+  materials: (courseId: number, signal?: AbortSignal) =>
+    request<DocumentOut[]>(`/courses/${courseId}/materials`, { signal }),
 
   documentChunks: (documentId: number) =>
     request<ChunkPreview[]>(`/documents/${documentId}/chunks`),
 
   deleteDocument: async (documentId: number) => {
-    const response = await fetch(`${BASE}/documents/${documentId}`, { method: "DELETE" });
-    if (!response.ok) throw new Error(await errorMessage(response));
+    const response = await send(`${BASE}/documents/${documentId}`, { method: "DELETE" });
+    if (!response.ok) throw await httpError(response);
   },
 
   uploadMaterial: (courseId: number, materialType: MaterialType, file: File, title?: string) => {

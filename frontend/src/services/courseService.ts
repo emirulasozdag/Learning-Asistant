@@ -27,8 +27,8 @@ export const courseService = {
     return withStats(await api.createCourse(input));
   },
 
-  materials(courseId: number): Promise<DocumentOut[]> {
-    return api.materials(courseId);
+  materials(courseId: number, signal?: AbortSignal): Promise<DocumentOut[]> {
+    return api.materials(courseId, signal);
   },
 
   uploadMaterial(courseId: number, type: MaterialType, file: File): Promise<DocumentOut> {

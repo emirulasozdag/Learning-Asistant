@@ -1,44 +1,70 @@
 import { ExternalLink, FileText, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { ApiError } from "../../api/client";
 import type { Highlight, SourceDetail } from "../../api/types";
 import Sheet from "../../components/Sheet";
 import { materialLabel } from "../../labels";
 import { tutorService } from "../../services/tutorService";
 import { reflow } from "../../text";
+import Button from "../../ui/Button";
 import { buttonClasses } from "../../ui/buttonStyles";
 import EmptyState from "../../ui/EmptyState";
 import IconButton from "../../ui/IconButton";
 import Skeleton from "../../ui/Skeleton";
 
-/** Seçilen alıntının ders materyalindeki yeri: gerçek PDF sayfası + işaretli satırlar. */
-export default function SourcePanel({ sourceId, onClose }: { sourceId: string; onClose: () => void }) {
+/**
+ * Seçilen alıntının ders materyalindeki yeri: gerçek PDF sayfası + işaretli satırlar.
+ * Kaynak değişince dışarıdan `key` ile yeniden oluşturulur; eski içerik ve hata kalmaz.
+ * `modal`: dar ekranda diyalogun içinde açılır (kök eleman `aside` değil `div`).
+ */
+export default function SourcePanel({
+  sourceId,
+  onClose,
+  modal = false,
+}: {
+  sourceId: string;
+  onClose: () => void;
+  modal?: boolean;
+}) {
   const [source, setSource] = useState<SourceDetail | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  /** "missing": kaynak yok (404), tekrar denemek işe yaramaz. "failed": ulaşılamadı. */
+  const [failure, setFailure] = useState<"missing" | "failed" | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
+    const controller = new AbortController();
     tutorService
-      .source(sourceId)
+      .source(sourceId, controller.signal)
       .then((detail) => {
-        if (!cancelled) {
-          setSource(detail);
-          setError(null);
-        }
+        if (!cancelled) setSource(detail);
       })
       .catch((reason: unknown) => {
-        if (!cancelled) setError(reason instanceof Error ? reason.message : String(reason));
+        if (cancelled) return;
+        setFailure(reason instanceof ApiError && reason.status === 404 ? "missing" : "failed");
       });
     return () => {
       cancelled = true;
+      controller.abort();
     };
-  }, [sourceId]);
+  }, [sourceId, attempt]);
+
+  function retry() {
+    setFailure(null);
+    setAttempt((count) => count + 1);
+  }
 
   const current = source?.source_id === sourceId ? source : null;
   const isPdf = Boolean(current?.page_image_url);
+  const Root = modal ? "div" : "aside";
 
   return (
-    <aside aria-label="Kaynak" className="flex h-full min-h-0 flex-col bg-canvas">
+    <Root
+      aria-label={modal ? undefined : "Kaynak"}
+      onKeyDown={modal ? undefined : (event) => event.key === "Escape" && onClose()}
+      className="flex h-full min-h-0 flex-col bg-canvas"
+    >
       <header className="flex h-14 shrink-0 items-center gap-3 border-b border-line bg-surface px-4">
         <FileText size={16} aria-hidden className="shrink-0 text-graphite" />
         <div className="min-w-0 flex-1">
@@ -50,7 +76,7 @@ export default function SourcePanel({ sourceId, onClose }: { sourceId: string; o
                 {current.page ? `, sayfa ${current.page}` : ""}
               </p>
             </>
-          ) : (
+          ) : failure ? null : (
             <div className="flex flex-col gap-1.5">
               <Skeleton className="h-3 w-40" />
               <Skeleton className="h-2.5 w-24" />
@@ -72,8 +98,20 @@ export default function SourcePanel({ sourceId, onClose }: { sourceId: string; o
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-5">
-        {error ? (
-          <EmptyState icon={FileText} tone="danger" title="Kaynak açılamadı" description={error} />
+        {failure ? (
+          <div role="alert">
+            <EmptyState
+              icon={FileText}
+              tone="danger"
+              title={failure === "missing" ? "Kaynak bulunamadı" : "Kaynak açılamadı"}
+              description={
+                failure === "missing"
+                  ? "Bu bölüm materyalden kaldırılmış olabilir."
+                  : "Kaynak şu an yüklenemedi. Bağlantını kontrol edip tekrar dene."
+              }
+              action={failure === "failed" ? <Button onClick={retry}>Tekrar dene</Button> : undefined}
+            />
+          </div>
         ) : !current ? (
           <Skeleton className="aspect-[1/1.3] w-full" />
         ) : isPdf ? (
@@ -86,8 +124,8 @@ export default function SourcePanel({ sourceId, onClose }: { sourceId: string; o
             />
             <p className="mt-3 text-sm text-graphite">
               {current.highlights.length > 0
-                ? "İşaretli satırlar cevabın dayandığı bölümdür."
-                : "Cevabın dayandığı bölüm bu sayfada."}
+                ? "İşaretli satırlar cevapta kullanılan bölümü gösterir. Cevapla karşılaştırıp kontrol et."
+                : "Cevapta kullanılan bölüm bu sayfada. Sayfayı okuyup cevapla karşılaştır."}
             </p>
             <details className="mt-4">
               <summary className="cursor-pointer text-sm text-graphite hover:text-ink">
@@ -110,7 +148,7 @@ export default function SourcePanel({ sourceId, onClose }: { sourceId: string; o
           </Sheet>
         )}
       </div>
-    </aside>
+    </Root>
   );
 }
 
