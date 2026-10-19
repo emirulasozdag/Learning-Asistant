@@ -1,4 +1,4 @@
-import { ArrowUpRight, BookOpen, ServerOff, ShieldCheck, SquarePen } from "lucide-react";
+import { ArrowUpRight, BookOpen, ServerOff, SquarePen } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 
@@ -6,9 +6,10 @@ import type { DocumentOut } from "../../api/types";
 import { useCourse, useCourses } from "../../features/courses/context";
 import AnswerBlock from "../../features/tutor/AnswerBlock";
 import Composer from "../../features/tutor/Composer";
-import { classifyFailure } from "../../features/tutor/outcome";
-import SourcePanel from "../../features/tutor/SourcePanel";
+import { classifyFailure, describeTurn } from "../../features/tutor/outcome";
+import SourceViewer from "../../features/tutor/SourceViewer";
 import type { Turn } from "../../features/tutor/types";
+import { isDesktopNow } from "../../features/tutor/useIsDesktop";
 import { materialLabel } from "../../labels";
 import { courseService, type Course } from "../../services/courseService";
 import { tutorService, type QuickAction } from "../../services/tutorService";
@@ -139,7 +140,8 @@ function TutorSession({ course }: { course: Course }) {
             updateTurn(id, (t) => ({ ...t, response: event.response }));
             setConversationId(event.response.conversation_id);
             const first = event.response.citations[0];
-            if (first) setSourceId(first.source_id);
+            // Dar ekranda kaynak tam ekran açılır; öğrenci istemeden cevabın üstünü örtmesin.
+            if (first && isDesktopNow()) setSourceId(first.source_id);
           } else {
             // Akıştaki `error` olayı kod taşımıyor: veritabanı, arama ya da üretim hatasını
             // ayıramayız. Hepsi "geçici sorun" olarak gösterilir, asla "konu derste yok" olarak değil.
@@ -205,8 +207,8 @@ function TutorSession({ course }: { course: Course }) {
                 sourceId ? "lg:hidden 2xl:flex" : ""
               }`}
             >
-              <ShieldCheck size={14} aria-hidden className="text-accent" />
-              Yalnızca bu dersin materyalinden cevaplar
+              <BookOpen size={14} aria-hidden className="text-graphite" />
+              Cevaplar bu dersin materyaline dayandırılır
             </span>
             {turns.length > 0 && (
               <Button size="sm" variant="ghost" icon={SquarePen} onClick={newConversation}>
@@ -264,25 +266,18 @@ function TutorSession({ course }: { course: Course }) {
                     ? "Takip sorusu sor"
                     : "Bu ders hakkında bir soru sor"
               }
-              hint="Cevaplar ders materyaline dayanır; önemli konularda kaynağını kontrol et."
+              hint="Cevaplar ders materyalindeki bölümlere dayandırılır; önemli konularda kaynağı açıp kontrol et."
             />
           </div>
         </div>
       </section>
 
-      {sourceId && (
-        <>
-          <div className="hidden w-[min(46%,560px)] shrink-0 border-l border-line lg:block">
-            <SourcePanel sourceId={sourceId} onClose={() => setSourceId(null)} />
-          </div>
-          <div className="fixed inset-0 z-40 lg:hidden">
-            <div className="fade-in absolute inset-0 bg-ink/25" onClick={() => setSourceId(null)} aria-hidden />
-            <div className="slide-in-right absolute inset-y-0 right-0 w-full max-w-md shadow-float">
-              <SourcePanel sourceId={sourceId} onClose={() => setSourceId(null)} />
-            </div>
-          </div>
-        </>
-      )}
+      {sourceId && <SourceViewer sourceId={sourceId} onClose={() => setSourceId(null)} />}
+
+      {/* Ekran okuyucu için durum duyurusu: yalnızca durum değişince güncellenir. */}
+      <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
+        {turns.length > 0 ? describeTurn(turns[turns.length - 1]) : ""}
+      </div>
     </div>
   );
 }
@@ -329,8 +324,8 @@ function TutorWelcome({
       <h1 className="text-2xl font-semibold tracking-tight text-ink">{course.name} dersine sor</h1>
       <p className="mt-2 text-md text-graphite">
         {materials
-          ? `Cevaplar bu dersin ${materials.length} dokümanından (${pages} sayfa) gelir ve her bilgi dayandığı sayfaya bağlanır. Materyalde olmayan bir şeye cevap uydurmaz.`
-          : "Cevaplar yalnızca bu dersin materyalinden gelir ve her bilgi dayandığı sayfaya bağlanır."}
+          ? `Cevaplar bu dersin ${materials.length} dokümanındaki (${pages} sayfa) bölümlere dayandırılır ve kaynak sayfaları gösterilir. Yine de önemli konularda kaynağı açıp kontrol et.`
+          : "Cevaplar bu dersin materyalindeki bölümlere dayandırılır ve kaynak sayfaları gösterilir. Önemli konularda kaynağı açıp kontrol et."}
       </p>
 
       <h2 className="mt-10 mb-2 text-sm text-graphite">Buradan başlayabilirsin</h2>

@@ -14,7 +14,7 @@ import { reflow } from "../../text";
 import Button from "../../ui/Button";
 import { LogoMark } from "../../ui/Logo";
 import CitedText from "./CitedText";
-import { classifyResponse } from "./outcome";
+import { classifyResponse, declineExplanation } from "./outcome";
 import RetrievalDetails from "./RetrievalDetails";
 import SourceCards from "./SourceCards";
 import type { SelectSourceProps, Turn, TutorFailure } from "./types";
@@ -104,7 +104,7 @@ function Body({ turn, isLatest, onQuickAction, onPractice, onRetry, ...select }:
   if (turn.stopped) {
     // Yarım kalan metin gösterilmez: kaynakları doğrulanmadan bırakılmıştır.
     return (
-      <div role="status" className="flex flex-col items-start gap-3">
+      <div className="flex flex-col items-start gap-3">
         <p className="flex items-center gap-2 text-base text-graphite">
           <CircleSlash size={16} aria-hidden />
           Durduruldu
@@ -134,7 +134,7 @@ function Body({ turn, isLatest, onQuickAction, onPractice, onRetry, ...select }:
       );
     }
     return (
-      <p role="status" className="flex h-7 items-center gap-2 text-base text-graphite">
+      <p className="flex h-7 items-center gap-2 text-base text-graphite">
         {turn.hits
           ? `${turn.hits.length} ilgili bölüm bulundu, cevap hazırlanıyor`
           : "Ders materyalinde aranıyor"}
@@ -184,7 +184,7 @@ function Body({ turn, isLatest, onQuickAction, onPractice, onRetry, ...select }:
             <SearchX size={16} aria-hidden className="text-graphite" />
             Bu soru için ders materyalinde yeterli bilgi bulunamadı
           </p>
-          <p className="mt-1 text-base text-graphite">{response.decline_reason}</p>
+          <p className="mt-1 text-base text-graphite">{declineExplanation(response)}</p>
         </div>
         {response.suggested_sources.length > 0 && (
           <div>

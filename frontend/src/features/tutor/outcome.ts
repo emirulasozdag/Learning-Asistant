@@ -1,6 +1,6 @@
 import { ApiError } from "../../api/client";
 import type { AskResponse } from "../../api/types";
-import type { TutorFailure } from "./types";
+import type { TutorFailure, Turn } from "./types";
 
 /** Öğrenciye gösterilen sonucun türü. Her tür farklı bir şey söyler ve farklı bir şey önerir. */
 export type ResponseOutcome =
@@ -19,6 +19,8 @@ export type ResponseOutcome =
 // eşleştirme silinip o alan kullanılacak.
 const DECLINE_UNSUPPORTED = "Cevap ders kaynaklarına dayandırılamadı; bu yüzden gösterilmedi.";
 const DECLINE_REFUSED = "Model bu soruyu yanıtlamadı.";
+const DECLINE_NOT_COVERED =
+  "Bu konu ders materyalinde yer almıyor; cevap uydurmamak için yanıt verilmedi.";
 
 /**
  * Backend cevabını öğrenciye gösterilecek türe çevirir.
@@ -36,6 +38,43 @@ export function classifyResponse(response: AskResponse): ResponseOutcome {
     return "not_generated";
   }
   return "out_of_scope";
+}
+
+/**
+ * Kapsam dışı retin öğrenciye gösterilecek açıklaması. Backend'in sabit cümlesi kesin bir
+ * iddia ("yer almıyor") içerdiği için yerine sade bir yönlendirme gelir; modelin kendi yazdığı
+ * eksik-bilgi cümlesi olduğu gibi gösterilir. GEÇİCİ: `classifyResponse` ile birlikte,
+ * backend ret kodu gelince sadeleşecek.
+ */
+export function declineExplanation(response: AskResponse): string {
+  const reason = response.decline_reason;
+  if (reason && reason !== DECLINE_NOT_COVERED) return reason;
+  return "Soruyu farklı kelimelerle sormayı dene. Ders materyalinde bu konuya yetecek bir bölüm bulamadık.";
+}
+
+/**
+ * Ekran okuyucuya duyurulacak durum cümlesi. Yalnızca durum değişince değişir: akan metnin
+ * her parçası duyurulmaz. Hatalar `role="alert"` ile ayrıca duyurulduğu için burada boştur.
+ */
+export function describeTurn(turn: Turn): string {
+  if (turn.failure) return "";
+  if (turn.stopped) return "Durduruldu.";
+  const { response } = turn;
+  if (response) {
+    switch (classifyResponse(response)) {
+      case "answered":
+        return `Cevap hazır. ${response.citations.length} kaynak gösterildi.`;
+      case "ai_unavailable":
+        return "Yapay zekâ şu an kullanılamıyor; ders materyalindeki ilgili bölüm gösterildi.";
+      case "not_generated":
+        return "Cevap hazırlanamadı.";
+      case "out_of_scope":
+        return "Bu soru için ders materyalinde yeterli bilgi bulunamadı.";
+    }
+  }
+  if (turn.streamText) return "Cevap yazılıyor.";
+  if (turn.hits) return "İlgili bölümler bulundu, cevap hazırlanıyor.";
+  return "Ders materyalinde aranıyor.";
 }
 
 /**
