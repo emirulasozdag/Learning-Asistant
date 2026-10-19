@@ -5,6 +5,7 @@ import {
   RotateCcw,
   SearchX,
   ServerOff,
+  ShieldCheck,
   Target,
   WandSparkles,
 } from "lucide-react";
@@ -121,7 +122,7 @@ function Body({ turn, isLatest, onQuickAction, onPractice, onRetry, ...select }:
       // Doğrulanmış cevap (`done`) geldiğinde tamamen onun yerini alır.
       return (
         <div aria-busy="true">
-          <p role="status" className="mb-1.5 flex items-center gap-1.5 text-sm text-graphite">
+          <p className="mb-1.5 flex items-center gap-1.5 text-sm text-graphite">
             <ShieldCheck size={14} aria-hidden className="text-accent" />
             Kaynaklarla kontrol ediliyor…
           </p>

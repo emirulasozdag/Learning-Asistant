@@ -13,38 +13,34 @@ export type ResponseOutcome =
   /** Soru için ders materyalinde yeterli bilgi yok. */
   | "out_of_scope";
 
-// GEÇİCİ: backend şimdilik ret nedenini yalnızca metin olarak veriyor. Bu sabitler
-// backend/app/generation/answer.py içindeki UNSUPPORTED / REFUSED / NOT_COVERED ile birebir
-// aynı olmalı. Backend `AskResponse`'a bir kod alanı (ör. `decline_code`) eklediğinde bu
-// eşleştirme silinip o alan kullanılacak.
-const DECLINE_UNSUPPORTED = "Cevap ders kaynaklarına dayandırılamadı; bu yüzden gösterilmedi.";
-const DECLINE_REFUSED = "Model bu soruyu yanıtlamadı.";
+// Backend'in "materyalde yok" sabit cümlesi; öğrenciye yerine sade bir yönlendirme gösterilir.
 const DECLINE_NOT_COVERED =
   "Bu konu ders materyalinde yer almıyor; cevap uydurmamak için yanıt verilmedi.";
 
 /**
- * Backend cevabını öğrenciye gösterilecek türe çevirir.
- *
- * `mode === "extractive"` yapısal işarettir (yapay zekâ yok). Retlerde yalnızca
- * `decline_reason` ayırt edici: UNSUPPORTED ve REFUSED, soru ilgisizlik kapısını
- * geçtikten sonra üretimde oluşur. Benzerlik değerine (`best_similarity`) bakılmaz, çünkü
- * kelime eşleşmesiyle kapıyı geçen düşük benzerlikli bir soruda da bu retler çıkabilir
- * ve "kapsam dışı" diye yanlış etiketlenirdi. Geri kalan her ret (kapıda elenen ya da
- * modelin "materyalde yok" demesi) kapsam dışıdır.
+ * Backend cevabını öğrenciye gösterilecek türe çevirir; backend'in `outcome` alanını kullanır.
+ * - provider_failure ya da LLM'siz mod (extractive): yapay zekâ yok, ilgili bölüm gösterildi
+ * - unsupported / model_refusal: kaynak bulundu ama dayanaklı cevap üretilemedi
+ * - insufficient_evidence: soru için materyalde yeterli bilgi yok
  */
 export function classifyResponse(response: AskResponse): ResponseOutcome {
-  if (!response.declined) return response.mode === "extractive" ? "ai_unavailable" : "answered";
-  if (response.decline_reason === DECLINE_UNSUPPORTED || response.decline_reason === DECLINE_REFUSED) {
-    return "not_generated";
+  switch (response.outcome) {
+    case "answered":
+      return response.mode === "extractive" ? "ai_unavailable" : "answered";
+    case "provider_failure":
+      return "ai_unavailable";
+    case "unsupported":
+    case "model_refusal":
+      return "not_generated";
+    case "insufficient_evidence":
+      return "out_of_scope";
   }
-  return "out_of_scope";
 }
 
 /**
  * Kapsam dışı retin öğrenciye gösterilecek açıklaması. Backend'in sabit cümlesi kesin bir
  * iddia ("yer almıyor") içerdiği için yerine sade bir yönlendirme gelir; modelin kendi yazdığı
- * eksik-bilgi cümlesi olduğu gibi gösterilir. GEÇİCİ: `classifyResponse` ile birlikte,
- * backend ret kodu gelince sadeleşecek.
+ * eksik-bilgi cümlesi olduğu gibi gösterilir.
  */
 export function declineExplanation(response: AskResponse): string {
   const reason = response.decline_reason;
