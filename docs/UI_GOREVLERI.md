@@ -1,5 +1,11 @@
 # Arayüz: tasarım sistemi ve ekip görevleri
 
+> **Güncelleme:** Ürün sürümünde mock veriler ve "geliştiriliyor" sayfaları kaldırıldı (plan
+> kuralı #6). Görev A ve C gerçek materyal verisiyle yapıldı. Görev B ve D'nin sayfaları,
+> route'ları ve mock dosyaları silindi. Bu ekranlar, backend API'leri hazır olunca ilgili sprint
+> issue'larıyla (#12, #17, #22…) gerçek veriyle eklenecek. Aşağıdaki görev listesi geçmiş kayıt
+> olarak duruyor; tasarım kuralları (bölüm 1) geçerli.
+
 Uygulamanın ilk profesyonel sürümünde tasarım sistemi, iskelet, giriş/kayıt, **AI Tutor** ve
 **Materyaller** ekranları hazır. Aşağıdaki dört ekran ekibe kaldı. Her biri için sayfa dosyası,
 route'u ve mock verisi hazır; yeni bir şey kurmanıza gerek yok, yalnızca sayfanın içini doldurun.

@@ -42,9 +42,9 @@ export default function MaterialsTable({
         <tr>
           <TH>Dosya</TH>
           <TH className="hidden md:table-cell">Tür</TH>
-          <TH className="hidden lg:table-cell">Yüklendi</TH>
+          <TH className="hidden xl:table-cell">Yüklendi</TH>
           <TH className="hidden sm:table-cell">İçerik</TH>
-          <TH>Durum</TH>
+          <TH className="hidden sm:table-cell">Durum</TH>
           <TH className="w-20">
             <span className="sr-only">İşlemler</span>
           </TH>
@@ -66,10 +66,10 @@ export default function MaterialsTable({
                 </div>
               </div>
             </TD>
-            <TD className="hidden text-graphite md:table-cell">{materialLabel(upload.type)}</TD>
-            <TD className="hidden text-graphite lg:table-cell">şimdi</TD>
+            <TD className="hidden whitespace-nowrap text-graphite md:table-cell">{materialLabel(upload.type)}</TD>
+            <TD className="hidden text-graphite xl:table-cell">şimdi</TD>
             <TD className="hidden text-graphite sm:table-cell">—</TD>
-            <TD>
+            <TD className="hidden sm:table-cell">
               <StatusBadge status={upload.status} />
             </TD>
             <TD>
@@ -108,14 +108,14 @@ export default function MaterialsTable({
                 </div>
               </div>
             </TD>
-            <TD className="hidden text-ink-2 md:table-cell">{materialLabel(document.material_type)}</TD>
-            <TD className="hidden whitespace-nowrap text-graphite lg:table-cell">
+            <TD className="hidden whitespace-nowrap text-ink-2 md:table-cell">{materialLabel(document.material_type)}</TD>
+            <TD className="hidden whitespace-nowrap text-graphite xl:table-cell">
               {formatRelative(document.created_at)}
             </TD>
             <TD className="hidden whitespace-nowrap text-graphite tabular-nums sm:table-cell">
               {document.page_count} sayfa, {document.chunk_count} parça
             </TD>
-            <TD>
+            <TD className="hidden sm:table-cell">
               <StatusBadge status="indexed" />
             </TD>
             <TD>

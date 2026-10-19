@@ -1,22 +1,12 @@
-/**
- * Dersler ve materyaller. Ders listesi, oluşturma ve materyal işlemleri GERÇEK API;
- * öğrenci/soru sayıları şimdilik mock (öğrenme kaydı backend'i henüz yok).
- */
+/** Dersler ve materyaller: tamamı gerçek API. */
 import { api } from "../api/client";
-import type { CourseCreate, CourseSummary, DocumentOut, MaterialType } from "../api/types";
-import { COURSE_STATS, DEFAULT_COURSE_STATS, type CourseStats } from "../mock/courseStats";
+import type { CourseCreate, CourseSummary, CourseUpdate, DocumentOut, MaterialType } from "../api/types";
 
-export interface Course extends CourseSummary {
-  stats: CourseStats;
-}
-
-function withStats(course: CourseSummary): Course {
-  return { ...course, stats: COURSE_STATS[course.code] ?? DEFAULT_COURSE_STATS };
-}
+export type Course = CourseSummary;
 
 export const courseService = {
   async list(): Promise<Course[]> {
-    return (await api.courses()).map(withStats);
+    return api.courses();
   },
 
   async get(courseId: number): Promise<Course | null> {
@@ -24,7 +14,11 @@ export const courseService = {
   },
 
   async create(input: CourseCreate): Promise<Course> {
-    return withStats(await api.createCourse(input));
+    return api.createCourse(input);
+  },
+
+  update(courseId: number, input: CourseUpdate): Promise<Course> {
+    return api.updateCourse(courseId, input);
   },
 
   materials(courseId: number, signal?: AbortSignal): Promise<DocumentOut[]> {

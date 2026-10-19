@@ -1,4 +1,4 @@
-import { CircleAlert, FileStack } from "lucide-react";
+import { CircleAlert, ServerOff } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router";
 
@@ -6,38 +6,48 @@ import type { DocumentOut, IngestionReport } from "../../api/types";
 import DocumentDrawer from "../../features/materials/DocumentDrawer";
 import Dropzone from "../../features/materials/Dropzone";
 import MaterialsTable, { type PendingUpload } from "../../features/materials/MaterialsTable";
+import { useCourseOutlet } from "../../features/courses/courseOutlet";
 import { courseService, guessMaterialType } from "../../services/courseService";
 import Button from "../../ui/Button";
 import Dialog from "../../ui/Dialog";
 import EmptyState from "../../ui/EmptyState";
+import PageTitle from "../../ui/PageTitle";
 import { SkeletonRows } from "../../ui/Skeleton";
+import { useToast } from "../../ui/toast/context";
 
 /** Dersin bilgi tabanı: yükle → parçala → vektörleştir; AI Tutor yalnızca buradan cevap verir. */
 export default function MaterialsPage() {
   const courseId = Number(useParams().courseId);
+  const toast = useToast();
+  const { reloadDocuments } = useCourseOutlet();
   const [documents, setDocuments] = useState<DocumentOut[] | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [pending, setPending] = useState<PendingUpload[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const [reports, setReports] = useState<Record<number, IngestionReport>>({});
   const [openDocument, setOpenDocument] = useState<DocumentOut | null>(null);
   const [toDelete, setToDelete] = useState<DocumentOut | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    let cancelled = false;
+    const controller = new AbortController();
     courseService
-      .materials(courseId)
+      .materials(courseId, controller.signal)
       .then((list) => {
-        if (!cancelled) setDocuments(list);
+        if (!controller.signal.aborted) setDocuments(list);
       })
-      .catch((reason: unknown) => {
-        if (!cancelled) setLoadError(reason instanceof Error ? reason.message : String(reason));
+      .catch(() => {
+        if (!controller.signal.aborted) setLoadFailed(true);
       });
-    return () => {
-      cancelled = true;
-    };
-  }, [courseId]);
+    return () => controller.abort();
+  }, [courseId, attempt]);
+
+  function reload() {
+    setLoadFailed(false);
+    setDocuments(null);
+    setAttempt((value) => value + 1);
+  }
 
   const upload = useCallback(
     async (item: PendingUpload) => {
@@ -48,6 +58,12 @@ export default function MaterialsPage() {
         const document = await courseService.uploadMaterial(courseId, item.type, item.file);
         setPending((list) => list.filter((p) => p.key !== item.key));
         setDocuments((list) => [document, ...(list ?? [])]);
+        reloadDocuments();
+        toast.show({
+          tone: "success",
+          title: `${document.title} yüklendi`,
+          description: `${document.page_count} sayfa, ${document.chunk_count} parça; öğrenciler artık bu dokümandan soru sorabilir.`,
+        });
         if (document.report) {
           const report = document.report;
           setReports((map) => ({ ...map, [document.id]: report }));
@@ -57,9 +73,10 @@ export default function MaterialsPage() {
         setPending((list) =>
           list.map((p) => (p.key === item.key ? { ...p, status: "failed", error: message } : p)),
         );
+        toast.show({ tone: "danger", title: `${item.file.name} yüklenemedi`, description: message });
       }
     },
-    [courseId],
+    [courseId, toast, reloadDocuments],
   );
 
   async function addFiles(files: File[]) {
@@ -82,6 +99,8 @@ export default function MaterialsPage() {
       await courseService.deleteMaterial(toDelete.id);
       setDocuments((list) => list?.filter((d) => d.id !== toDelete.id) ?? null);
       if (openDocument?.id === toDelete.id) setOpenDocument(null);
+      toast.show({ tone: "success", title: `${toDelete.title} silindi` });
+      reloadDocuments();
       setToDelete(null);
     } catch (reason) {
       setNotice(reason instanceof Error ? reason.message : String(reason));
@@ -96,22 +115,20 @@ export default function MaterialsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-semibold text-ink">Bilgi tabanı</h2>
-          <p className="mt-1 max-w-2xl text-base text-graphite">
-            Bu dersin AI Tutor'u yalnızca buradaki dokümanlardan cevap verir ve her cevabında
-            dayandığı sayfayı gösterir.
-          </p>
-        </div>
-        {documents && documents.length > 0 && (
-          <dl className="flex gap-6 text-right">
-            <Stat label="doküman" value={documents.length} />
-            <Stat label="sayfa" value={totalPages} />
-            <Stat label="parça" value={totalChunks} />
-          </dl>
-        )}
-      </div>
+      <PageTitle
+        title="Materyaller"
+        description="Bu dersin AI Tutor'u yalnızca buradaki dokümanlardan cevap verir ve her cevabında dayandığı sayfayı gösterir."
+        actions={
+          documents &&
+          documents.length > 0 && (
+            <dl className="flex gap-8">
+              <Stat label="doküman" value={documents.length} />
+              <Stat label="sayfa" value={totalPages} />
+              <Stat label="parça" value={totalChunks} />
+            </dl>
+          )
+        }
+      />
 
       <Dropzone
         onFiles={(files) => void addFiles(files)}
@@ -126,19 +143,20 @@ export default function MaterialsPage() {
         </p>
       )}
 
-      {loadError ? (
+      {loadFailed ? (
         <EmptyState
-          icon={FileStack}
+          icon={ServerOff}
           tone="danger"
           title="Materyaller yüklenemedi"
-          description={`API'ye ulaşılamıyor olabilir. (${loadError})`}
+          description="Ders materyaline şu an ulaşılamıyor. Bağlantını kontrol edip tekrar dene."
+          action={<Button onClick={reload}>Tekrar dene</Button>}
         />
       ) : documents === null ? (
         <SkeletonRows rows={3} />
       ) : documents.length === 0 && pending.length === 0 ? (
-        <p className="text-center text-base text-graphite">
-          Henüz materyal yok. İlk ders notunu yükle; birkaç saniye içinde öğrenciler soru sormaya
-          başlayabilir.
+        <p className="py-4 text-center text-base text-graphite">
+          Henüz materyal yok. İlk ders notunu yükle; işlendikten sonra öğrenciler bu dersten soru
+          sorabilir.
         </p>
       ) : (
         <MaterialsTable
@@ -193,7 +211,7 @@ function Stat({ label, value }: { label: string; value: number }) {
   return (
     <div className="flex flex-col-reverse">
       <dt className="text-sm text-graphite">{label}</dt>
-      <dd className="text-lg font-semibold text-ink tabular-nums">{value}</dd>
+      <dd className="text-xl leading-tight font-bold text-ink tabular-nums">{value}</dd>
     </div>
   );
 }

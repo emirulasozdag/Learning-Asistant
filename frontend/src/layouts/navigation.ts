@@ -1,6 +1,5 @@
 import {
   LayoutDashboard,
-  ListChecks,
   MessageSquareText,
   type LucideIcon,
 } from "lucide-react";
@@ -15,21 +14,18 @@ export interface NavItem {
   end?: boolean;
 }
 
-/** Rol başına ana menü. Dersler, menünün altında ayrıca listelenir. */
+/** Rol başına üst bar menüsü. Dersin bölümleri ders sayfasının solundadır. */
 export const NAVIGATION: Record<Role, NavItem[]> = {
-  instructor: [{ to: "/instructor", label: "Genel bakış", icon: LayoutDashboard, end: true }],
+  instructor: [{ to: "/instructor", label: "Derslerim", icon: LayoutDashboard, end: true }],
   student: [
-    { to: "/student", label: "Ana sayfa", icon: LayoutDashboard, end: true },
+    { to: "/student", label: "Derslerim", icon: LayoutDashboard, end: true },
     { to: "/student/tutor", label: "AI Tutor", icon: MessageSquareText },
-    { to: "/student/practice", label: "Pratik", icon: ListChecks },
   ],
 };
 
-/** Bir dersin, role göre açılacağı sayfa. */
+/** Bir dersin ana sayfası (genel bakış); bölümler bunun altındadır. */
 export function coursePath(role: Role, courseId: number): string {
-  return role === "instructor"
-    ? `/instructor/courses/${courseId}`
-    : `/student/courses/${courseId}/tutor`;
+  return `/${role}/courses/${courseId}`;
 }
 
 export const ROLE_LABELS: Record<Role, string> = {

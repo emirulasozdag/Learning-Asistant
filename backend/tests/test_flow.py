@@ -16,6 +16,15 @@ from app.db.models import Chunk, Course, Message
 from app.llm.base import LLMError
 from tests.test_answer import FakeLLM
 
+# Ders bilgisi alanları verilmediğinde boş döner.
+EMPTY_INFO = {
+    "instructor_name": None,
+    "term": None,
+    "level": None,
+    "department": None,
+    "description": None,
+}
+
 
 def upload(client: TestClient, course_id: int, path: Path, material_type: str = "notes"):
     with path.open("rb") as file:
@@ -37,6 +46,7 @@ def test_courses_are_listed(client: TestClient, course: Course) -> None:
             "name": "Veri Yapilari ve Algoritmalar",
             "language": "tr",
             "role": None,
+            **EMPTY_INFO,
         }
     ]
 
@@ -187,6 +197,7 @@ def test_create_course_normalizes_code_and_rejects_duplicates(client: TestClient
         "name": "Veri Yapilari",
         "language": "tr",
         "role": None,
+        **EMPTY_INFO,
     }
     assert duplicate.status_code == 409
     assert "zaten var" in duplicate.json()["detail"]
@@ -406,3 +417,66 @@ def test_stream_reports_unexpected_errors_as_event(
 
     names = [name for name, _ in parse_sse(response.text)]
     assert names[0] == "retrieval" and names[-1] == "error"
+
+
+def test_instructor_activity_is_computed_from_real_questions(
+    client: TestClient, course: Course, sample_pdf: Path
+) -> None:
+    upload(client, course.id, sample_pdf)
+    answered = client.post(
+        "/ask", json={"course_id": course.id, "question": "Neden sag yari elenir?"}
+    ).json()
+    client.post("/ask", json={"course_id": course.id, "question": "Fransa'nın başkenti neresi?"})
+
+    activity = client.get(f"/instructor/courses/{course.id}/activity").json()
+
+    assert activity["questions"] == 2 and activity["conversations"] == 2
+    assert activity["answered"] == 1 and activity["not_covered"] == 1
+    assert len(activity["daily"]) == 14 and activity["daily"][-1]["questions"] == 2
+    top = activity["top_sources"][0]
+    assert top["source_id"] == answered["citations"][0]["source_id"]
+    assert (top["document_title"], top["page"], top["citations"]) == ("notlar", 2, 1)
+    unanswered = [q["question"] for q in activity["unanswered_questions"]]
+    assert unanswered == ["Fransa'nın başkenti neresi?"]
+    assert activity["recent_questions"][0]["question"] == "Fransa'nın başkenti neresi?"
+
+
+def test_instructor_activity_for_unknown_course_is_404(client: TestClient) -> None:
+    assert client.get("/instructor/courses/999/activity").status_code == 404
+
+
+def test_course_info_is_created_updated_and_listed(client: TestClient) -> None:
+    created = client.post(
+        "/courses",
+        json={
+            "code": "blm 3021",
+            "name": "Algoritma Analizi",
+            "term": "Güz 2026",
+            "level": "undergraduate",
+            "description": "  ",
+        },
+    ).json()
+    assert created["code"] == "BLM3021"
+    assert (created["term"], created["level"]) == ("Güz 2026", "undergraduate")
+    assert created["instructor_name"] is None and created["description"] is None
+
+    updated = client.patch(
+        f"/courses/{created['id']}",
+        json={
+            "instructor_name": "Eğitmen Adı",
+            "department": "Bilgisayar Mühendisliği",
+            "term": "",
+        },
+    )
+
+    assert updated.status_code == 200
+    listed = next(c for c in client.get("/courses").json() if c["id"] == created["id"])
+    assert listed["instructor_name"] == "Eğitmen Adı"
+    assert listed["department"] == "Bilgisayar Mühendisliği"
+    assert listed["term"] is None  # boş metin alanı temizler
+    assert listed["level"] == "undergraduate"  # gönderilmeyen alan değişmez
+    assert listed["name"] == "Algoritma Analizi"
+
+
+def test_updating_unknown_course_is_404(client: TestClient) -> None:
+    assert client.patch("/courses/999", json={"term": "Güz 2026"}).status_code == 404

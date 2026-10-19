@@ -10,13 +10,23 @@ function initials(name: string): string {
     .join("");
 }
 
-export default function Avatar({ name, size = "md" }: { name: string; size?: "sm" | "md" }) {
+export default function Avatar({
+  name,
+  size = "md",
+  className,
+}: {
+  name: string;
+  size?: "sm" | "md";
+  className?: string;
+}) {
   return (
     <span
       aria-hidden
       className={cx(
-        "inline-flex shrink-0 items-center justify-center rounded-full bg-ink font-medium text-white",
+        "inline-flex shrink-0 items-center justify-center rounded-full font-medium text-white",
         size === "sm" ? "size-6 text-[10px]" : "size-8 text-xs",
+        // Zemin rengi verilmezse mürekkep rengi.
+        className ?? "bg-ink",
       )}
     >
       {initials(name)}

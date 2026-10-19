@@ -2,7 +2,7 @@ import type { HTMLAttributes, ReactNode, TdHTMLAttributes, ThHTMLAttributes } fr
 
 import { cx } from "./cx";
 
-/** Sade veri tablosu: çerçeveli tek panel, satır çizgileri, hover vurgusu. */
+/** Kurumsal veri tablosu: mavi başlık satırı, zebra satırlar, hover vurgusu. */
 export function Table({ children, label }: { children: ReactNode; label: string }) {
   return (
     <div className="overflow-x-auto rounded-panel border border-line bg-surface">
@@ -14,14 +14,14 @@ export function Table({ children, label }: { children: ReactNode; label: string 
 }
 
 export function THead({ children }: { children: ReactNode }) {
-  return <thead className="border-b border-line bg-canvas/70">{children}</thead>;
+  return <thead className="bg-banner text-white">{children}</thead>;
 }
 
 export function TH({ className, ...props }: ThHTMLAttributes<HTMLTableCellElement>) {
   return (
     <th
       scope="col"
-      className={cx("h-9 px-4 text-sm font-medium whitespace-nowrap text-graphite", className)}
+      className={cx("h-11 px-4 text-sm font-bold whitespace-nowrap", className)}
       {...props}
     />
   );
@@ -36,7 +36,7 @@ export function TR({
   return (
     <tr
       className={cx(
-        "border-b border-line last:border-b-0",
+        "border-b border-line last:border-b-0 even:bg-canvas/70",
         interactive && "cursor-pointer transition-colors hover:bg-canvas",
         selected && "bg-accent-soft/50",
         className,
@@ -47,5 +47,5 @@ export function TR({
 }
 
 export function TD({ className, ...props }: TdHTMLAttributes<HTMLTableCellElement>) {
-  return <td className={cx("h-12 px-4 align-middle", className)} {...props} />;
+  return <td className={cx("h-14 px-4 py-2.5 align-middle", className)} {...props} />;
 }

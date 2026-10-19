@@ -5,6 +5,8 @@ import Button from "../../ui/Button";
 import Dialog from "../../ui/Dialog";
 import Field from "../../ui/Field";
 import SegmentedControl from "../../ui/SegmentedControl";
+import CourseInfoFields from "./CourseInfoFields";
+import { EMPTY_INFO_DRAFT, infoFromDraft } from "./courseInfoDraft";
 
 interface CreateCourseDialogProps {
   open: boolean;
@@ -16,6 +18,7 @@ export default function CreateCourseDialog({ open, onClose, onCreated }: CreateC
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [language, setLanguage] = useState<"tr" | "en">("tr");
+  const [info, setInfo] = useState(EMPTY_INFO_DRAFT);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -24,9 +27,10 @@ export default function CreateCourseDialog({ open, onClose, onCreated }: CreateC
     setSaving(true);
     setError(null);
     try {
-      onCreated(await courseService.create({ code, name, language }));
+      onCreated(await courseService.create({ code, name, language, ...infoFromDraft(info) }));
       setCode("");
       setName("");
+      setInfo(EMPTY_INFO_DRAFT);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason));
     } finally {
@@ -38,6 +42,7 @@ export default function CreateCourseDialog({ open, onClose, onCreated }: CreateC
     <Dialog
       open={open}
       onClose={onClose}
+      size="lg"
       title="Ders oluştur"
       description="Her dersin bilgi tabanı ayrıdır; öğrenci soruları yalnızca o dersin materyalinde aranır."
       footer={
@@ -82,7 +87,18 @@ export default function CreateCourseDialog({ open, onClose, onCreated }: CreateC
             { value: "en", label: "İngilizce" },
           ]}
         />
-        {error && <p className="text-base text-danger">{error}</p>}
+        <div className="border-t border-line pt-4">
+          <p className="mb-3 text-sm text-graphite">
+            Ders bilgileri öğrencilere ders sayfasında gösterilir. Şimdi boş bırakıp sonra da
+            ekleyebilirsin.
+          </p>
+          <CourseInfoFields draft={info} onChange={setInfo} />
+        </div>
+        {error && (
+          <p role="alert" className="text-base text-danger">
+            {error}
+          </p>
+        )}
       </form>
     </Dialog>
   );

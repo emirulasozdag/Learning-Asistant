@@ -4,6 +4,8 @@
 @import "@fontsource/ibm-plex-sans/400.css";
 @import "@fontsource/ibm-plex-sans/500.css";
 @import "@fontsource/ibm-plex-sans/600.css";
+@import "@fontsource/ibm-plex-sans/700.css";
+@import "@fontsource/ibm-plex-sans/300.css";
 @import "@fontsource/source-serif-4/400.css";
 @import "@fontsource/source-serif-4/600.css";
 
@@ -20,26 +22,43 @@
  */
 @theme {
   /* Yüzeyler */
-  --color-canvas: #f6f7f9;
+  --color-canvas: #f3f4f8;
   --color-surface: #ffffff;
-  --color-subtle: #f1f3f6;
-  --color-muted-bg: #e9ecf1;
+  --color-subtle: #eef0f4;
+  --color-muted-bg: #e4e7ec;
 
   /* Metin */
-  --color-ink: #141a26;
-  --color-ink-2: #3b4352;
-  --color-graphite: #5d6575;
-  --color-faint: #8b93a2;
+  --color-ink: #1c1e22;
+  --color-ink-2: #3a3d44;
+  /* İkincil metin: beyaz ve canvas üzerinde AA'nın rahatça üstünde (≈6.5:1). */
+  --color-graphite: #52565e;
+  /* Yalnızca ipucu ve yer tutucu; asıl bilgi taşımaz. */
+  --color-faint: #80848c;
 
   /* Çizgiler */
-  --color-line: #e3e6eb;
-  --color-line-strong: #cfd4dc;
+  --color-line: #dde0e6;
+  --color-line-strong: #c4c8d0;
 
   /* Vurgu (tek) */
-  --color-accent: #2445c7;
-  --color-accent-hover: #1c379f;
-  --color-accent-soft: #edf1fd;
-  --color-accent-line: #c9d4f6;
+  /* Ders şeridi ve tablo başlıkları: kurumsal mavi (beyaz metinle ≈6.6:1) */
+  --color-banner: #1b5e8c;
+  --color-banner-soft: #e8f0f6;
+  /* Metin içi bağlantılar: altı çizili mavi */
+  --color-link: #1a5e94;
+  --color-link-hover: #0f4673;
+
+  /* Vurgu: akademik bordo (beyaz metinle ≈7.5:1) */
+  --color-accent: #9a1f36;
+  --color-accent-hover: #7f182c;
+  --color-accent-soft: #fbedf0;
+  --color-accent-line: #efc3cc;
+
+  /* Kurumsal üst bar: siyah */
+  --color-nav: #0b0b0c;
+  --color-nav-raised: #1f2023;
+  --color-nav-line: #333539;
+  --color-nav-ink: #f4f5f7;
+  --color-nav-muted: #b3b7be;
 
   /* Anlamsal: alıntı */
   --color-marker: #ffe14d;
@@ -53,43 +72,37 @@
   --color-danger: #b42318;
   --color-danger-soft: #fdeceb;
 
-  /* Eski adlar (geçiş): mevcut bileşenler bozulmasın */
-  --color-paper: var(--color-canvas);
-  --color-sheet: var(--color-surface);
-  --color-rule: var(--color-line);
-  --color-pen: var(--color-accent);
-  --color-pen-dark: var(--color-accent-hover);
-  --color-pen-soft: var(--color-accent-soft);
-  --color-redpen: var(--color-danger);
-  --color-redpen-soft: var(--color-danger-soft);
+  /* Kaynak görünümündeki defter kenar çizgisi */
   --color-margin: #f0c4bf;
 
   --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
   --font-serif: "Source Serif 4", ui-serif, Georgia, serif;
 
-  /* Yazı ölçeği (SaaS yoğunluğu): 12 / 13 / 14 / 15 / 18 / 22 / 28 / 40 */
+  /* Yazı ölçeği: 12 / 14 / 15 / 16 / 19 / 23 / 30 / 42 — okunaklı, yine de yoğun ekranlara uygun */
   --text-xs: 0.75rem;
-  --text-xs--line-height: 1.4;
-  --text-sm: 0.8125rem;
+  --text-xs--line-height: 1.45;
+  --text-sm: 0.875rem;
   --text-sm--line-height: 1.5;
-  --text-base: 0.875rem;
+  --text-base: 0.9375rem;
   --text-base--line-height: 1.55;
-  --text-md: 0.9375rem;
-  --text-md--line-height: 1.6;
-  --text-lg: 1.125rem;
+  --text-md: 1rem;
+  --text-md--line-height: 1.65;
+  --text-lg: 1.1875rem;
   --text-lg--line-height: 1.4;
-  --text-xl: 1.375rem;
+  --text-xl: 1.4375rem;
   --text-xl--line-height: 1.3;
-  --text-2xl: 1.75rem;
+  --text-2xl: 1.875rem;
   --text-2xl--line-height: 1.2;
-  --text-3xl: 2.5rem;
+  --text-3xl: 2.625rem;
   --text-3xl--line-height: 1.1;
 
-  --radius-control: 6px;
-  --radius-panel: 8px;
+  --radius-control: 4px;
+  --radius-panel: 6px;
 
   --shadow-float: 0 1px 2px rgb(20 26 38 / 0.06), 0 12px 32px -12px rgb(20 26 38 / 0.22);
   --shadow-page: 0 1px 2px rgb(20 26 38 / 0.05), 0 6px 20px -10px rgb(20 26 38 / 0.16);
+  --shadow-card: 0 1px 2px rgb(20 26 63 / 0.05), 0 2px 8px -2px rgb(20 26 63 / 0.06);
+  --shadow-lift: 0 2px 4px rgb(20 26 63 / 0.06), 0 16px 32px -16px rgb(20 26 63 / 0.28);
 }
 
 html {
@@ -101,13 +114,46 @@ body {
   font-feature-settings: "ss01", "tnum" 0;
 }
 
-:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 2px;
+/* Taban katmanında: bileşenlerdeki `focus:outline-none` gibi araç sınıfları bunu ezebilsin. */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
 }
 
 ::selection {
   background: var(--color-accent-soft);
+}
+
+/* Metin içi bağlantı: OCW'deki gibi altı çizili mavi. */
+.link {
+  color: var(--color-link);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+.link:hover {
+  color: var(--color-link-hover);
+  text-decoration-thickness: 2px;
+}
+
+/* Sayfa kabı: tüm uygulama sayfaları aynı genişlik ve kenar boşluğunu kullanır. */
+.page {
+  width: 100%;
+  max-width: 72rem;
+  margin-inline: auto;
+  padding: 2rem 1.25rem 4rem;
+}
+@media (min-width: 640px) {
+  .page {
+    padding-inline: 2rem;
+  }
+}
+@media (min-width: 1024px) {
+  .page {
+    padding: 2.5rem 2.5rem 5rem;
+  }
 }
 
 /* Fosforlu kalem: alıntılanan metin soldan sağa işaretlenir. */
@@ -188,6 +234,21 @@ body {
   }
 }
 
+.slide-in-left {
+  animation: slide-in-left 200ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes slide-in-left {
+  from {
+    transform: translateX(-16px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
 .fade-in {
   animation: fade-in 160ms ease-out both;
 }
@@ -247,6 +308,7 @@ body {
   .marker-box,
   .step-reveal,
   .slide-in-right,
+  .slide-in-left,
   .fade-in,
   .thinking-dot,
   .skeleton {

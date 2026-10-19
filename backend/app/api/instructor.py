@@ -1,9 +1,19 @@
 from fastapi import APIRouter
 
+from app.api.deps import DbSession, get_course_or_404
 from app.api.not_implemented import not_implemented
-from app.schemas.instructor import MistakeSummary, ReviewDecision
+from app.instructor.activity import course_activity
+from app.schemas.instructor import CourseActivity, MistakeSummary, ReviewDecision
 
 router = APIRouter(prefix="/instructor", tags=["instructor"])
+
+
+@router.get("/courses/{course_id}/activity", response_model=CourseActivity)
+def activity(course_id: int, db: DbSession) -> CourseActivity:
+    """Dersin soru-cevap etkinliği: sayılar, son 14 gün, en çok alıntılanan kaynaklar ve
+    materyalde cevabı bulunamayan sorular. Kayıtlı mesajlardan hesaplanır."""
+    get_course_or_404(db, course_id)
+    return course_activity(db, course_id)
 
 
 @router.get("/courses/{course_id}/mistakes", response_model=list[MistakeSummary])

@@ -1,6 +1,6 @@
-import { ArrowUpRight, BookOpen, ServerOff, SquarePen } from "lucide-react";
+import { BookOpen, MessageSquareText, ServerOff, SquarePen } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router";
+import { useParams, useSearchParams } from "react-router";
 
 import type { DocumentOut } from "../../api/types";
 import { useCourse, useCourses } from "../../features/courses/context";
@@ -13,7 +13,6 @@ import { isDesktopNow } from "../../features/tutor/useIsDesktop";
 import { materialLabel } from "../../labels";
 import { courseService, type Course } from "../../services/courseService";
 import { tutorService, type QuickAction } from "../../services/tutorService";
-import Badge from "../../ui/Badge";
 import Button from "../../ui/Button";
 import EmptyState from "../../ui/EmptyState";
 import FileBadge from "../../ui/FileBadge";
@@ -75,7 +74,6 @@ export default function TutorPage() {
 
 function TutorSession({ course }: { course: Course }) {
   const courseId = course.id;
-  const navigate = useNavigate();
 
   const [materials, setMaterials] = useState<DocumentOut[] | null>(null);
   const [materialsFailed, setMaterialsFailed] = useState(false);
@@ -87,6 +85,9 @@ function TutorSession({ course }: { course: Course }) {
   const [sourceId, setSourceId] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  // Ana sayfadaki soru kutusundan gelen soru (?q=): materyal hazır olunca bir kez sorulur.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const pendingQuestion = useRef(searchParams.get("q"));
 
   useEffect(() => {
     const controller = new AbortController();
@@ -165,6 +166,16 @@ function TutorSession({ course }: { course: Course }) {
     }
   }
 
+  useEffect(() => {
+    const text = pendingQuestion.current;
+    if (!text || !materials || materials.length === 0) return;
+    pendingQuestion.current = null;
+    setSearchParams({}, { replace: true });
+    void ask(text);
+    // `ask` her çizimde yeniden oluşur; soru yalnızca materyal ilk yüklendiğinde sorulmalı.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [materials]);
+
   /** Süren cevabı durdurur; tur "Durduruldu" olarak işaretlenir (ask içindeki catch'te). */
   function stop() {
     abortRef.current?.abort();
@@ -189,18 +200,16 @@ function TutorSession({ course }: { course: Course }) {
     void ask(tutorService.quickActionPrompt(action));
   }
 
-  function practice(topic: string) {
-    navigate(`/student/practice?course=${courseId}&topic=${encodeURIComponent(topic)}`);
-  }
-
   const noMaterials = materials !== null && materials.length === 0;
 
   return (
     <div className="flex h-full min-h-0">
       <section className="flex min-w-0 flex-1 flex-col">
         <div className="flex h-12 shrink-0 items-center gap-3 border-b border-line bg-surface px-5">
-          <Badge>{course.code}</Badge>
-          <p className="truncate text-base font-medium text-ink">{course.name}</p>
+          <p className="flex items-center gap-2 text-base font-bold text-ink">
+            <MessageSquareText size={17} aria-hidden className="text-accent" />
+            AI Tutor
+          </p>
           <div className="ml-auto flex shrink-0 items-center gap-3">
             <span
               className={`hidden items-center gap-1.5 text-sm whitespace-nowrap text-graphite md:flex ${
@@ -226,7 +235,6 @@ function TutorSession({ course }: { course: Course }) {
                 materials={materials}
                 failed={materialsFailed}
                 onReload={reloadMaterials}
-                onAsk={(text) => void ask(text)}
               />
             ) : (
               <ol className="pt-8 pb-6">
@@ -237,7 +245,6 @@ function TutorSession({ course }: { course: Course }) {
                       turn={turn}
                       isLatest={index === turns.length - 1}
                       onQuickAction={quickAction}
-                      onPractice={() => practice(turn.question)}
                       onRetry={() => retry(turn)}
                       selectedSourceId={sourceId}
                       onSelectSource={setSourceId}
@@ -287,14 +294,12 @@ function TutorWelcome({
   materials,
   failed,
   onReload,
-  onAsk,
 }: {
   course: Course;
   materials: DocumentOut[] | null;
   /** Materyal listesi yüklenemedi: "materyal yok"tan farklı bir durum. */
   failed: boolean;
   onReload: () => void;
-  onAsk: (text: string) => void;
 }) {
   if (failed) {
     return (
@@ -321,50 +326,35 @@ function TutorWelcome({
   const pages = materials?.reduce((sum, d) => sum + d.page_count, 0) ?? 0;
   return (
     <div className="py-14">
-      <h1 className="text-2xl font-semibold tracking-tight text-ink">{course.name} dersine sor</h1>
+      <h1 className="text-2xl font-semibold tracking-tight text-balance text-ink">{course.name} dersine sor</h1>
       <p className="mt-2 text-md text-graphite">
         {materials
           ? `Cevaplar bu dersin ${materials.length} dokümanındaki (${pages} sayfa) bölümlere dayandırılır ve kaynak sayfaları gösterilir. Yine de önemli konularda kaynağı açıp kontrol et.`
           : "Cevaplar bu dersin materyalindeki bölümlere dayandırılır ve kaynak sayfaları gösterilir. Önemli konularda kaynağı açıp kontrol et."}
       </p>
 
-      <h2 className="mt-10 mb-2 text-sm text-graphite">Buradan başlayabilirsin</h2>
-      <ul className="divide-y divide-line rounded-panel border border-line bg-surface">
-        {tutorService.suggestedQuestions(course.code).map((suggestion) => (
-          <li key={suggestion}>
-            <button
-              type="button"
-              onClick={() => onAsk(suggestion)}
-              className="group flex w-full items-center justify-between gap-4 px-4 py-3 text-left text-md text-ink transition-colors hover:bg-canvas"
-            >
-              {suggestion}
-              <ArrowUpRight
-                size={16}
-                aria-hidden
-                className="shrink-0 text-faint transition-colors group-hover:text-accent"
-              />
-            </button>
-          </li>
-        ))}
-      </ul>
-
       {materials === null && (
         <>
-          <h2 className="mt-10 mb-3 text-sm text-graphite">Bu derste aranan materyal</h2>
+          <h2 className="mt-10 mb-3 text-sm font-medium text-ink-2">Cevapların dayandığı materyal</h2>
           <SkeletonRows rows={2} />
         </>
       )}
 
       {materials && materials.length > 0 && (
         <>
-          <h2 className="mt-10 mb-3 text-sm text-graphite">Bu derste aranan materyal</h2>
-          <ul className="flex flex-col gap-2">
+          <h2 className="mt-10 mb-3 text-sm font-medium text-ink-2">Cevapların dayandığı materyal</h2>
+          <ul className="grid gap-3 sm:grid-cols-2">
             {materials.map((document) => (
-              <li key={document.id} className="flex items-center gap-3 text-base">
-                <FileBadge filename={document.filename} size="sm" />
-                <span className="truncate text-ink">{document.title}</span>
-                <span className="ml-auto shrink-0 text-sm text-graphite">
-                  {materialLabel(document.material_type)}, {document.page_count} sayfa
+              <li
+                key={document.id}
+                className="flex items-center gap-3 rounded-panel border border-line bg-surface px-4 py-3 shadow-card"
+              >
+                <FileBadge filename={document.filename} />
+                <span className="min-w-0">
+                  <span className="block truncate text-base font-medium text-ink">{document.title}</span>
+                  <span className="block text-sm text-graphite">
+                    {materialLabel(document.material_type)}, {document.page_count} sayfa
+                  </span>
                 </span>
               </li>
             ))}

@@ -46,9 +46,13 @@ export default function CoursesProvider({ children }: { children: ReactNode }) {
     setCourses((list) => [...list, course].sort((a, b) => a.code.localeCompare(b.code)));
   }, []);
 
+  const replace = useCallback((course: Course) => {
+    setCourses((list) => list.map((item) => (item.id === course.id ? course : item)));
+  }, []);
+
   const value = useMemo(
-    () => ({ courses, loading, error, refresh, add, openCreate: () => setCreating(true) }),
-    [courses, loading, error, refresh, add],
+    () => ({ courses, loading, error, refresh, add, replace, openCreate: () => setCreating(true) }),
+    [courses, loading, error, refresh, add, replace],
   );
 
   return (
@@ -60,7 +64,7 @@ export default function CoursesProvider({ children }: { children: ReactNode }) {
         onCreated={(course) => {
           add(course);
           setCreating(false);
-          navigate(`/instructor/courses/${course.id}/materials`);
+          navigate(`/instructor/courses/${course.id}`);
         }}
       />
     </CoursesContext>
