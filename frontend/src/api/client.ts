@@ -4,8 +4,10 @@ import type {
   AskResponse,
   AskStreamEvent,
   ChunkPreview,
+  CourseActivity,
   CourseCreate,
   CourseSummary,
+  CourseUpdate,
   DocumentOut,
   LearningRecord,
   MaterialType,
@@ -151,6 +153,9 @@ export const api = {
   createCourse: (body: CourseCreate) =>
     request<CourseSummary>("/courses", { method: "POST", body: JSON.stringify(body) }),
 
+  updateCourse: (courseId: number, body: CourseUpdate) =>
+    request<CourseSummary>(`/courses/${courseId}`, { method: "PATCH", body: JSON.stringify(body) }),
+
   askStream,
 
   source: (sourceId: string, signal?: AbortSignal) =>
@@ -170,6 +175,9 @@ export const api = {
 
   learningRecord: (courseId: number) =>
     request<LearningRecord>(`/courses/${courseId}/learning-record`),
+
+  courseActivity: (courseId: number, signal?: AbortSignal) =>
+    request<CourseActivity>(`/instructor/courses/${courseId}/activity`, { signal }),
 
   frequentMistakes: (courseId: number) =>
     request<MistakeSummary[]>(`/instructor/courses/${courseId}/mistakes`),

@@ -18,11 +18,21 @@ export function LogoMark({ className }: { className?: string }) {
   );
 }
 
-export default function Logo({ className }: { className?: string }) {
+/** "Learning Assistant": ilk kelime kalın, ikincisi ince — kurumsal sözcük işareti. */
+function Wordmark() {
+  const [first, ...rest] = PRODUCT_NAME.split(" ");
   return (
-    <span className={cx("inline-flex items-center gap-2 text-ink", className)}>
-      <LogoMark />
-      <span className="text-md font-semibold tracking-tight">{PRODUCT_NAME}</span>
+    <span className="text-lg leading-none tracking-tight">
+      <span className="font-bold">{first}</span> <span className="font-light">{rest.join(" ")}</span>
+    </span>
+  );
+}
+
+export default function Logo({ className, onDark }: { className?: string; onDark?: boolean }) {
+  return (
+    <span className={cx("inline-flex items-center gap-2", onDark ? "text-white" : "text-ink", className)}>
+      <LogoMark className="text-accent" />
+      <Wordmark />
     </span>
   );
 }

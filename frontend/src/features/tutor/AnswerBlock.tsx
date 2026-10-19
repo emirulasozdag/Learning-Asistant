@@ -6,7 +6,6 @@ import {
   SearchX,
   ServerOff,
   ShieldCheck,
-  Target,
   WandSparkles,
 } from "lucide-react";
 
@@ -25,7 +24,6 @@ interface AnswerBlockProps extends SelectSourceProps {
   /** Yalnızca son cevapta hızlı eylemler ve "Tekrar sor" gösterilir. */
   isLatest: boolean;
   onQuickAction: (action: QuickAction) => void;
-  onPractice: () => void;
   onRetry: () => void;
 }
 
@@ -49,7 +47,6 @@ export default function AnswerBlock({
   turn,
   isLatest,
   onQuickAction,
-  onPractice,
   onRetry,
   selectedSourceId,
   onSelectSource,
@@ -63,7 +60,6 @@ export default function AnswerBlock({
           turn={turn}
           isLatest={isLatest}
           onQuickAction={onQuickAction}
-          onPractice={onPractice}
           onRetry={onRetry}
           {...select}
         />
@@ -80,7 +76,7 @@ function RetryButton({ onRetry }: { onRetry: () => void }) {
   );
 }
 
-function Body({ turn, isLatest, onQuickAction, onPractice, onRetry, ...select }: AnswerBlockProps) {
+function Body({ turn, isLatest, onQuickAction, onRetry, ...select }: AnswerBlockProps) {
   if (turn.failure) {
     const copy = FAILURE_COPY[turn.failure.kind];
     const description = turn.failure.detail || copy.description;
@@ -238,9 +234,6 @@ function Body({ turn, isLatest, onQuickAction, onPractice, onRetry, ...select }:
           </Button>
           <Button size="sm" icon={FlaskConical} onClick={() => onQuickAction("example")}>
             Örnek ver
-          </Button>
-          <Button size="sm" icon={Target} onClick={onPractice}>
-            Bu konuyu çalış
           </Button>
         </div>
       )}

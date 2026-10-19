@@ -27,6 +27,13 @@ class Course(Base):
     name: Mapped[str] = mapped_column(String(200))
     # "tr" | "en" — full-text aramada kullanılacak dil.
     language: Mapped[str] = mapped_column(String(2), default="tr")
+    # Ders bilgisi (eğitmen girer; boş olabilir).
+    instructor_name: Mapped[str | None] = mapped_column(String(200))
+    term: Mapped[str | None] = mapped_column(String(64))
+    # "undergraduate" | "graduate"
+    level: Mapped[str | None] = mapped_column(String(16))
+    department: Mapped[str | None] = mapped_column(String(200))
+    description: Mapped[str | None] = mapped_column(Text)
 
     documents: Mapped[list["Document"]] = relationship(back_populates="course")
 

@@ -30,7 +30,8 @@ test("soru sorulur; kaynaklı cevap, incelenen bölümler ve duyuru gelir", asyn
       exact: true,
     }),
   ).toBeVisible();
-  await expect(page.getByText("sağ yarı atılır")).toBeVisible();
+  // Aynı metin otomatik açılan kaynak panelinde de bulunur; cevap DOM'da önce gelir.
+  await expect(page.getByText("sağ yarı atılır").first()).toBeVisible();
   await expect(firstCitation(page)).toBeVisible();
   await expect(liveRegion(page)).toHaveText(/ilgili bölüm gösterildi/);
 
@@ -138,7 +139,7 @@ test("ders değiştirince sohbet ve kaynak sıfırlanır; yeni derste ilk soru h
   // Eski dersin sohbet kimliği gitseydi backend "Sohbet bulunamadı" derdi.
   await ask(page, "Yığın nasıl çalışır?");
   await waitForAnswer(page);
-  await expect(page.getByText("son giren ilk çıkar")).toBeVisible();
+  await expect(page.getByText("son giren ilk çıkar").first()).toBeVisible();
   await expect(page.getByText(/Soru gönderilemedi|Sohbet bulunamadı/)).toHaveCount(0);
 
   // Soru sürerken ders değiştirilirse istek iptal edilir; ekran takılı kalmaz.

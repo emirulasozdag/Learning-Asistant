@@ -8,6 +8,8 @@ export interface CoursesContextValue {
   error: string | null;
   refresh: () => Promise<void>;
   add: (course: Course) => void;
+  /** Güncellenen dersi listede yerine koyar. */
+  replace: (course: Course) => void;
   /** Ders oluşturma diyaloğunu açar (sidebar ve dashboard'dan). */
   openCreate: () => void;
 }

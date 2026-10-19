@@ -2,7 +2,7 @@ import { forwardRef, useId, type InputHTMLAttributes, type ReactNode } from "rea
 
 
 export const inputClasses =
-  "h-9 w-full rounded-control border border-line bg-surface px-3 text-base text-ink placeholder:text-faint transition-colors hover:border-line-strong focus:border-accent focus:outline-none focus:ring-3 focus:ring-accent/12 disabled:bg-subtle disabled:text-faint aria-invalid:border-danger aria-invalid:focus:ring-danger/12";
+  "h-10 w-full rounded-control border border-line bg-surface px-3 text-base text-ink placeholder:text-faint transition-colors hover:border-line-strong focus:border-accent focus:outline-none focus:ring-3 focus:ring-accent/12 disabled:bg-subtle disabled:text-faint aria-invalid:border-danger aria-invalid:focus:ring-danger/12";
 
 interface FieldProps extends InputHTMLAttributes<HTMLInputElement> {
   label: string;

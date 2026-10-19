@@ -16,6 +16,13 @@ export function materialLabel(type: string): string {
   return MATERIAL_LABELS[type as MaterialType] ?? type;
 }
 
+const LANGUAGE_LABELS: Record<string, string> = { tr: "Türkçe", en: "İngilizce" };
+
+/** Dersin materyal dili: "tr" → "Türkçe". */
+export function languageLabel(code: string): string {
+  return LANGUAGE_LABELS[code] ?? code.toUpperCase();
+}
+
 export function citationLabel(citation: Citation): string {
   const title = citation.document_title ?? "Kaynak";
   return citation.page ? `${title}, s. ${citation.page}` : title;
@@ -30,4 +37,20 @@ export function courseInitials(name: string): string {
     .slice(0, 2)
     .map((word) => word[0].toLocaleUpperCase("tr"))
     .join("");
+}
+
+export const LEVEL_LABELS: Record<"undergraduate" | "graduate", string> = {
+  undergraduate: "Lisans",
+  graduate: "Yüksek lisans",
+};
+
+/** Ders şeridindeki üst satır: "BLM2512 | Güz 2026 | Lisans" (yalnızca dolu alanlar). */
+export function courseMetaParts(course: {
+  code: string;
+  term: string | null;
+  level: "undergraduate" | "graduate" | null;
+}): string[] {
+  return [course.code, course.term, course.level && LEVEL_LABELS[course.level]].filter(
+    (part): part is string => Boolean(part),
+  );
 }

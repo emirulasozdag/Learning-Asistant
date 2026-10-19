@@ -1,8 +1,8 @@
 from fastapi import APIRouter, HTTPException, status
 
-from app.api.deps import DbSession
+from app.api.deps import DbSession, get_course_or_404
 from app.courses import service
-from app.schemas.courses import CourseCreate, CourseSummary
+from app.schemas.courses import CourseCreate, CourseSummary, CourseUpdate
 
 router = APIRouter(prefix="/courses", tags=["courses"])
 
@@ -22,3 +22,9 @@ def create_course(data: CourseCreate, db: DbSession) -> CourseSummary:
         raise HTTPException(
             status.HTTP_409_CONFLICT, f"{data.code} kodlu bir ders zaten var."
         ) from exc
+
+
+@router.patch("/{course_id}", response_model=CourseSummary)
+def update_course(course_id: int, data: CourseUpdate, db: DbSession) -> CourseSummary:
+    """Ders bilgisini düzenler (eğitmen, dönem, seviye, bölüm, açıklama, ad, dil)."""
+    return service.update_course(db, get_course_or_404(db, course_id), data)

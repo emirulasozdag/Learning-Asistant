@@ -102,6 +102,29 @@ export interface LearningRecord {
   attempts: { item_id: number; concept: string | null; score: number; max_score: number }[];
 }
 
+/** Dersin soru-cevap etkinliği (eğitmen): kayıtlı mesajlardan hesaplanır, anonim. */
+export interface CourseActivity {
+  questions: number;
+  conversations: number;
+  answered: number;
+  /** Materyalde yeterli dayanak yok. */
+  not_covered: number;
+  /** Doğrulanamadı ya da model reddetti. */
+  not_generated: number;
+  /** Modele ulaşılamadı. */
+  unavailable: number;
+  daily: { day: string; questions: number }[];
+  top_sources: { source_id: string; document_title: string; page: number | null; citations: number }[];
+  recent_questions: QuestionItem[];
+  unanswered_questions: QuestionItem[];
+}
+
+export interface QuestionItem {
+  question: string;
+  outcome: AskOutcome;
+  asked_at: string;
+}
+
 export interface MistakeSummary {
   concept: string;
   error_type: string;
@@ -116,7 +139,18 @@ export interface ReviewDecision {
   correction?: string | null;
 }
 
-export interface CourseSummary {
+export type CourseLevel = "undergraduate" | "graduate";
+
+/** Dersin tanıtım bilgileri: eğitmen girer, hepsi boş olabilir. */
+export interface CourseInfo {
+  instructor_name: string | null;
+  term: string | null;
+  level: CourseLevel | null;
+  department: string | null;
+  description: string | null;
+}
+
+export interface CourseSummary extends CourseInfo {
   id: number;
   code: string;
   name: string;
@@ -124,11 +158,14 @@ export interface CourseSummary {
   role: "student" | "instructor" | "ta" | null;
 }
 
-export interface CourseCreate {
+export interface CourseCreate extends Partial<CourseInfo> {
   code: string;
   name: string;
   language: "tr" | "en";
 }
+
+/** Kısmi güncelleme: yalnızca gönderilen alanlar değişir; boş metin alanı temizler. */
+export type CourseUpdate = Partial<CourseInfo> & { name?: string; language?: "tr" | "en" };
 
 export type MaterialType = "textbook" | "notes" | "slides" | "past_exam" | "transcript" | "video";
 

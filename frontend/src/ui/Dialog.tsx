@@ -55,12 +55,20 @@ function useOverlay(open: boolean, onClose: () => void) {
   return panelRef;
 }
 
-/** Ortada açılan diyalog (ör. ders oluşturma). */
-export default function Dialog({ open, onClose, title, description, children, footer }: OverlayProps) {
+/** Ortada açılan diyalog (ör. ders oluşturma). Uzun içerik kendi içinde kayar. */
+export default function Dialog({
+  open,
+  onClose,
+  title,
+  description,
+  children,
+  footer,
+  size = "md",
+}: OverlayProps & { size?: "md" | "lg" }) {
   const panelRef = useOverlay(open, onClose);
   if (!open) return null;
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[12vh]">
+    <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[8vh]">
       <div className="fade-in absolute inset-0 bg-ink/25" onClick={onClose} aria-hidden />
       <div
         ref={panelRef}
@@ -68,18 +76,21 @@ export default function Dialog({ open, onClose, title, description, children, fo
         aria-modal="true"
         aria-labelledby="dialog-title"
         tabIndex={-1}
-        className="fade-in relative w-full max-w-md rounded-panel border border-line bg-surface shadow-float"
+        className={cx(
+          "fade-in relative flex max-h-[86vh] w-full flex-col rounded-panel border border-line bg-surface shadow-float",
+          size === "lg" ? "max-w-2xl" : "max-w-md",
+        )}
       >
         <div className="flex items-start justify-between gap-4 border-b border-line px-5 py-4">
           <div>
-            <h2 id="dialog-title" className="text-md font-semibold text-ink">
+            <h2 id="dialog-title" className="text-lg font-bold text-ink">
               {title}
             </h2>
             {description && <p className="mt-1 text-base text-graphite">{description}</p>}
           </div>
           <IconButton icon={X} label="Kapat" size="sm" onClick={onClose} />
         </div>
-        <div className="px-5 py-4">{children}</div>
+        <div className="min-h-0 overflow-y-auto px-5 py-4">{children}</div>
         {footer && (
           <div className="flex justify-end gap-2 border-t border-line bg-canvas/60 px-5 py-3">
             {footer}

@@ -8,6 +8,7 @@ import Avatar from "../../ui/Avatar";
 import Button from "../../ui/Button";
 import Field from "../../ui/Field";
 import PasswordField from "./PasswordField";
+import { emailError } from "./validation";
 
 export default function LoginPage() {
   const { login, loginAs } = useAuth();
@@ -16,6 +17,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [emailProblem, setEmailProblem] = useState<string | null>(null);
   const [pending, setPending] = useState<string | null>(null);
 
   function goHome(user: User) {
@@ -26,10 +28,13 @@ export default function LoginPage() {
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    const problem = emailError(email);
+    setEmailProblem(problem);
+    if (problem) return;
     setPending("form");
     setError(null);
     try {
-      goHome(await login(email, password));
+      goHome(await login(email.trim(), password));
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason));
       setPending(null);
@@ -43,7 +48,7 @@ export default function LoginPage() {
 
   return (
     <>
-      <h2 className="text-xl font-semibold tracking-tight text-ink">Giriş yap</h2>
+      <h2 className="text-2xl font-semibold tracking-tight text-ink">Giriş yap</h2>
       <p className="mt-1.5 text-base text-graphite">Üniversite e-posta adresinle devam et.</p>
 
       <form onSubmit={submit} className="mt-8 flex flex-col gap-4" noValidate>
@@ -53,7 +58,12 @@ export default function LoginPage() {
           autoComplete="email"
           placeholder="ad.soyad@universite.edu.tr"
           value={email}
-          onChange={(event) => setEmail(event.target.value)}
+          onChange={(event) => {
+            setEmail(event.target.value);
+            if (emailProblem) setEmailProblem(null);
+          }}
+          onBlur={() => email && setEmailProblem(emailError(email))}
+          error={emailProblem}
           required
         />
         <PasswordField
@@ -76,10 +86,9 @@ export default function LoginPage() {
         </Button>
       </form>
 
-      <div className="my-8 flex items-center gap-3 text-sm text-faint">
-        <span className="h-px flex-1 bg-line" />
-        demo hesabıyla dene
-        <span className="h-px flex-1 bg-line" />
+      <div className="mt-10 mb-3">
+        <p className="text-sm font-medium text-ink-2">Pilot hesaplar</p>
+        <p className="mt-0.5 text-sm text-graphite">Pilot dönemde hazır bir hesapla da girebilirsin.</p>
       </div>
 
       <ul className="flex flex-col gap-2">

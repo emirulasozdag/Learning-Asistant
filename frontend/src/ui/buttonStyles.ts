@@ -5,7 +5,7 @@ export type Size = "sm" | "md" | "lg";
 
 const VARIANTS: Record<Variant, string> = {
   primary:
-    "bg-accent text-white hover:bg-accent-hover disabled:bg-muted-bg disabled:text-faint",
+    "bg-accent text-white shadow-sm hover:bg-accent-hover disabled:bg-muted-bg disabled:text-faint disabled:shadow-none",
   secondary:
     "border border-line bg-surface text-ink hover:border-line-strong hover:bg-subtle disabled:text-faint",
   ghost: "text-ink-2 hover:bg-subtle hover:text-ink disabled:text-faint",
@@ -13,9 +13,9 @@ const VARIANTS: Record<Variant, string> = {
 };
 
 const SIZES: Record<Size, string> = {
-  sm: "h-7 gap-1.5 px-2.5 text-sm",
-  md: "h-8 gap-2 px-3 text-base",
-  lg: "h-10 gap-2 px-4 text-md",
+  sm: "h-8 gap-1.5 px-3 text-sm",
+  md: "h-9 gap-2 px-3.5 text-base",
+  lg: "h-11 gap-2 px-5 text-md",
 };
 
 export function buttonClasses(variant: Variant = "secondary", size: Size = "md"): string {
