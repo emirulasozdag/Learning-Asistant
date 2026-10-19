@@ -1,4 +1,4 @@
-import { ArrowUp } from "lucide-react";
+import { ArrowUp, Square } from "lucide-react";
 import { useEffect, useRef, type FormEvent, type KeyboardEvent } from "react";
 
 import { cx } from "../../ui/cx";
@@ -9,6 +9,8 @@ interface ComposerProps {
   onSubmit: () => void;
   disabled?: boolean;
   busy?: boolean;
+  /** Cevap sürerken gönder düğmesinin yerine "Durdur" gösterilir. */
+  onStop?: () => void;
   placeholder: string;
   hint: string;
 }
@@ -22,6 +24,7 @@ export default function Composer({
   onSubmit,
   disabled,
   busy,
+  onStop,
   placeholder,
   hint,
 }: ComposerProps) {
@@ -69,14 +72,26 @@ export default function Composer({
           disabled={disabled}
           className="max-h-[168px] min-h-9 flex-1 resize-none bg-transparent px-2 py-1.5 text-md text-ink placeholder:text-faint focus:outline-none disabled:cursor-not-allowed"
         />
-        <button
-          type="submit"
-          disabled={!canSend}
-          aria-label="Gönder"
-          className="flex size-9 shrink-0 items-center justify-center rounded-control bg-accent text-white transition-colors hover:bg-accent-hover disabled:bg-muted-bg disabled:text-faint"
-        >
-          <ArrowUp size={16} aria-hidden />
-        </button>
+        {busy && onStop ? (
+          <button
+            type="button"
+            onClick={onStop}
+            aria-label="Durdur"
+            title="Cevabı durdur"
+            className="flex size-9 shrink-0 items-center justify-center rounded-control bg-ink text-white transition-colors hover:bg-ink/85"
+          >
+            <Square size={14} fill="currentColor" aria-hidden />
+          </button>
+        ) : (
+          <button
+            type="submit"
+            disabled={!canSend}
+            aria-label="Gönder"
+            className="flex size-9 shrink-0 items-center justify-center rounded-control bg-accent text-white transition-colors hover:bg-accent-hover disabled:bg-muted-bg disabled:text-faint"
+          >
+            <ArrowUp size={16} aria-hidden />
+          </button>
+        )}
       </div>
       <p className="mt-2 text-center text-xs text-faint">{hint}</p>
     </form>

@@ -37,7 +37,7 @@ export const tutorService = {
     return SUGGESTED_QUESTIONS[courseCode] ?? GENERIC_QUESTIONS;
   },
 
-  source(sourceId: string) {
-    return api.source(sourceId);
+  source(sourceId: string, signal?: AbortSignal) {
+    return api.source(sourceId, signal);
   },
 };

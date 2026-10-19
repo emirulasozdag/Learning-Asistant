@@ -1,21 +1,47 @@
-import { CircleAlert, FlaskConical, ShieldCheck, Target, WandSparkles } from "lucide-react";
+import {
+  CircleAlert,
+  CircleSlash,
+  FlaskConical,
+  RotateCcw,
+  SearchX,
+  ServerOff,
+  Target,
+  WandSparkles,
+} from "lucide-react";
 
 import type { QuickAction } from "../../services/tutorService";
 import { reflow } from "../../text";
 import Button from "../../ui/Button";
 import { LogoMark } from "../../ui/Logo";
 import CitedText from "./CitedText";
+import { classifyResponse, declineExplanation } from "./outcome";
 import RetrievalDetails from "./RetrievalDetails";
 import SourceCards from "./SourceCards";
-import type { SelectSourceProps, Turn } from "./types";
+import type { SelectSourceProps, Turn, TutorFailure } from "./types";
 
 interface AnswerBlockProps extends SelectSourceProps {
   turn: Turn;
-  /** Yalnızca son cevapta hızlı eylemler gösterilir. */
+  /** Yalnızca son cevapta hızlı eylemler ve "Tekrar sor" gösterilir. */
   isLatest: boolean;
   onQuickAction: (action: QuickAction) => void;
   onPractice: () => void;
+  onRetry: () => void;
 }
+
+const FAILURE_COPY: Record<TutorFailure["kind"], { title: string; description: string }> = {
+  unavailable: {
+    title: "Ders servisine ulaşılamıyor",
+    description: "Bağlantını kontrol edip birkaç saniye sonra tekrar dene. Sorun sürerse eğitmenine haber ver.",
+  },
+  temporary: {
+    title: "Geçici bir sorun oluştu",
+    description: "Cevap hazırlanırken bir sorun çıktı. Tekrar sorarak yeniden deneyebilirsin.",
+  },
+  rejected: {
+    title: "Soru gönderilemedi",
+    description: "",
+  },
+};
 
 /** Bir sorunun cevabı: arıyor → yazıyor → doğrulanmış cevap / ret / hata. */
 export default function AnswerBlock({
@@ -23,6 +49,7 @@ export default function AnswerBlock({
   isLatest,
   onQuickAction,
   onPractice,
+  onRetry,
   selectedSourceId,
   onSelectSource,
 }: AnswerBlockProps) {
@@ -31,19 +58,59 @@ export default function AnswerBlock({
     <div className="flex gap-3">
       <LogoMark className="mt-0.5 size-5 shrink-0 text-ink" />
       <div className="min-w-0 flex-1">
-        <Body turn={turn} isLatest={isLatest} onQuickAction={onQuickAction} onPractice={onPractice} {...select} />
+        <Body
+          turn={turn}
+          isLatest={isLatest}
+          onQuickAction={onQuickAction}
+          onPractice={onPractice}
+          onRetry={onRetry}
+          {...select}
+        />
       </div>
     </div>
   );
 }
 
-function Body({ turn, isLatest, onQuickAction, onPractice, ...select }: AnswerBlockProps) {
-  if (turn.error) {
+function RetryButton({ onRetry }: { onRetry: () => void }) {
+  return (
+    <Button size="sm" icon={RotateCcw} onClick={onRetry}>
+      Tekrar sor
+    </Button>
+  );
+}
+
+function Body({ turn, isLatest, onQuickAction, onPractice, onRetry, ...select }: AnswerBlockProps) {
+  if (turn.failure) {
+    const copy = FAILURE_COPY[turn.failure.kind];
+    const description = turn.failure.detail || copy.description;
     return (
-      <p role="alert" className="flex items-start gap-2 text-md text-danger">
-        <CircleAlert size={16} aria-hidden className="mt-0.5 shrink-0" />
-        Cevap alınamadı: {turn.error}
-      </p>
+      <div role="alert" className="flex flex-col items-start gap-3">
+        <div>
+          <p className="flex items-center gap-2 text-base font-medium text-danger">
+            {turn.failure.kind === "unavailable" ? (
+              <ServerOff size={16} aria-hidden />
+            ) : (
+              <CircleAlert size={16} aria-hidden />
+            )}
+            {copy.title}
+          </p>
+          {description && <p className="mt-1 text-base text-graphite">{description}</p>}
+        </div>
+        {isLatest && <RetryButton onRetry={onRetry} />}
+      </div>
+    );
+  }
+
+  if (turn.stopped) {
+    // Yarım kalan metin gösterilmez: kaynakları doğrulanmadan bırakılmıştır.
+    return (
+      <div className="flex flex-col items-start gap-3">
+        <p className="flex items-center gap-2 text-base text-graphite">
+          <CircleSlash size={16} aria-hidden />
+          Durduruldu
+        </p>
+        {isLatest && <RetryButton onRetry={onRetry} />}
+      </div>
     );
   }
 
@@ -66,7 +133,7 @@ function Body({ turn, isLatest, onQuickAction, onPractice, ...select }: AnswerBl
       );
     }
     return (
-      <p role="status" className="flex h-7 items-center gap-2 text-base text-graphite">
+      <p className="flex h-7 items-center gap-2 text-base text-graphite">
         {turn.hits
           ? `${turn.hits.length} ilgili bölüm bulundu, cevap hazırlanıyor`
           : "Ders materyalinde aranıyor"}
@@ -79,15 +146,23 @@ function Body({ turn, isLatest, onQuickAction, onPractice, ...select }: AnswerBl
     );
   }
 
-  if (response.declined) {
+  const outcome = classifyResponse(response);
+
+  if (outcome === "not_generated") {
     return (
       <div className="flex flex-col gap-4">
-        <div className="rounded-panel border border-line bg-canvas px-4 py-3">
-          <p className="flex items-center gap-2 text-base font-medium text-ink">
-            <ShieldCheck size={16} aria-hidden className="text-accent" />
-            Bu soru ders materyalinde yok
-          </p>
-          <p className="mt-1 text-base text-graphite">{response.decline_reason}</p>
+        <div role="alert" className="flex flex-col items-start gap-3">
+          <div>
+            <p className="flex items-center gap-2 text-base font-medium text-ink">
+              <CircleAlert size={16} aria-hidden className="text-warning" />
+              Cevap hazırlanamadı
+            </p>
+            <p className="mt-1 text-base text-graphite">
+              Bu soru için ders materyalinden dayanaklı bir cevap yazılamadı. Tekrar sorabilir ya da
+              soruyu daha açık yazabilirsin.
+            </p>
+          </div>
+          {isLatest && <RetryButton onRetry={onRetry} />}
         </div>
         {response.suggested_sources.length > 0 && (
           <div>
@@ -100,12 +175,33 @@ function Body({ turn, isLatest, onQuickAction, onPractice, ...select }: AnswerBl
     );
   }
 
-  const extractive = response.mode === "extractive";
+  if (outcome === "out_of_scope") {
+    return (
+      <div className="flex flex-col gap-4">
+        <div className="rounded-panel border border-line bg-canvas px-4 py-3">
+          <p className="flex items-center gap-2 text-base font-medium text-ink">
+            <SearchX size={16} aria-hidden className="text-graphite" />
+            Bu soru için ders materyalinde yeterli bilgi bulunamadı
+          </p>
+          <p className="mt-1 text-base text-graphite">{declineExplanation(response)}</p>
+        </div>
+        {response.suggested_sources.length > 0 && (
+          <div>
+            <p className="mb-2 text-sm text-graphite">Notlardaki en yakın bölümler</p>
+            <SourceCards citations={response.suggested_sources} numbered={false} {...select} />
+          </div>
+        )}
+        <RetrievalDetails response={response} {...select} />
+      </div>
+    );
+  }
+
+  const extractive = outcome === "ai_unavailable";
   return (
     <div className="flex flex-col gap-4">
       {extractive && (
         <p className="text-sm text-graphite">
-          Özetleyen model bağlı değil; ders notundaki ilgili bölüm aynen alıntılandı.
+          Yapay zekâ şu an kullanılamıyor; ders materyalindeki ilgili bölüm olduğu gibi gösteriliyor.
         </p>
       )}
       <div
