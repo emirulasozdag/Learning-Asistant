@@ -14,7 +14,7 @@ Engineering Design II · Project 8. Pilot ders: Veri Yapıları ve Algoritmalar.
 > - **Hibrit RAG arama:** anlamsal (e5 + pgvector) ve kelime (PostgreSQL tam metin) aramaları RRF ile birleşir. Alakasız sorular modele hiç gitmeden elenir.
 > - **AI chat:** OpenRouter üzerinden Claude; cevap akarak gelir, her bilgi [1], [2] ile kaynağına bağlanır, kaynak yetmezse reddeder. Takip sorularını hatırlar.
 > - **Kaynak gösterme:** alıntıya tıklayınca PDF'in gerçek sayfası açılır, alıntılanan satırlar işaretlenir. "Nasıl bulundu" paneli arama skorlarını gösterir.
-> - **Henüz yok:** video, pratik, değerlendirme, eğitmen analizleri, hallucination ölçümü, giriş/yetki. Bu endpoint'ler `501` döner.
+> - **Henüz yok:** video, pratik, değerlendirme, eğitmen analizleri, hallucination ölçümü, gerçek giriş/yetki (arayüzdeki giriş sahtedir; backend hiçbir isteği kimliğe veya ders üyeliğine göre kısıtlamaz). Pratik, eğitmen, öğrenme kaydı ve rubrik endpoint'leri `501` döner.
 >
 > Hangi özelliğin hangi dosyada olduğu ve durumu: [ANALYSIS.md §14.1](docs/ANALYSIS.md).
 > Kapsam, gereksinimler, mimari ve yol haritası: **[docs/ANALYSIS.md](docs/ANALYSIS.md)**
@@ -25,19 +25,19 @@ Engineering Design II · Project 8. Pilot ders: Veri Yapıları ve Algoritmalar.
 Learning-Asistent/
 ├── backend/               FastAPI uygulaması
 │   ├── app/
-│   │   ├── api/           HTTP endpoint'leri (/health dışındakiler şimdilik 501)
+│   │   ├── api/           HTTP endpoint'leri (pratik, eğitmen, öğrenme kaydı, rubrik: şimdilik 501)
 │   │   ├── schemas/       API sözleşmeleri (Pydantic)
 │   │   ├── core/          yapılandırma
-│   │   ├── db/            bağlantı, oturum, ORM tabanı (tablolar WP3)
+│   │   ├── db/            bağlantı, oturum, ORM modelleri
 │   │   ├── ingestion/     parser'lar, temizleme, chunking, transkript
 │   │   ├── retrieval/     dense + lexical + RRF + rerank + video-zaman
-│   │   ├── generation/    answer · question · grade · conversation
+│   │   ├── generation/    answer · question · grade
 │   │   ├── verification/  kaynak ID, pratik kontrolleri, iddia / judge, hallucination
 │   │   ├── routing/       task router
 │   │   ├── llm/           model gateway (local / hosted)
 │   │   ├── courses/       ders listesi
 │   │   ├── sources/       alıntılanan kaynağı getirme
-│   │   ├── auth/          ders bazlı erişim kontrolü
+│   │   ├── auth/          ders bazlı erişim kontrolü (henüz iskelet)
 │   │   ├── learning/      öğrenme kaydı
 │   │   └── instructor/    sık hatalar, onay / düzeltme, rubrikler
 │   ├── migrations/        Alembic
@@ -50,7 +50,7 @@ Learning-Asistent/
 │   ├── features/          tutor/, materials/, courses/
 │   └── pages/             route başına sayfa (auth, instructor, student)
 ├── evaluation/            gold set'ler, rubrikler, insan etiketleri, harness/
-├── docs/                  analiz, ekip belgeleri
+├── docs/                  analiz, ekip kararları (DECISIONS), sözleşmeler (CONTRACTS)
 ├── docker/                PostgreSQL init
 ├── .github/               CI, issue / PR şablonları
 └── docker-compose.yml
@@ -76,7 +76,7 @@ Portlar doluysa `.env` içindeki `WEB_PORT`, `API_PORT`, `POSTGRES_PORT` değiş
 Sonraki açılışlarda model `models` volume'undan yüklenir, internet gerekmez.
 
 ### Demo
-Giriş ekranındaki **demo hesaplarıyla** tek tıkla girilir (kimlik doğrulama backend'i henüz yok; oturum tarayıcıda tutulur):
+Giriş ekranındaki **demo hesaplarıyla** tek tıkla girilir (sahte giriş: kimlik doğrulama ve erişim kontrolü henüz yok, oturum yalnızca tarayıcıda tutulur; bkz. [docs/DECISIONS.md](docs/DECISIONS.md)):
 **Dr. Ayşe Demir** (eğitmen) ve **Elif Kaya** (öğrenci).
 
 1. Eğitmen olarak gir. Sol menüdeki **+** ile bir ders oluştur (ya da hazır BLM2512'yi kullan).
