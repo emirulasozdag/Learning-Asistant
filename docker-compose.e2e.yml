@@ -1,0 +1,33 @@
+# Tarayıcı testleri (Playwright) için ayrı, geçici sistem. Geliştirme sistemine dokunmaz.
+#
+#   docker compose -p learning-e2e -f docker-compose.yml -f docker-compose.e2e.yml up -d --build
+#   docker compose -p learning-e2e -f docker-compose.yml -f docker-compose.e2e.yml down -v
+#
+# - `-p learning-e2e`: veritabanı ve diğer volume'lar ayrı ada sahip olur.
+# - Portlar `!override` ile değiştirilir (yoksa Compose ana dosyadaki portlara ekler ve
+#   açık geliştirme sistemiyle çakışır): web 5273, API 8100, veritabanı 5532.
+# - Yüklenen dosyalar `./data` yerine ayrı bir volume'a yazılır.
+# - LLM'siz mod ve sahte embedder: model indirilmez, cevaplar deterministiktir.
+
+services:
+  db:
+    ports: !override
+      - "5532:5432"
+
+  api:
+    environment:
+      LLM_API_KEY: ""
+      EMBEDDING_PROVIDER: fake
+      CORS_ORIGINS: http://localhost:5273
+    ports: !override
+      - "8100:8000"
+    volumes:
+      # Aynı hedef yol: ana dosyadaki `./data:/code/data` bağlamasının yerine geçer.
+      - e2e-data:/code/data
+
+  web:
+    ports: !override
+      - "5273:5173"
+
+volumes:
+  e2e-data:
