@@ -49,20 +49,19 @@ function Body({ turn, isLatest, onQuickAction, onPractice, ...select }: AnswerBl
 
   const { response } = turn;
   if (!response) {
-    if (turn.streamText && turn.hits) {
-      const hits = turn.hits;
+    if (turn.streamText) {
+      // Akan metin doğrulanmamış taslaktır: soluk gösterilir, alıntılar tıklanamaz.
+      // Doğrulanmış cevap (`done`) geldiğinde tamamen onun yerini alır.
       return (
-        <div className="text-md leading-7 whitespace-pre-wrap text-ink">
-          <CitedText
-            text={turn.streamText}
-            pattern={/(\[S\d+\])/}
-            resolve={(n) => {
-              const hit = hits[n - 1];
-              return hit && { source_id: hit.source_id, document_title: hit.document_title, page: hit.page };
-            }}
-            {...select}
-          />
-          <span aria-hidden className="ml-0.5 inline-block h-4 w-[7px] translate-y-0.5 animate-pulse bg-accent" />
+        <div aria-busy="true">
+          <p role="status" className="mb-1.5 flex items-center gap-1.5 text-sm text-graphite">
+            <ShieldCheck size={14} aria-hidden className="text-accent" />
+            Kaynaklarla kontrol ediliyor…
+          </p>
+          <div className="text-md leading-7 whitespace-pre-wrap text-graphite opacity-80">
+            {draftText(turn.streamText)}
+            <span aria-hidden className="ml-0.5 inline-block h-4 w-[7px] translate-y-0.5 animate-pulse bg-accent" />
+          </div>
         </div>
       );
     }
@@ -124,6 +123,12 @@ function Body({ turn, isLatest, onQuickAction, onPractice, ...select }: AnswerBl
         />
       </div>
 
+      {response.unsupported_removed > 0 && (
+        <p className="text-sm text-graphite">
+          Kaynaklarda dayanağı bulunmayan {response.unsupported_removed} cümle cevaptan çıkarıldı.
+        </p>
+      )}
+
       <div>
         <p className="mb-2 text-sm text-graphite">Kaynaklar</p>
         <SourceCards citations={response.citations} {...select} />
@@ -145,6 +150,11 @@ function Body({ turn, isLatest, onQuickAction, onPractice, ...select }: AnswerBl
       <RetrievalDetails response={response} {...select} />
     </div>
   );
+}
+
+/** Taslaktaki [S#] etiketleri (yarım kalmış olanlar dahil) henüz doğrulanmadığı için gizlenir. */
+function draftText(text: string): string {
+  return text.replace(/\s?\[S\d+\]/g, "").replace(/\s?\[S?\d*$/, "");
 }
 
 /** LLM'siz cevabın ilk satırı ("…en uygun kısım:") üstteki notla aynı şeyi söyler. */

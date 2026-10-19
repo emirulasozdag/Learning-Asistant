@@ -61,7 +61,11 @@ def ask_stream(
     llm: LLMClient | None,
     embedder: Embedder | None = None,
 ) -> Iterator[QAEvent]:
-    """Önce bulunan parçalar, sonra cevap metni parça parça, en sonda doğrulanmış cevap."""
+    """Önce bulunan parçalar, sonra taslak cevap metni parça parça, en sonda doğrulanmış cevap.
+
+    DeltaEvent'ler doğrulanmamış taslaktır; DoneEvent'teki cevap taslağın yerini alır
+    (iddialar çıkarılmış, cevap reddedilmiş ya da LLM'siz alıntıya düşülmüş olabilir).
+    """
     conversation = get_conversation(db, course, request.conversation_id)
     history = _history(db, conversation)
 
@@ -101,6 +105,7 @@ def ask_stream(
                 content=response.answer or response.decline_reason or "",
                 meta={
                     "declined": response.declined,
+                    "outcome": response.outcome,
                     "mode": response.mode,
                     "model": response.model,
                     "cited_source_ids": sorted(cited),

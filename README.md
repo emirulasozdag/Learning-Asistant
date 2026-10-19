@@ -100,6 +100,32 @@ LLM_MODEL=anthropic/claude-opus-5.5
 - `LLM_MODEL` ile model değiştirilebilir. Örneğin `anthropic/claude-haiku-5.5` çok daha ucuzdur.
 - Anahtar boşsa sistem **LLM'siz** çalışır: cevap yerine en ilgili ders parçasını kaynağıyla gösterir.
 
+### Cevap akışı ve alıntı doğrulama
+`POST /api/ask/stream` sırasıyla şu olayları gönderir:
+1. `retrieval`: bulunan parçalar
+2. `delta`: **taslak** metin parçaları
+3. `done`: doğrulanmış cevap
+
+Hata olursa `error` olayı gelir.
+
+- **Taslak doğrulanmamıştır.** Arayüz onu soluk renkte, "Kaynaklarla kontrol ediliyor…" notuyla ve alıntıları tıklanamaz halde gösterir. `done` geldiğinde taslak tamamen `done.answer` ile değiştirilir.
+- **Doğrulama** (`backend/app/verification/citations.py`) cümle düzeyinde çalışır:
+  - Uydurma etiketli (`[S9]`) ya da hiç alıntısı olmayan iddia cümleleri cevaptan çıkarılır.
+  - Etiketsiz cümleler, aynı paragrafta kendilerinden sonra gelen etiketli cümlenin kaynağını paylaşır.
+  - Desteklenen iddia oranı %60'ın altına düşerse ya da geçerli alıntı kalmazsa cevap gösterilmez.
+- **`done.outcome`** sonucu bildirir:
+  - `answered`: cevaplandı
+  - `insufficient_evidence`: materyalde yok
+  - `unsupported`: doğrulamadan geçemedi
+  - `model_refusal`: model reddetti
+  - `provider_failure`: modele ulaşılamadı; en ilgili parça alıntılandı
+
+  `unsupported_removed` kaç cümlenin çıkarıldığını söyler.
+- **Gecikme:**
+  - İlk taslak kelimeler, aramadan sonra modelin ilk token süresi kadar gecikir (canlı ölçüm #8 baseline'ında yapılacak).
+  - Doğrulama yerel ve milisaniyeler sürer; `done`, model yazmayı bitirir bitirmez gelir.
+  - Alakasız sorular LLM'e hiç gitmez; anında `insufficient_evidence` döner.
+
 ### Yerel geliştirme
 
 Backend (Python 3.12):

@@ -13,6 +13,7 @@ from sqlalchemy import func, select
 
 from app.api import ask as ask_api
 from app.db.models import Chunk, Course, Message
+from app.llm.base import LLMError
 from tests.test_answer import FakeLLM
 
 
@@ -118,7 +119,7 @@ def test_ask_returns_cited_answer_and_source_opens_at_page(
     ).json()
 
     assert not answer["declined"]
-    assert answer["mode"] == "extractive"
+    assert answer["mode"] == "extractive" and answer["outcome"] == "answered"
     assert "sag yari elenir" in answer["answer"]
     citation = answer["citations"][0]
     assert (citation["document_title"], citation["page"]) == ("notlar", 2)
@@ -139,6 +140,7 @@ def test_ask_out_of_scope_question_is_declined(
     ).json()
 
     assert answer["declined"] is True
+    assert answer["outcome"] == "insufficient_evidence"
     assert answer["answer"] is None
     assert answer["citations"] == []
 
@@ -303,10 +305,57 @@ def test_stream_endpoint_sends_retrieval_deltas_and_validated_answer(
     hits = events[0][1]
     done = events[-1][1]
     assert done["answer"] == "Dizi sirali oldugu icin sag yari elenir [1]."
+    assert done["outcome"] == "answered"
     assert done["model"] == "fake-model"
     assert done["citations"][0]["source_id"] == hits[0]["source_id"]
     assert [hit["used"] for hit in done["retrieval"]][0] is True
     assert done["similarity_threshold"] == pytest.approx(0.78)
+
+
+def test_stream_draft_is_superseded_by_verified_answer(
+    client: TestClient, db, course: Course, sample_pdf: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    upload(client, course.id, sample_pdf)
+    llm = FakeLLM(
+        [
+            "Dizi sirali oldugu icin sag yari elenir [S1]. ",
+            "Arama her adimda yariya iner [S1]. ",
+            "Bu da uydurma bir iddia [S9].",
+        ]
+    )
+    monkeypatch.setattr(ask_api, "select_client", lambda: llm)
+
+    response = client.post(
+        "/ask/stream", json={"course_id": course.id, "question": "Neden sag yari elenir?"}
+    )
+    events = parse_sse(response.text)
+
+    draft = "".join(data["text"] for name, data in events if name == "delta")
+    done = events[-1][1]
+    assert "uydurma" in draft  # taslak akmıştı...
+    assert "uydurma" not in done["answer"]  # ...ama doğrulanmış cevapta yok
+    assert done["unsupported_removed"] == 1
+    stored = db.scalars(select(Message).where(Message.role == "assistant")).one()
+    assert stored.content == done["answer"]
+    assert stored.meta["outcome"] == "answered"
+
+
+def test_stream_provider_failure_mid_answer_is_reported(
+    client: TestClient, course: Course, sample_pdf: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    upload(client, course.id, sample_pdf)
+    llm = FakeLLM(["Dizi sirali oldugu icin "], error=LLMError("baglanti koptu"))
+    monkeypatch.setattr(ask_api, "select_client", lambda: llm)
+
+    response = client.post(
+        "/ask/stream", json={"course_id": course.id, "question": "Neden sag yari elenir?"}
+    )
+    events = parse_sse(response.text)
+
+    assert [name for name, _ in events] == ["retrieval", "delta", "done"]
+    done = events[-1][1]
+    assert done["outcome"] == "provider_failure"
+    assert done["mode"] == "extractive" and "sag yari elenir" in done["answer"]
 
 
 def test_irrelevant_question_never_reaches_the_llm(
