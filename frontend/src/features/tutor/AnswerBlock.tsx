@@ -1,5 +1,6 @@
 import {
   CircleAlert,
+  CircleSlash,
   FlaskConical,
   RotateCcw,
   SearchX,
@@ -95,6 +96,19 @@ function Body({ turn, isLatest, onQuickAction, onPractice, onRetry, ...select }:
           </p>
           {description && <p className="mt-1 text-base text-graphite">{description}</p>}
         </div>
+        {isLatest && <RetryButton onRetry={onRetry} />}
+      </div>
+    );
+  }
+
+  if (turn.stopped) {
+    // Yarım kalan metin gösterilmez: kaynakları doğrulanmadan bırakılmıştır.
+    return (
+      <div role="status" className="flex flex-col items-start gap-3">
+        <p className="flex items-center gap-2 text-base text-graphite">
+          <CircleSlash size={16} aria-hidden />
+          Durduruldu
+        </p>
         {isLatest && <RetryButton onRetry={onRetry} />}
       </div>
     );

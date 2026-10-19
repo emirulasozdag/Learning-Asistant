@@ -21,6 +21,8 @@ export interface Turn {
   streamText: string;
   response?: AskResponse;
   failure?: TutorFailure;
+  /** Öğrenci "Durdur"a bastı; cevap tamamlanmadı. */
+  stopped?: boolean;
 }
 
 export interface SelectSourceProps {

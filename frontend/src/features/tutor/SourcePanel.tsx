@@ -18,8 +18,9 @@ export default function SourcePanel({ sourceId, onClose }: { sourceId: string; o
 
   useEffect(() => {
     let cancelled = false;
+    const controller = new AbortController();
     tutorService
-      .source(sourceId)
+      .source(sourceId, controller.signal)
       .then((detail) => {
         if (!cancelled) {
           setSource(detail);
@@ -31,6 +32,7 @@ export default function SourcePanel({ sourceId, onClose }: { sourceId: string; o
       });
     return () => {
       cancelled = true;
+      controller.abort();
     };
   }, [sourceId]);
 

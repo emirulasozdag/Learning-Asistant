@@ -1,4 +1,4 @@
-import { ArrowUpRight, BookOpen, ShieldCheck, SquarePen } from "lucide-react";
+import { ArrowUpRight, BookOpen, ServerOff, ShieldCheck, SquarePen } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 
@@ -16,16 +16,69 @@ import Badge from "../../ui/Badge";
 import Button from "../../ui/Button";
 import EmptyState from "../../ui/EmptyState";
 import FileBadge from "../../ui/FileBadge";
-import Skeleton from "../../ui/Skeleton";
+import { SkeletonRows } from "../../ui/Skeleton";
 
-/** AI Tutor: dersin materyalinden, kaynaklı ve akışlı cevaplar. Ürünün ana ekranı. */
+/**
+ * AI Tutor: dersin materyalinden, kaynaklı ve akışlı cevaplar. Ürünün ana ekranı.
+ * Ders listesinin durumunu (yükleniyor / hata / ders yok) burada çözer; sohbet `TutorSession`'da.
+ */
 export default function TutorPage() {
   const courseId = Number(useParams().courseId);
   const course = useCourse(courseId);
-  const { loading: coursesLoading } = useCourses();
+  const { loading, error, refresh } = useCourses();
+  const [retrying, setRetrying] = useState(false);
+
+  async function retryCourses() {
+    setRetrying(true);
+    await refresh();
+    setRetrying(false);
+  }
+
+  if (!course) {
+    if (loading) {
+      return (
+        <div className="mx-auto max-w-3xl px-6 pt-10">
+          <SkeletonRows rows={2} />
+        </div>
+      );
+    }
+    if (error) {
+      return (
+        <EmptyState
+          icon={ServerOff}
+          tone="danger"
+          title="Dersler yüklenemedi"
+          description="Ders listesine şu an ulaşılamıyor. Bağlantını kontrol edip tekrar dene."
+          action={
+            <Button loading={retrying} onClick={() => void retryCourses()}>
+              Tekrar dene
+            </Button>
+          }
+          className="py-24"
+        />
+      );
+    }
+    return (
+      <EmptyState
+        icon={BookOpen}
+        title="Ders bulunamadı"
+        description="Soldaki menüden bir ders seç."
+        className="py-24"
+      />
+    );
+  }
+
+  // `key`: ders değişince sohbet, açık kaynak, materyal durumu ve süren istekler sıfırlanır.
+  return <TutorSession key={course.id} course={course} />;
+}
+
+function TutorSession({ course }: { course: Course }) {
+  const courseId = course.id;
   const navigate = useNavigate();
 
   const [materials, setMaterials] = useState<DocumentOut[] | null>(null);
+  const [materialsFailed, setMaterialsFailed] = useState(false);
+  const [materialsAttempt, setMaterialsAttempt] = useState(0);
   const [turns, setTurns] = useState<Turn[]>([]);
   const [question, setQuestion] = useState("");
   const [conversationId, setConversationId] = useState<number | null>(null);
@@ -35,20 +88,26 @@ export default function TutorPage() {
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    let cancelled = false;
+    const controller = new AbortController();
     courseService
-      .materials(courseId)
+      .materials(courseId, controller.signal)
       .then((list) => {
-        if (!cancelled) setMaterials(list);
+        if (!controller.signal.aborted) setMaterials(list);
       })
       .catch(() => {
-        if (!cancelled) setMaterials([]);
+        if (!controller.signal.aborted) setMaterialsFailed(true);
       });
-    return () => {
-      cancelled = true;
-      abortRef.current?.abort();
-    };
-  }, [courseId]);
+    return () => controller.abort();
+  }, [courseId, materialsAttempt]);
+
+  // Sayfadan ya da dersten ayrılırken süren soruyu iptal et.
+  useEffect(() => () => abortRef.current?.abort(), []);
+
+  function reloadMaterials() {
+    setMaterialsFailed(false);
+    setMaterials(null);
+    setMaterialsAttempt((attempt) => attempt + 1);
+  }
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -89,16 +148,24 @@ export default function TutorPage() {
         },
         controller.signal,
       );
-      updateTurn(id, (t) =>
-        t.response || t.failure ? t : { ...t, failure: { kind: "unavailable" } },
-      );
+      updateTurn(id, (t) => {
+        if (t.response || t.failure) return t;
+        return controller.signal.aborted ? { ...t, stopped: true } : { ...t, failure: { kind: "unavailable" } };
+      });
     } catch (reason) {
-      if (!controller.signal.aborted) {
-        updateTurn(id, (t) => ({ ...t, failure: classifyFailure(reason) }));
-      }
+      updateTurn(id, (t) => {
+        if (t.response || t.failure) return t;
+        return controller.signal.aborted ? { ...t, stopped: true } : { ...t, failure: classifyFailure(reason) };
+      });
     } finally {
-      setBusy(false);
+      // Yeni sohbet başladıysa eski isteğin bitişi yeni isteğin durumunu bozmasın.
+      if (abortRef.current === controller) setBusy(false);
     }
+  }
+
+  /** Süren cevabı durdurur; tur "Durduruldu" olarak işaretlenir (ask içindeki catch'te). */
+  function stop() {
+    abortRef.current?.abort();
   }
 
   function newConversation() {
@@ -124,31 +191,14 @@ export default function TutorPage() {
     navigate(`/student/practice?course=${courseId}&topic=${encodeURIComponent(topic)}`);
   }
 
-  if (!course && !coursesLoading) {
-    return (
-      <EmptyState
-        icon={BookOpen}
-        title="Ders bulunamadı"
-        description="Soldaki menüden bir ders seç."
-        className="py-24"
-      />
-    );
-  }
-
   const noMaterials = materials !== null && materials.length === 0;
 
   return (
     <div className="flex h-full min-h-0">
       <section className="flex min-w-0 flex-1 flex-col">
         <div className="flex h-12 shrink-0 items-center gap-3 border-b border-line bg-surface px-5">
-          {course ? (
-            <>
-              <Badge>{course.code}</Badge>
-              <p className="truncate text-base font-medium text-ink">{course.name}</p>
-            </>
-          ) : (
-            <Skeleton className="h-3.5 w-64" />
-          )}
+          <Badge>{course.code}</Badge>
+          <p className="truncate text-base font-medium text-ink">{course.name}</p>
           <div className="ml-auto flex shrink-0 items-center gap-3">
             <span
               className={`hidden items-center gap-1.5 text-sm whitespace-nowrap text-graphite md:flex ${
@@ -169,13 +219,13 @@ export default function TutorPage() {
         <div className="min-h-0 flex-1 overflow-y-auto">
           <div className="mx-auto w-full max-w-[720px] px-5 sm:px-8">
             {turns.length === 0 ? (
-              course && (
-                <TutorWelcome
-                  course={course}
-                  materials={materials}
-                  onAsk={(text) => void ask(text)}
-                />
-              )
+              <TutorWelcome
+                course={course}
+                materials={materials}
+                failed={materialsFailed}
+                onReload={reloadMaterials}
+                onAsk={(text) => void ask(text)}
+              />
             ) : (
               <ol className="pt-8 pb-6">
                 {turns.map((turn, index) => (
@@ -205,6 +255,7 @@ export default function TutorPage() {
               onChange={setQuestion}
               onSubmit={() => void ask(question)}
               busy={busy}
+              onStop={stop}
               disabled={noMaterials}
               placeholder={
                 noMaterials
@@ -239,12 +290,29 @@ export default function TutorPage() {
 function TutorWelcome({
   course,
   materials,
+  failed,
+  onReload,
   onAsk,
 }: {
   course: Course;
   materials: DocumentOut[] | null;
+  /** Materyal listesi yüklenemedi: "materyal yok"tan farklı bir durum. */
+  failed: boolean;
+  onReload: () => void;
   onAsk: (text: string) => void;
 }) {
+  if (failed) {
+    return (
+      <EmptyState
+        icon={ServerOff}
+        tone="danger"
+        title="Materyaller yüklenemedi"
+        description="Ders materyaline şu an ulaşılamıyor. Bağlantını kontrol edip tekrar dene."
+        action={<Button onClick={onReload}>Tekrar dene</Button>}
+        className="py-24"
+      />
+    );
+  }
   if (materials !== null && materials.length === 0) {
     return (
       <EmptyState
@@ -284,6 +352,13 @@ function TutorWelcome({
           </li>
         ))}
       </ul>
+
+      {materials === null && (
+        <>
+          <h2 className="mt-10 mb-3 text-sm text-graphite">Bu derste aranan materyal</h2>
+          <SkeletonRows rows={2} />
+        </>
+      )}
 
       {materials && materials.length > 0 && (
         <>

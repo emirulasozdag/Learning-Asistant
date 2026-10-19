@@ -153,7 +153,8 @@ export const api = {
 
   askStream,
 
-  source: (sourceId: string) => request<SourceDetail>(`/sources/${encodeURIComponent(sourceId)}`),
+  source: (sourceId: string, signal?: AbortSignal) =>
+    request<SourceDetail>(`/sources/${encodeURIComponent(sourceId)}`, { signal }),
 
   ask: (body: AskRequest) =>
     request<AskResponse>("/ask", { method: "POST", body: JSON.stringify(body) }),
@@ -184,7 +185,8 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
-  materials: (courseId: number) => request<DocumentOut[]>(`/courses/${courseId}/materials`),
+  materials: (courseId: number, signal?: AbortSignal) =>
+    request<DocumentOut[]>(`/courses/${courseId}/materials`, { signal }),
 
   documentChunks: (documentId: number) =>
     request<ChunkPreview[]>(`/documents/${documentId}/chunks`),
