@@ -28,16 +28,33 @@ class RetrievalHit(BaseModel):
     used: bool = False
 
 
+# Cevabın nasıl sonuçlandığı (arayüz her birine farklı mesaj gösterebilir):
+# - answered: doğrulanmış, alıntılı cevap (LLM ya da LLM'siz alıntı modu)
+# - insufficient_evidence: materyalde yok (alakasızlık kapısı ya da model "YOK:" dedi)
+# - unsupported: model cevap yazdı ama alıntı doğrulamasından geçemedi
+# - model_refusal: model soruyu yanıtlamayı reddetti
+# - provider_failure: LLM servisine ulaşılamadı; yerine en ilgili parça alıntılandı
+AskOutcome = Literal[
+    "answered", "insufficient_evidence", "unsupported", "model_refusal", "provider_failure"
+]
+
+
 class AskResponse(BaseModel):
     """Cite-or-decline cevabı: ya alıntılı cevap ya da gerekçeli reddetme.
 
     `answer` içindeki [1], [2] işaretleri `citations` listesindeki sıraya karşılık gelir.
     mode: "llm" = model kaynaklardan cevap yazdı; "extractive" = LLM yok/erişilemedi,
     en ilgili parça alıntılandı.
+
+    Akışta (`/ask/stream`) gelen `delta` metni taslaktır; yalnızca bu yanıt doğrulanmıştır
+    ve taslağın yerini her zaman alır.
     """
 
     answer: str | None
     mode: Literal["llm", "extractive"] = "llm"
+    outcome: AskOutcome = "answered"
+    # Kaynağa dayanmadığı için cevaptan çıkarılan iddia (cümle) sayısı.
+    unsupported_removed: int = 0
     citations: list[Citation] = []
     declined: bool = False
     decline_reason: str | None = None

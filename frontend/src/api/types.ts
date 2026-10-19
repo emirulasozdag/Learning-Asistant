@@ -27,11 +27,29 @@ export interface RetrievalHit {
   used: boolean;
 }
 
+/**
+ * Cevabın nasıl sonuçlandığı:
+ * - answered: doğrulanmış, alıntılı cevap
+ * - insufficient_evidence: materyalde yok
+ * - unsupported: model yazdı ama alıntı doğrulamasından geçemedi
+ * - model_refusal: model yanıtlamayı reddetti
+ * - provider_failure: modele ulaşılamadı; en ilgili parça alıntılandı
+ */
+export type AskOutcome =
+  | "answered"
+  | "insufficient_evidence"
+  | "unsupported"
+  | "model_refusal"
+  | "provider_failure";
+
 export interface AskResponse {
   /** [1], [2]... işaretleri `citations` sırasına karşılık gelir. */
   answer: string | null;
   /** "llm": model kaynaklardan yazdı; "extractive": LLM yok, en ilgili parça alıntılandı. */
   mode: "llm" | "extractive";
+  outcome: AskOutcome;
+  /** Kaynağa dayanmadığı için cevaptan çıkarılan cümle sayısı. */
+  unsupported_removed: number;
   citations: Citation[];
   declined: boolean;
   decline_reason: string | null;
@@ -43,7 +61,10 @@ export interface AskResponse {
   model: string | null;
 }
 
-/** /ask/stream olayları (Server-Sent Events). */
+/**
+ * /ask/stream olayları (Server-Sent Events). `delta` metni doğrulanmamış taslaktır;
+ * `done` içindeki cevap doğrulanmıştır ve taslağın yerini her zaman alır.
+ */
 export type AskStreamEvent =
   | { type: "retrieval"; hits: RetrievalHit[] }
   | { type: "delta"; text: string }

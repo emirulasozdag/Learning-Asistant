@@ -28,8 +28,8 @@ def ask(request: AskRequest, db: DbSession) -> AskResponse:
 def ask_stream(request: AskRequest, db: DbSession, sessions: SessionFactory) -> StreamingResponse:
     """Aynı akış, Server-Sent Events olarak.
 
-    Olaylar: `retrieval` (bulunan parçalar), `delta` (cevap metni parçası),
-    `done` (doğrulanmış AskResponse), hata olursa `error`.
+    Olaylar: `retrieval` (bulunan parçalar), `delta` (doğrulanmamış taslak metin parçası),
+    `done` (doğrulanmış AskResponse; taslağın yerini her zaman alır), hata olursa `error`.
     """
     get_course_or_404(db, request.course_id)
 

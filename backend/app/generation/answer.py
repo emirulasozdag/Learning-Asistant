@@ -1,9 +1,11 @@
 """Cite-or-decline cevap üretimi (sunum slayt 4, 12).
 
 Model düz metin yazar ve her bilgiye dayandığı kaynağın etiketini koyar ([S1], [S2]...).
-Kaynaklar yetmiyorsa cevaba "YOK:" ile başlar. Akış bitince etiketler doğrulanır
-(`verification.citations`) ve [1], [2]... olarak yeniden numaralanır; geçerli alıntı
-kalmazsa cevap gösterilmez.
+Kaynaklar yetmiyorsa cevaba "YOK:" ile başlar. Akış bitince iddialar doğrulanır
+(`verification.citations`): uydurma etiketli ya da alıntısız cümleler çıkarılır, kalan
+etiketler [1], [2]... olarak numaralanır; yeterli kapsama kalmazsa cevap gösterilmez.
+
+Akan metin (str parçaları) yalnızca taslaktır; son AskResponse her zaman onun yerini alır.
 """
 
 import logging
@@ -12,14 +14,14 @@ from collections.abc import Iterator
 from app.db.models import Course
 from app.llm.base import ChatMessage, LLMClient, LLMError, LLMRefusal
 from app.retrieval.types import RetrievalResult, RetrievedPassage
-from app.schemas.ask import AskResponse
+from app.schemas.ask import AskOutcome, AskResponse
 from app.schemas.common import Citation
-from app.verification.citations import resolve_citations
+from app.verification.citations import verify_answer
 
 logger = logging.getLogger(__name__)
 
 NOT_COVERED = "Bu konu ders materyalinde yer almıyor; cevap uydurmamak için yanıt verilmedi."
-UNSUPPORTED = "Cevap ders kaynaklarına dayandırılamadı; bu yüzden gösterilmedi."
+UNSUPPORTED = "Cevap ders kaynaklarıyla doğrulanamadı; bu yüzden gösterilmedi."
 REFUSED = "Model bu soruyu yanıtlamadı."
 DECLINE_PREFIX = "YOK:"
 # LLM'siz modda alıntılanacak en fazla karakter.
@@ -63,6 +65,7 @@ def stream_answer(
             answer=None,
             declined=True,
             decline_reason=NOT_COVERED,
+            outcome="insufficient_evidence",
             mode="llm" if llm else "extractive",
         )
         return
@@ -94,22 +97,43 @@ def stream_answer(
             if not declined:
                 yield delta
     except LLMRefusal:
-        yield AskResponse(answer=None, declined=True, decline_reason=REFUSED, model=llm.model)
+        yield AskResponse(
+            answer=None,
+            declined=True,
+            decline_reason=REFUSED,
+            outcome="model_refusal",
+            model=llm.model,
+        )
         return
     except LLMError as exc:
+        # Yarım kalan taslak gösterilmez; yerine en ilgili parça açıkça alıntılanır.
         logger.warning("LLM kullanılamadı, LLM'siz moda düşülüyor: %s", exc)
-        yield extractive_answer(passages)
+        fallback = extractive_answer(passages)
+        fallback.outcome = "provider_failure"
+        yield fallback
         return
 
     if declined or text.lstrip().startswith(DECLINE_PREFIX):
         reason = text.lstrip()[len(DECLINE_PREFIX) :].strip() or NOT_COVERED
-        response = _decline(reason, passages)
+        response = _decline(reason, passages, "insufficient_evidence")
     else:
-        answer, cited = resolve_citations(text, [], labels)
+        verification = verify_answer(text, labels)
+        if verification.dropped_claims:
+            logger.info(
+                "Doğrulanamayan %d iddia çıkarıldı (kapsama %.2f, geçersiz etiketler %s)",
+                len(verification.dropped_claims),
+                verification.coverage,
+                verification.invalid_labels,
+            )
         response = (
-            AskResponse(answer=answer, citations=[to_citation(p) for p in cited], mode="llm")
-            if cited and answer
-            else _decline(UNSUPPORTED, passages)
+            AskResponse(
+                answer=verification.text,
+                citations=[to_citation(p) for p in verification.cited],
+                unsupported_removed=len(verification.dropped_claims),
+                mode="llm",
+            )
+            if verification.accepted
+            else _decline(UNSUPPORTED, passages, "unsupported")
         )
     response.model = llm.model
     yield response
@@ -136,11 +160,12 @@ def to_citation(passage: RetrievedPassage) -> Citation:
     )
 
 
-def _decline(reason: str, passages: list[RetrievedPassage]) -> AskResponse:
+def _decline(reason: str, passages: list[RetrievedPassage], outcome: AskOutcome) -> AskResponse:
     return AskResponse(
         answer=None,
         declined=True,
         decline_reason=reason,
+        outcome=outcome,
         suggested_sources=[to_citation(p) for p in passages[:SUGGESTED_SOURCES]],
     )
 
