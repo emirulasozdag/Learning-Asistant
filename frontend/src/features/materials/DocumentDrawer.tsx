@@ -5,7 +5,7 @@ import type { ChunkPreview, DocumentOut, IngestionReport as Report } from "../..
 import Sheet from "../../components/Sheet";
 import { documentExtent, documentIndexStatus, materialLabel } from "../../labels";
 import { courseService } from "../../services/courseService";
-import { formatRelative, reflow } from "../../text";
+import { formatRelative } from "../../text";
 import { StatusBadge } from "../../ui/Badge";
 import { buttonClasses } from "../../ui/buttonStyles";
 import { Drawer } from "../../ui/Dialog";
@@ -82,7 +82,7 @@ function DocumentDetail({ document, report }: { document: DocumentOut; report?: 
             {chunks.map((chunk) => (
               <li key={chunk.id}>
                 <Sheet page={chunk.page}>
-                  <p className="text-md leading-relaxed whitespace-pre-wrap">{reflow(chunk.text)}</p>
+                  <p className="font-mono text-sm leading-relaxed whitespace-pre-wrap">{chunk.text}</p>
                 </Sheet>
               </li>
             ))}

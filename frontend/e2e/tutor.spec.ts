@@ -1,4 +1,6 @@
 import { expect, test } from "@playwright/test";
+import { INSTRUCTOR } from "./accounts";
+import { PRIVACY_POLICY_VERSION } from "../src/services/authService";
 
 import {
   ask,
@@ -8,6 +10,7 @@ import {
   loginAsStudent,
   openTutor,
   questionBox,
+  submitLogin,
   waitForAnswer,
 } from "./helpers";
 
@@ -164,4 +167,84 @@ test("ders kapsamı dışındaki soru kapsam dışı olarak gösterilir", async 
   await expect(page.getByText("Bu soru için ders materyalinde yeterli bilgi bulunamadı", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Tekrar sor" })).toHaveCount(0);
   await expect(page.getByText(/Cevap hazırlanamadı|Ders servisine ulaşılamıyor/)).toHaveCount(0);
+});
+
+test("kod ve sayılar yüklemeden kaynak görünümüne kadar korunur", async ({ page, browser }, testInfo) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  const teacherContext = await browser.newContext({ baseURL: testInfo.project.use.baseURL });
+  const teacher = await teacherContext.newPage();
+  teacher.on("pageerror", (error) => errors.push(error.message));
+  let documentId: number | undefined;
+  try {
+    await teacher.goto("/login");
+    await submitLogin(teacher, INSTRUCTOR);
+    await teacher.waitForURL(/\/instructor/);
+    const consent = await teacher.request.put("/api/me/consent", {
+      data: { research_logging: false, policy_version: PRIVACY_POLICY_VERSION },
+    });
+    expect(consent.ok()).toBeTruthy();
+    const created = await teacher.request.post("/api/courses", {
+      data: { code: `CODE${Date.now()}`, name: "Kod ve sayılar", language: "tr" },
+    });
+    expect(created.ok()).toBeTruthy();
+    const target = await created.json() as { id: number; name: string };
+    const pdfPage = await browser.newPage();
+    const code = "def answer():\n    if True:\n        return 42";
+    let pdf: Buffer;
+    try {
+      await pdfPage.setContent(
+        `<html><body><pre style="font: 14px monospace">${code}\n\n42\nx = n - 1\n\nvalue    count\n42       7</pre></body></html>`,
+      );
+      pdf = await pdfPage.pdf({ format: "A4", margin: { top: "2cm", left: "2cm" } });
+    } finally {
+      await pdfPage.close();
+    }
+    await teacher.goto(`/instructor/courses/${target.id}/materials`);
+    await teacher.getByRole("checkbox").check();
+    const responsePromise = teacher.waitForResponse((response) =>
+      response.url().endsWith(`/courses/${target.id}/materials`) && response.request().method() === "POST",
+    );
+    await teacher.locator('input[type="file"]').setInputFiles({ name: "Kod notları.pdf", mimeType: "application/pdf", buffer: pdf });
+    const uploaded = await responsePromise;
+    expect(uploaded.status()).toBe(201);
+    const document = await uploaded.json() as { id: number; report: { warnings: string[] } };
+    documentId = document.id;
+    const chunksResponse = await teacher.request.get(`/api/documents/${document.id}/chunks`);
+    const chunks = await chunksResponse.json() as { text: string }[];
+    expect(chunks[0].text).toContain(code);
+    expect(chunks[0].text).toContain("\n42\n");
+    expect(chunks[0].text).toContain("value    count");
+    expect(document.report.warnings.length).toBeGreaterThan(0);
+    await teacher.getByRole("button", { name: "Kod notları", exact: true }).click();
+    const preview = teacher.getByRole("dialog").locator("p.whitespace-pre-wrap").first();
+    await expect.poll(() => preview.textContent()).toBe(chunks[0].text);
+    await expect(teacher.getByRole("region", { name: "Yükleme raporu" })).toBeVisible();
+    await teacher.screenshot({ path: testInfo.outputPath("code-upload.png"), animations: "disabled" });
+
+    const joinCode = await (await teacher.request.get(`/api/courses/${target.id}/join-code`)).json() as { code: string };
+    expect((await page.request.post("/api/courses/join", { data: joinCode })).ok()).toBeTruthy();
+    await openTutor(page, { id: target.id, name: target.name, documentTitle: "Kod notları" });
+    await ask(page, "def answer return 42");
+    await waitForAnswer(page);
+    const quoted = page.locator("div.border-l-2").first();
+    await expect.poll(() => quoted.textContent()).toContain(code);
+    const panel = page.getByRole("complementary", { name: "Kaynak" });
+    await expect(panel.getByRole("img")).toBeVisible();
+    await expect(panel.getByRole("img")).toHaveCSS("opacity", "1");
+    await panel.getByText("Alıntılanan bölümü metin olarak göster").click();
+    const excerpt = panel.locator("details p.whitespace-pre-wrap");
+    await expect.poll(() => excerpt.textContent()).toBe(chunks[0].text);
+    await excerpt.scrollIntoViewIfNeeded();
+    await quoted.scrollIntoViewIfNeeded();
+    await expect(page).toHaveURL(new RegExp(`/student/courses/${target.id}/tutor$`));
+    await expect(page.locator("vite-error-overlay")).toHaveCount(0);
+    await page.screenshot({ path: testInfo.outputPath("code-source.png"), animations: "disabled" });
+    expect(errors).toEqual([]);
+  } finally {
+    if (documentId !== undefined) {
+      expect((await teacher.request.delete(`/api/documents/${documentId}`)).ok()).toBeTruthy();
+    }
+    await teacherContext.close();
+  }
 });

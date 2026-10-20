@@ -113,7 +113,11 @@ def ingest_document(
             else:
                 cleaned, stats = clean_segments_with_stats(segments)
         with _timed(timings, "chunk"):
-            drafts = chunk_timed_segments(cleaned) if is_video else chunk_segments(cleaned)
+            drafts = (
+                chunk_timed_segments(cleaned, embedder)
+                if is_video
+                else chunk_segments(cleaned, embedder)
+            )
         if not drafts:
             raise IngestionError(
                 "Altyazıdan metin çıkarılamadı."
@@ -148,6 +152,8 @@ def ingest_document(
         timings_ms=timings,
         **_video_report_fields(parsed),
     )
+    report.warnings.extend(warning for segment in segments for warning in segment.warnings)
+    report.warnings = list(dict.fromkeys(report.warnings))
     return document, report
 
 

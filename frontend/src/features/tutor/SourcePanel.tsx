@@ -6,7 +6,7 @@ import type { Highlight, SourceDetail } from "../../api/types";
 import Sheet from "../../components/Sheet";
 import { materialLabel } from "../../labels";
 import { tutorService } from "../../services/tutorService";
-import { formatTimeRange, reflow } from "../../text";
+import { formatTimeRange } from "../../text";
 import Button from "../../ui/Button";
 import { buttonClasses } from "../../ui/buttonStyles";
 import EmptyState from "../../ui/EmptyState";
@@ -137,16 +137,16 @@ export default function SourcePanel({
               </summary>
               <div className="mt-3">
                 <Sheet page={current.page}>
-                  <p className="text-md leading-relaxed whitespace-pre-wrap">{reflow(current.text)}</p>
+                  <p className="font-mono text-sm leading-relaxed whitespace-pre-wrap">{current.text}</p>
                 </Sheet>
               </div>
             </details>
           </>
         ) : (
           <Sheet page={current.page}>
-            <p className="text-md leading-relaxed whitespace-pre-wrap">
+            <p className="font-mono text-sm leading-relaxed whitespace-pre-wrap">
               <span key={current.source_id} className="marker-sweep">
-                {reflow(current.text)}
+                {current.text}
               </span>
             </p>
           </Sheet>

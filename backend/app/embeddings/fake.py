@@ -16,6 +16,11 @@ class FakeEmbedder:
     name = "fake"
     dim = EMBEDDING_DIM
     identity = "fake/bow-blake2b/v1"
+    max_passage_tokens = 512
+
+    def count_passage_tokens(self, text: str) -> int:
+        # Test-only tokenizer; production measures the active model's complete inputs.
+        return len(text.split())
 
     def embed_passages(self, texts: list[str]) -> list[list[float]]:
         return [self._vector(text) for text in texts]

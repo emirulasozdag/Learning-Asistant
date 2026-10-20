@@ -10,7 +10,6 @@ import {
 } from "lucide-react";
 
 import type { QuickAction } from "../../services/tutorService";
-import { reflow } from "../../text";
 import Button from "../../ui/Button";
 import { LogoMark } from "../../ui/Logo";
 import CitedText from "./CitedText";
@@ -204,12 +203,12 @@ function Body({ turn, isLatest, onQuickAction, onRetry, ...select }: AnswerBlock
       <div
         className={
           extractive
-            ? "border-l-2 border-marker pl-4 font-serif text-md leading-7 whitespace-pre-wrap text-ink"
+            ? "border-l-2 border-marker pl-4 font-mono text-sm leading-7 whitespace-pre-wrap text-ink"
             : "text-md leading-7 whitespace-pre-wrap text-ink"
         }
       >
         <CitedText
-          text={extractive ? reflow(stripIntro(response.answer ?? "")) : (response.answer ?? "")}
+          text={extractive ? stripIntro(response.answer ?? "") : (response.answer ?? "")}
           pattern={/(\[\d+\])/}
           resolve={(n) => response.citations[n - 1]}
           {...select}

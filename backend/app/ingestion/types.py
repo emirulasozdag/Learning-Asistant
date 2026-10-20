@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 class IngestionError(ValueError):
@@ -13,6 +13,9 @@ class RawSegment:
     page: int | None = None
     t_start: float | None = None
     t_end: float | None = None
+    # Text-line index -> normalized (x, y), only with page-margin evidence.
+    margin_lines: dict[int, tuple[float, float]] = field(default_factory=dict)
+    warnings: list[str] = field(default_factory=list)
 
 
 @dataclass
