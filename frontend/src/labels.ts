@@ -6,12 +6,34 @@ export const MATERIAL_LABELS: Record<MaterialType, string> = {
   slides: "Slayt",
   textbook: "Ders kitabı",
   past_exam: "Geçmiş sınav",
+  assignment: "Ödev",
+  practice_problem: "Pratik problem",
   transcript: "Transkript",
   video: "Video",
 };
 
 /** Yükleme ekranında seçilebilen türler (video: altyazı dosyası; videonun kendisi henüz yüklenemez). */
-export const UPLOADABLE_TYPES: MaterialType[] = ["notes", "slides", "textbook", "past_exam", "video"];
+export const UPLOADABLE_TYPES: MaterialType[] = [
+  "notes",
+  "slides",
+  "textbook",
+  "past_exam",
+  "assignment",
+  "practice_problem",
+  "video",
+];
+
+/** Türlerin listelenme sırası (genel bakış, tüm materyaller). */
+export const TYPE_ORDER: MaterialType[] = [
+  "notes",
+  "slides",
+  "textbook",
+  "past_exam",
+  "practice_problem",
+  "assignment",
+  "transcript",
+  "video",
+];
 
 export function materialLabel(type: string): string {
   return MATERIAL_LABELS[type as MaterialType] ?? type;

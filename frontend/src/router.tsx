@@ -3,8 +3,12 @@ import { Navigate, createBrowserRouter } from "react-router";
 import RequireRole from "./auth/RequireRole";
 import AppShell from "./layouts/AppShell";
 import AuthLayout from "./layouts/AuthLayout";
+import { MATERIAL_SECTIONS } from "./features/courses/sections";
 import CourseShell from "./layouts/CourseShell";
+import CalendarPage from "./pages/course/CalendarPage";
 import CourseOverview from "./pages/course/CourseOverview";
+import CourseSectionPage from "./pages/course/CourseSectionPage";
+import SyllabusPage from "./pages/course/SyllabusPage";
 import LoginPage from "./pages/auth/LoginPage";
 import RegisterPage from "./pages/auth/RegisterPage";
 import CourseActivityPage from "./pages/instructor/CourseActivityPage";
@@ -27,7 +31,20 @@ import { NotFound, RootRedirect } from "./pages/system";
  *   /student/courses/:id                     ders genel bakış
  *   /student/courses/:id/materials           ders materyalleri
  *   /student/courses/:id/tutor               AI Tutor
+ * Her iki rolde ders içeriği (OCW düzeni):
+ *   …/courses/:id/syllabus, /calendar        izlence, takvim
+ *   …/courses/:id/videos, /lecture-notes, /quizzes, /practice-problems, /assignments
  */
+
+/** İki rolde ortak ders içeriği bölümleri. */
+const contentRoutes = [
+  { path: "syllabus", element: <SyllabusPage /> },
+  { path: "calendar", element: <CalendarPage /> },
+  ...MATERIAL_SECTIONS.map((section) => ({
+    path: section.path,
+    element: <CourseSectionPage key={section.path} section={section} />,
+  })),
+];
 export const router = createBrowserRouter([
   { path: "/", element: <RootRedirect /> },
   {
@@ -53,6 +70,7 @@ export const router = createBrowserRouter([
           { index: true, element: <CourseOverview /> },
           { path: "materials", element: <MaterialsPage /> },
           { path: "activity", element: <CourseActivityPage /> },
+          ...contentRoutes,
           // Eski sekme adresleri (yer imleri) genel bakışa düşer.
           { path: "*", element: <Navigate to=".." relative="path" replace /> },
         ],
@@ -77,6 +95,7 @@ export const router = createBrowserRouter([
           { index: true, element: <CourseOverview /> },
           { path: "materials", element: <CourseMaterialsPage /> },
           { path: "tutor", element: <TutorPage /> },
+          ...contentRoutes,
         ],
       },
     ],

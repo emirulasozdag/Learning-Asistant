@@ -5,7 +5,7 @@ from app.api.errors import ApiError
 from app.auth.dependencies import AuthUser, not_found_error
 from app.courses import service
 from app.schemas.auth import JoinCourseRequest
-from app.schemas.courses import CourseCreate, CourseSummary, CourseUpdate, JoinCode
+from app.schemas.courses import CourseCreate, CourseOutline, CourseSummary, CourseUpdate, JoinCode
 
 router = APIRouter(prefix="/courses", tags=["courses"])
 
@@ -58,3 +58,10 @@ def get_join_code(course_id: int, user: AuthUser, db: DbSession) -> JoinCode:
 def rotate_join_code(course_id: int, user: AuthUser, db: DbSession) -> JoinCode:
     """Katılım kodunu yeniler; eski kod geçersiz olur. Var olan üyelikler etkilenmez."""
     return service.rotate_join_code(db, get_course_for(db, user, course_id, "instructor"))
+
+
+@router.get("/{course_id}/outline", response_model=CourseOutline)
+def course_outline(course_id: int, user: AuthUser, db: DbSession) -> CourseOutline:
+    """Dersin izlencesi ve takvimi (OCW "Syllabus" / "Calendar"); dersin her üyesi görür."""
+    course = get_course_for(db, user, course_id)
+    return CourseOutline.model_validate({"syllabus": course.syllabus, "calendar": course.calendar})

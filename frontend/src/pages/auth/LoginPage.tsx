@@ -1,49 +1,37 @@
 import { useState, type FormEvent } from "react";
-import { Link, useLocation, useNavigate } from "react-router";
+import { Link } from "react-router";
 
-import { homePath, useAuth } from "../../auth/useAuth";
-import { ROLE_LABELS } from "../../layouts/navigation";
-import { authService, type User } from "../../services/authService";
-import Avatar from "../../ui/Avatar";
+import { useAuth } from "../../auth/useAuth";
+import { useDemoInfo } from "../../auth/useDemoInfo";
 import Button from "../../ui/Button";
 import Field from "../../ui/Field";
+import DemoAccounts from "./DemoAccounts";
 import PasswordField from "./PasswordField";
 import { emailError } from "./validation";
 
 export default function LoginPage() {
-  const { login, loginAs } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
+  const { login } = useAuth();
+  const demo = useDemoInfo();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [emailProblem, setEmailProblem] = useState<string | null>(null);
-  const [pending, setPending] = useState<string | null>(null);
-
-  function goHome(user: User) {
-    const from = (location.state as { from?: string } | null)?.from;
-    const fromMatchesRole = from?.startsWith(homePath(user.role));
-    navigate(fromMatchesRole && from ? from : homePath(user.role), { replace: true });
-  }
+  const [pending, setPending] = useState(false);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     const problem = emailError(email);
     setEmailProblem(problem);
     if (problem) return;
-    setPending("form");
+    setPending(true);
     setError(null);
     try {
-      goHome(await login(email.trim(), password));
+      // Yönlendirmeyi AuthLayout yapar: kullanıcı gelince istenen sayfaya (ya da ana sayfaya) gider.
+      await login(email.trim(), password);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason));
-      setPending(null);
+      setPending(false);
     }
-  }
-
-  async function enterAs(user: User) {
-    setPending(user.id);
-    goHome(await loginAs(user));
   }
 
   return (
@@ -78,7 +66,7 @@ export default function LoginPage() {
           type="submit"
           variant="primary"
           size="lg"
-          loading={pending === "form"}
+          loading={pending}
           disabled={!email || !password}
           className="mt-2 w-full"
         >
@@ -86,30 +74,12 @@ export default function LoginPage() {
         </Button>
       </form>
 
-      <div className="mt-10 mb-3">
-        <p className="text-sm font-medium text-ink-2">Pilot hesaplar</p>
-        <p className="mt-0.5 text-sm text-graphite">Pilot dönemde hazır bir hesapla da girebilirsin.</p>
-      </div>
+      {demo && demo.accounts.length > 0 && <DemoAccounts info={demo} />}
 
-      <ul className="flex flex-col gap-2">
-        {authService.demoUsers().map((user) => (
-          <li key={user.id}>
-            <button
-              type="button"
-              onClick={() => void enterAs(user)}
-              disabled={pending !== null}
-              className="flex w-full items-center gap-3 rounded-panel border border-line bg-surface px-3 py-2.5 text-left transition-colors hover:border-line-strong hover:bg-canvas disabled:opacity-60"
-            >
-              <Avatar name={user.name} />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-base font-medium text-ink">{user.name}</span>
-                <span className="block truncate text-sm text-graphite">{user.title}</span>
-              </span>
-              <span className="text-sm text-graphite">{ROLE_LABELS[user.role]}</span>
-            </button>
-          </li>
-        ))}
-      </ul>
+      <p className="mt-8 rounded-panel border border-line bg-canvas px-4 py-3 text-sm text-graphite">
+        Öğrenciler hesap oluşturup eğitmenin verdiği katılım koduyla derse katılır. Eğitmen hesaplarını
+        üniversite açar.
+      </p>
 
       <p className="mt-10 text-base text-graphite">
         Hesabın yok mu?{" "}

@@ -1,5 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 
+import { STUDENT } from "./accounts";
 import { COURSE_A, COURSE_B } from "./fixtures/pdf";
 
 export interface SetupCourse {
@@ -16,10 +17,17 @@ export function course(key: "A" | "B"): SetupCourse {
   return { id, name, documentTitle: (key === "A" ? COURSE_A : COURSE_B).documentTitle };
 }
 
-/** Giriş ekranındaki öğrenci demo hesabıyla girer. */
+/** Giriş formunu doldurup gönderir (sayfa zaten /login'de olmalı). */
+export async function submitLogin(page: Page, account: { email: string; password: string }) {
+  await page.getByLabel("E-posta").fill(account.email);
+  await page.getByLabel("Şifre", { exact: true }).fill(account.password);
+  await page.getByRole("button", { name: "Giriş yap" }).click();
+}
+
+/** Test öğrencisiyle giriş formundan girer (aydınlatma metni global-setup'ta onaylandı). */
 export async function loginAsStudent(page: Page) {
   await page.goto("/login");
-  await page.getByRole("button", { name: /Elif Kaya/ }).click();
+  await submitLogin(page, STUDENT);
   await page.waitForURL(/\/student/);
 }
 

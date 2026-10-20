@@ -8,6 +8,7 @@
 #   açık geliştirme sistemiyle çakışır): web 5273, API 8100, veritabanı 5532.
 # - Yüklenen dosyalar `./data` yerine ayrı bir volume'a yazılır.
 # - LLM'siz mod ve sahte embedder: model indirilmez, cevaplar deterministiktir.
+# - Test hesapları açılışta oluşturulur (SEED_DEV_ACCOUNTS); şifreler yalnızca bu geçici sistem içindir.
 
 services:
   db:
@@ -19,6 +20,14 @@ services:
       LLM_API_KEY: ""
       EMBEDDING_PROVIDER: fake
       CORS_ORIGINS: http://localhost:5273
+      # Test hesapları (frontend/e2e/accounts.ts ile aynı); yalnızca bu geçici sistemde.
+      SEED_DEV_ACCOUNTS: "true"
+      # Testler giriş formunu kullanır; sunum modu kapalı.
+      DEMO_LOGIN: "false"
+      DEV_INSTRUCTOR_EMAIL: e2e-egitmen@example.com
+      DEV_INSTRUCTOR_PASSWORD: e2e-egitmen-sifre
+      DEV_STUDENT_EMAIL: e2e-ogrenci@example.com
+      DEV_STUDENT_PASSWORD: e2e-ogrenci-sifre
     ports: !override
       - "8100:8000"
     volumes:

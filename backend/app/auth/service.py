@@ -74,7 +74,13 @@ def me(db: Session, user: User) -> Me:
         .order_by(Enrollment.course_id)
     ).all()
     return Me(
-        user=UserOut(id=user.id, name=user.name, email=user.email, title=user.title),
+        user=UserOut(
+            id=user.id,
+            name=user.name,
+            email=user.email,
+            title=user.title,
+            can_create_courses=user.can_create_courses,
+        ),
         memberships=[Membership(course_id=course_id, role=role) for course_id, role in rows],
         consent=consent(user),
     )

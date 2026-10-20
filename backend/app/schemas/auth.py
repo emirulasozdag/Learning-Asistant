@@ -4,6 +4,7 @@ Yalnızca tip tanımları: bu şemaları kullanan endpoint henüz yok (#11, #12)
 """
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -15,6 +16,9 @@ class UserOut(BaseModel):
     name: str
     email: str
     title: str | None = None
+    # Ders açabilir mi (eğitmen hesabı, ADR-1). Arayüz hiç dersi olmayan eğitmeni de eğitmen
+    # ana sayfasına bununla yönlendirir (DECISIONS.md açık soru 7).
+    can_create_courses: bool = False
 
 
 class Membership(BaseModel):
@@ -62,3 +66,30 @@ class RegisterRequest(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     email: str = Field(min_length=1, max_length=320)
     password: str = Field(min_length=1)
+
+
+class DemoAccount(BaseModel):
+    """Sunum modunda giriş ekranında gösterilen hesap (DEMO_LOGIN; üretimde kapalı)."""
+
+    role: Literal["instructor", "student"]
+    name: str
+    email: str
+    title: str | None = None
+
+
+class DemoCourse(BaseModel):
+    """Sunum modunda gösterilen ders ve katılım kodu."""
+
+    course_id: int
+    code: str
+    name: str
+    join_code: str
+
+
+class DemoInfo(BaseModel):
+    accounts: list[DemoAccount]
+    courses: list[DemoCourse]
+
+
+class DemoLoginRequest(BaseModel):
+    role: Literal["instructor", "student"]

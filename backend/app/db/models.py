@@ -99,6 +99,10 @@ class Course(Base):
     # Katılım kodu (ADR-2); eğitmen yeniler. Süresi dolmuşsa ya da yoksa kodla katılınamaz.
     join_code: Mapped[str | None] = mapped_column(String(32), unique=True)
     join_code_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Ders izlencesi ve takvimi (OCW "Syllabus" / "Calendar"): HTML değil, yapılandırılmış veri.
+    # Biçim: app.schemas.courses.SyllabusBlock listesi ve CourseCalendar.
+    syllabus: Mapped[list | None] = mapped_column(JSONB)
+    calendar: Mapped[dict | None] = mapped_column(JSONB)
 
     documents: Mapped[list["Document"]] = relationship(back_populates="course")
 

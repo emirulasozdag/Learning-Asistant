@@ -1,11 +1,12 @@
-import { BarChart3, BookOpen, FolderOpen, Info, LayoutList, MessageSquareText, ServerOff } from "lucide-react";
+import { BookOpen, Info, ServerOff } from "lucide-react";
 import { Fragment, useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useParams } from "react-router";
 
-import type { DocumentOut } from "../api/types";
+import type { CourseOutline, DocumentOut } from "../api/types";
 import { useAuth } from "../auth/useAuth";
 import { useCourse, useCourses } from "../features/courses/context";
 import type { CourseOutlet } from "../features/courses/courseOutlet";
+import { contentSections, toolSections } from "../features/courses/sections";
 import { LEVEL_LABELS, MATERIAL_LABELS, courseMetaParts, languageLabel, materialTotals } from "../labels";
 import { courseService, type Course } from "../services/courseService";
 import { formatRelative, formatTime } from "../text";
@@ -13,7 +14,7 @@ import Button from "../ui/Button";
 import { cx } from "../ui/cx";
 import EmptyState from "../ui/EmptyState";
 import InfoPanel, { type InfoSection } from "../ui/InfoPanel";
-import { SectionNav, SectionTabs, type SectionLink } from "../ui/SectionNav";
+import { SectionNav, SectionTabs } from "../ui/SectionNav";
 import Skeleton from "../ui/Skeleton";
 import { coursePath } from "./navigation";
 
@@ -85,6 +86,8 @@ function CourseFrame({ course, role }: { course: Course; role: "student" | "inst
   const [documentsFailed, setDocumentsFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [infoClosed, setInfoClosed] = useState(readInfoClosed);
+  const [outline, setOutline] = useState<CourseOutline | null>(null);
+  const [outlineFailed, setOutlineFailed] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -98,6 +101,19 @@ function CourseFrame({ course, role }: { course: Course; role: "student" | "inst
       });
     return () => controller.abort();
   }, [course.id, attempt]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    courseService
+      .outline(course.id, controller.signal)
+      .then((data) => {
+        if (!controller.signal.aborted) setOutline(data);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setOutlineFailed(true);
+      });
+    return () => controller.abort();
+  }, [course.id]);
 
   function reloadDocuments() {
     setDocumentsFailed(false);
@@ -114,21 +130,11 @@ function CourseFrame({ course, role }: { course: Course; role: "student" | "inst
   }
 
   const base = coursePath(role, course.id);
-  const sections: SectionLink[] =
-    role === "instructor"
-      ? [
-          { to: base, label: "Genel bakış", icon: LayoutList, end: true },
-          { to: `${base}/materials`, label: "Materyaller", icon: FolderOpen },
-          { to: `${base}/activity`, label: "Etkinlik ve analitik", icon: BarChart3 },
-        ]
-      : [
-          { to: base, label: "Genel bakış", icon: LayoutList, end: true },
-          { to: `${base}/materials`, label: "Ders materyalleri", icon: FolderOpen },
-          { to: `${base}/tutor`, label: "AI Tutor", icon: MessageSquareText },
-        ];
+  const tools = toolSections(role, base);
+  const content = contentSections(role, base);
   // Tutor tam yükseklikte çalışır ve sağ tarafı kaynak paneli için kullanır.
   const tutor = pathname.endsWith("/tutor");
-  const outlet: CourseOutlet = { course, documents, documentsFailed, reloadDocuments };
+  const outlet: CourseOutlet = { course, documents, documentsFailed, reloadDocuments, outline, outlineFailed };
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -138,12 +144,18 @@ function CourseFrame({ course, role }: { course: Course; role: "student" | "inst
         onShowInfo={!tutor && infoClosed ? () => toggleInfo(false) : undefined}
       />
       <div className="lg:hidden">
-        <SectionTabs links={sections} label="Ders bölümleri" />
+        <SectionTabs links={[...tools, ...content]} label="Ders bölümleri" />
       </div>
 
       <div className="flex min-h-0 flex-1">
         <aside className="hidden w-64 shrink-0 flex-col gap-8 overflow-y-auto border-r border-line bg-surface px-3 py-6 lg:flex">
-          <SectionNav links={sections} label="Ders bölümleri" />
+          <SectionNav links={tools} label="Ders araçları" />
+          <div className="border-t border-line pt-6">
+            <p className="px-3 text-sm font-bold tracking-wide text-ink uppercase">Ders içeriği</p>
+            <div className="mt-2">
+              <SectionNav links={content} label="Ders içeriği" />
+            </div>
+          </div>
           <OtherCourses role={role} currentId={course.id} section={currentSection(pathname, course.id)} />
         </aside>
 

@@ -31,12 +31,19 @@ services:
       RETRIEVAL_MIN_KEYWORD_COVERAGE: ${RETRIEVAL_MIN_KEYWORD_COVERAGE:-0.5}
       RETRIEVAL_FOLLOW_UP_MIN_SIMILARITY: ${RETRIEVAL_FOLLOW_UP_MIN_SIMILARITY:-0.77}
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
-      # Geliştirme hesapları: yalnızca SEED_DEV_ACCOUNTS=true ve şifreler .env'de verilmişse.
-      SEED_DEV_ACCOUNTS: ${SEED_DEV_ACCOUNTS:-false}
-      DEV_INSTRUCTOR_EMAIL: ${DEV_INSTRUCTOR_EMAIL:-egitmen@example.com}
-      DEV_INSTRUCTOR_PASSWORD: ${DEV_INSTRUCTOR_PASSWORD:-}
-      DEV_STUDENT_EMAIL: ${DEV_STUDENT_EMAIL:-ogrenci@example.com}
-      DEV_STUDENT_PASSWORD: ${DEV_STUDENT_PASSWORD:-}
+      # Yerel geliştirme ve sunum: demo hesapları açılışta oluşturulur, giriş ekranında tek tıkla
+      # (şifresiz) girilir ve derslerin katılım kodları görünür. Bu dosya yalnızca yerel geliştirme
+      # içindir; uygulamanın kendi varsayılanı kapalıdır. Gerçek kurulumda SEED_DEV_ACCOUNTS=false
+      # ve DEMO_LOGIN=false olmalı. .env'deki değerler bu varsayılanların önüne geçer.
+      SEED_DEV_ACCOUNTS: ${SEED_DEV_ACCOUNTS:-true}
+      DEMO_LOGIN: ${DEMO_LOGIN:-true}
+      DEV_INSTRUCTOR_EMAIL: ${DEV_INSTRUCTOR_EMAIL:-ayse.demir@universite.edu.tr}
+      DEV_INSTRUCTOR_PASSWORD: ${DEV_INSTRUCTOR_PASSWORD:-demo-egitmen-2026}
+      DEV_INSTRUCTOR_NAME: ${DEV_INSTRUCTOR_NAME:-Dr. Ayşe Demir}
+      DEV_INSTRUCTOR_TITLE: ${DEV_INSTRUCTOR_TITLE:-Bilgisayar Mühendisliği}
+      DEV_STUDENT_EMAIL: ${DEV_STUDENT_EMAIL:-elif.kaya@ogr.universite.edu.tr}
+      DEV_STUDENT_PASSWORD: ${DEV_STUDENT_PASSWORD:-demo-ogrenci-2026}
+      DEV_STUDENT_NAME: ${DEV_STUDENT_NAME:-Elif Kaya}
     # Açılışta (hepsi tekrar çalıştırılabilir): şemayı güncelle, demo dersini (ve açıksa
     # geliştirme hesaplarını) oluştur,
     # embedding modelini hazırla (ilk seferde ~1 GB indirir), vektörü eksik ya da başka

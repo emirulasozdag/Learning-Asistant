@@ -48,7 +48,7 @@ export default function AppHeader({ onOpenMenu }: { onOpenMenu: () => void }) {
           <p className="text-xs text-nav-muted">{ROLE_LABELS[user.role]}</p>
         </div>
         <Avatar name={user.name} className="bg-accent" />
-        <IconButton icon={LogOut} label="Çıkış yap" onClick={logout} tone="dark" />
+        <IconButton icon={LogOut} label="Çıkış yap" onClick={() => void logout()} tone="dark" />
       </div>
     </header>
   );

@@ -1,105 +1,118 @@
 /**
- * Kimlik doğrulama — ŞU AN MOCK. Backend'de auth yok (FR-17); oturum tarayıcıda tutulur.
- * Gerçek API gelince yalnızca bu dosyanın içi değişir; `AuthProvider` ve ekranlar aynı kalır.
+ * Kimlik doğrulama: backend oturumu (ADR-1). Oturum httpOnly `la_session` çerezindedir; tarayıcıda
+ * kimlik saklanmaz. Kullanıcı her açılışta `GET /me` ile çözülür.
  */
-import { DEMO_USERS } from "../mock/users";
+import { ApiError, api } from "../api/client";
+import type { DemoInfo, Me } from "../api/types";
 
+/** Arayüzün iki alanı: eğitmen (`/instructor`) ve öğrenci (`/student`). Asıl rol ders başınadır. */
 export type Role = "student" | "instructor";
 
 export interface User {
-  id: string;
+  id: number;
   name: string;
   email: string;
   role: Role;
-  /** Bölüm / sınıf gibi kısa bilgi. */
+  /** Bölüm / unvan gibi kısa bilgi. */
   title?: string;
+  /** Aydınlatma metninin güncel sürümü kabul edildi mi (soru sormak için gerekli, ADR-4). */
+  consented: boolean;
+  researchLogging: boolean;
 }
 
 export interface RegisterInput {
   name: string;
   email: string;
   password: string;
-  role: Role;
 }
 
-const SESSION_KEY = "la.session";
-const ACCOUNTS_KEY = "la.accounts";
-const MIN_PASSWORD = 6;
+/** Aydınlatma metninin sürümü; metin değişince backend'deki PRIVACY_POLICY_VERSION ile birlikte artar. */
+export const PRIVACY_POLICY_VERSION = "2026-10-20";
+
+const MIN_PASSWORD = 8;
 
 export class AuthError extends Error {}
 
-function read<T>(key: string, fallback: T): T {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as T) : fallback;
-  } catch {
-    return fallback;
+/**
+ * `Me` → arayüz kullanıcısı. Eğitmen alanı: ders açabilen hesap ya da bir derste eğitmen/TA olan
+ * kullanıcı. Diğer herkes öğrenci alanını görür.
+ */
+export function toUser(me: Me): User {
+  const teaches = me.memberships.some((m) => m.role === "instructor" || m.role === "ta");
+  return {
+    id: me.user.id,
+    name: me.user.name,
+    email: me.user.email,
+    title: me.user.title ?? undefined,
+    role: me.user.can_create_courses || teaches ? "instructor" : "student",
+    consented: me.consent.consented_at !== null && me.consent.policy_version === PRIVACY_POLICY_VERSION,
+    researchLogging: me.consent.research_logging,
+  };
+}
+
+function authError(reason: unknown, fallback: string): AuthError {
+  if (reason instanceof ApiError) {
+    if (reason.kind === "network") return new AuthError("Sunucuya ulaşılamıyor. Bağlantını kontrol edip tekrar dene.");
+    if (reason.code === "not_authenticated") return new AuthError("E-posta veya şifre hatalı.");
+    if (reason.code === "email_exists") return new AuthError("Bu e-posta ile zaten bir hesap var. Giriş yapmayı dene.");
+    return new AuthError(reason.message);
   }
+  return new AuthError(fallback);
 }
-
-function write(key: string, value: unknown): void {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // Gizli sekme vb.: oturum yalnızca bu sayfa açıkken sürer.
-  }
-}
-
-function accounts(): User[] {
-  return [...DEMO_USERS, ...read<User[]>(ACCOUNTS_KEY, [])];
-}
-
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export const authService = {
-  currentUser(): User | null {
-    return read<User | null>(SESSION_KEY, null);
-  },
-
-  demoUsers(): User[] {
-    return DEMO_USERS;
+  /** Oturumdaki kullanıcı; oturum yoksa `null`. Ağ hatası olduğu gibi fırlatılır. */
+  async currentUser(signal?: AbortSignal): Promise<User | null> {
+    try {
+      return toUser(await api.me(signal));
+    } catch (reason) {
+      if (reason instanceof ApiError && reason.status === 401) return null;
+      throw reason;
+    }
   },
 
   async login(email: string, password: string): Promise<User> {
-    await delay(350);
-    const user = accounts().find((a) => a.email.toLowerCase() === email.trim().toLowerCase());
-    if (!user) throw new AuthError("Bu e-posta ile kayıtlı bir hesap bulunamadı.");
-    if (password.length < MIN_PASSWORD) throw new AuthError("E-posta veya şifre hatalı.");
-    write(SESSION_KEY, user);
-    return user;
+    try {
+      return toUser(await api.login({ email: email.trim(), password }));
+    } catch (reason) {
+      throw authError(reason, "Giriş yapılamadı.");
+    }
   },
 
   async register(input: RegisterInput): Promise<User> {
-    await delay(450);
-    if (accounts().some((a) => a.email.toLowerCase() === input.email.trim().toLowerCase())) {
-      throw new AuthError("Bu e-posta ile zaten bir hesap var. Giriş yapmayı dene.");
-    }
-    if (input.password.length < MIN_PASSWORD) {
-      throw new AuthError(`Şifre en az ${MIN_PASSWORD} karakter olmalı.`);
-    }
-    const user: User = {
-      id: `u-${Date.now()}`,
-      name: input.name.trim(),
-      email: input.email.trim(),
-      role: input.role,
-    };
-    write(ACCOUNTS_KEY, [...read<User[]>(ACCOUNTS_KEY, []), user]);
-    write(SESSION_KEY, user);
-    return user;
-  },
-
-  /** Demo hesabına doğrudan giriş (sunumda hızlı geçiş için). */
-  async loginAs(user: User): Promise<User> {
-    await delay(200);
-    write(SESSION_KEY, user);
-    return user;
-  },
-
-  logout(): void {
     try {
-      localStorage.removeItem(SESSION_KEY);
+      return toUser(await api.register({ ...input, name: input.name.trim(), email: input.email.trim() }));
+    } catch (reason) {
+      throw authError(reason, "Hesap oluşturulamadı.");
+    }
+  },
+
+  /** Sunum modu açıksa demo hesapları ve katılım kodları; kapalıysa `null`. */
+  async demoInfo(signal?: AbortSignal): Promise<DemoInfo | null> {
+    try {
+      return await api.demoInfo(signal);
     } catch {
-      // yok say
+      return null;
+    }
+  },
+
+  async demoLogin(role: Role): Promise<User> {
+    try {
+      return toUser(await api.demoLogin(role));
+    } catch (reason) {
+      throw authError(reason, "Demo hesabıyla girilemedi.");
+    }
+  },
+
+  async acceptPolicy(researchLogging: boolean): Promise<void> {
+    await api.updateConsent({ research_logging: researchLogging, policy_version: PRIVACY_POLICY_VERSION });
+  },
+
+  async logout(): Promise<void> {
+    try {
+      await api.logout();
+    } catch {
+      // Oturum zaten düşmüş olabilir; arayüz yine de çıkış yapmış sayılır.
     }
   },
 

@@ -57,8 +57,15 @@ class Settings(BaseSettings):
     seed_dev_accounts: bool = False
     dev_instructor_email: str = "egitmen@example.com"
     dev_instructor_password: str = ""
+    dev_instructor_name: str = "Geliştirme Eğitmeni"
+    dev_instructor_title: str = ""
     dev_student_email: str = "ogrenci@example.com"
     dev_student_password: str = ""
+    dev_student_name: str = "Geliştirme Öğrencisi"
+    # Sunum modu: giriş ekranı geliştirme hesaplarına (DEV_*_EMAIL) şifresiz giriş sunar ve
+    # eğitmenin derslerinin katılım kodlarını gösterir. Yalnızca yerel demo içindir; üretimde
+    # KAPALI kalır (ADR-1).
+    demo_login: bool = False
 
     @field_validator("cors_origins", mode="before")
     @classmethod

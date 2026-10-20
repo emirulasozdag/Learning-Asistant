@@ -1,14 +1,22 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Cookie, Response, status
+from fastapi import APIRouter, Cookie, HTTPException, Response, status
 
 from app.api.deps import DbSession
 from app.api.errors import ApiError
-from app.auth import service
+from app.auth import demo, service
 from app.auth.dependencies import AuthUser
 from app.auth.sessions import clear_session_cookie, create_session, end_session, set_session_cookie
 from app.core.config import settings
-from app.schemas.auth import Consent, ConsentUpdate, LoginRequest, Me, RegisterRequest
+from app.schemas.auth import (
+    Consent,
+    ConsentUpdate,
+    DemoInfo,
+    DemoLoginRequest,
+    LoginRequest,
+    Me,
+    RegisterRequest,
+)
 
 router = APIRouter(tags=["auth"])
 
@@ -44,6 +52,33 @@ def login(
     end_session(db, current)
     set_session_cookie(response, create_session(db, user))
     return service.me(db, user)
+
+
+@router.get("/auth/demo", response_model=DemoInfo)
+def demo_accounts(db: DbSession) -> DemoInfo:
+    """Sunum modu: giriş ekranındaki demo hesapları ve katılım kodları. Kapalıysa 404."""
+    _require_demo()
+    return demo.demo_info(db)
+
+
+@router.post("/auth/demo-login", response_model=Me)
+def demo_login(
+    data: DemoLoginRequest, db: DbSession, response: Response, current: SessionCookie = None
+) -> Me:
+    """Sunum modu: seçilen roldeki geliştirme hesabına şifresiz giriş. Kapalıysa 404."""
+    _require_demo()
+    user = demo.demo_user(db, data.role)
+    if user is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Demo hesabı yok")
+    end_session(db, current)
+    set_session_cookie(response, create_session(db, user))
+    return service.me(db, user)
+
+
+def _require_demo() -> None:
+    # Kapalıyken yanıt, olmayan bir adresinkiyle aynıdır: uç noktanın varlığı belli edilmez.
+    if not settings.demo_login:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Not Found")
 
 
 @router.post("/auth/logout", status_code=status.HTTP_204_NO_CONTENT)

@@ -186,8 +186,20 @@ sütunu #12'ye kadar geçerlidir.
   - `ErrorCode`'a `consent_required`, `email_exists`.
   - `POST /courses/{id}/materials` formuna zorunlu `declaration=true` (ADR-3 beyanı) — **[KIRICI]** arayüz yükleme formu.
   - `POST /courses` yalnızca ders açma yetkisi olan hesap (eğitmen hesabı; seed ya da `create_instructor` betiği);
-    değilse `403 insufficient_role`. `Me` bu yetkiyi taşımaz: hiç dersi olmayan eğitmenin ana sayfası #12'de
-    açık soru (DECISIONS.md açık soru 7).
+    değilse `403 insufficient_role`.
+- **[ekleme] #12:** `UserOut.can_create_courses: bool` (ders açma yetkisi). Arayüz eğitmen alanını, ders açabilen
+  ya da en az bir derste `instructor`/`ta` olan kullanıcıya açar; diğerleri öğrenci alanını görür (DECISIONS.md
+  açık soru 7'deki öneri). Hiç dersi olmayan eğitmen de böylece eğitmen ana sayfasına gider.
+- **[ekleme] Sunum modu (`DEMO_LOGIN`; uygulama varsayılanı `false`, yerel `docker-compose.yml` varsayılanı `true`):** `GET /auth/demo` → `DemoInfo {accounts, courses}`
+  (geliştirme hesapları ve geliştirme eğitmeninin derslerinin katılım kodları); `POST /auth/demo-login {role}` →
+  `Me` (şifresiz oturum). Hesap istemciden seçilmez, `DEV_*_EMAIL` ayarından okunur. Kapalıyken ikisi de düz 404.
+  Yalnızca yerel demo içindir (ADR-1: üretimde demo hesap yok). Yerel compose demo hesaplarını da varsayılan açar
+  (`SEED_DEV_ACCOUNTS`, Dr. Ayşe Demir / Elif Kaya); `import_ocw` içeri aldığı dersi demo eğitmenine bağlar.
+- **#12'de koda geçti (frontend):** oturum `GET /me` ile çözülür (tarayıcıda kimlik saklanmaz); herhangi bir
+  istekte 401 gelirse kullanıcı çıkış yapmış sayılır. Kayıt formunda rol seçimi yok. Aydınlatma metni ilk
+  girişte gösterilir (`PRIVACY_POLICY_VERSION`, `services/authService.ts`, backend'deki değerle aynı olmalı).
+  Öğrenci katılım koduyla derse katılır; eğitmen kodu ders genel bakışında görür ve yeniler. Yükleme ekranında
+  ADR-3 beyanı işaretlenmeden dosya bırakılamaz.
 - Şifre: 8–256 karakter; e-posta küçük harfe çevrilir ve basit biçim denetiminden geçer.
 
 **Şu an.**
@@ -206,7 +218,7 @@ sütunu #12'ye kadar geçerlidir.
 ```
 Role = "student" | "instructor" | "ta"
 
-UserOut        { id: int, name: str, email: str, title: str | null }
+UserOut        { id: int, name: str, email: str, title: str | null, can_create_courses: bool }   # son alan: [ekleme] #12
 Membership     { course_id: int, role: Role }
 Consent        { research_logging: bool, consented_at: datetime | null, policy_version: str }
 ConsentUpdate  { research_logging: bool, policy_version: str }
@@ -481,14 +493,35 @@ kararı ekibe aittir.
 
 ## 7. Çalışma zamanında hâlâ mock olan veriler
 
-Issue #3'e göre çalışma zamanında mock/demo veri kullanılmaz. PR #68, `courseStats`, `dashboard`, `practice` ve
-`tutor` mock'larını ve bunları kullanan `dashboardService`/`practiceService`'i sildi; ekranlarda sahte sayı ya da
-sahte içerik gösterilmez ([mock/README.md](../frontend/src/mock/README.md)). Kalan tek mock:
+Yok. Son mock olan kimlik doğrulama (`services/authService.ts`, `mock/users.ts`) #12'de backend oturumuna
+bağlandı ve `src/mock/` kaldırıldı. Ekranlarda sahte sayı ya da sahte içerik gösterilmez; backend'i olmayan
+özellikler (pratik, öğrenci listesi, sık hatalar) ilgili API hazır olunca gerçek veriyle eklenir.
 
-| Mock | Dosya | Gerçek kaynak | Bağlı iş |
-|---|---|---|---|
-| Hesaplar, giriş, oturum (localStorage) | `services/authService.ts`, `mock/users.ts` | ADR-1; §3 | #12 (backend: #11) |
+---
 
-Backend'i olmayan özellikler (pratik, öğrenci listesi, sık hatalar) ilgili API hazır olunca gerçek veriyle eklenir
-(#17 ve ilgili işler). Ders istatistikleri artık mock değildir; öğrenci sayısı gibi alanlar kullanıcı/üyelik
-verisi (#11) gelene kadar gösterilmez.
+## 8. Ders içeriği bölümleri (OCW düzeni)
+
+Ders sayfası MIT OpenCourseWare gibi bölümlere ayrılır: İzlence, Takvim, Video dersler, Ders notları, Sınavlar,
+Pratik problemler, Ödevler. Bölümler `frontend/src/features/courses/sections.ts`'te tanımlıdır. Materyal bölümleri
+dokümanları türüne göre süzer, izlence ve takvim ayrı bir endpoint'ten gelir. Hepsi **[ekleme]**: mevcut alan ve
+endpoint'ler değişmez.
+
+| Değişiklik | Backend | Frontend |
+|---|---|---|
+| Yeni materyal türleri | `MaterialType.ASSIGNMENT = "assignment"`, `PRACTICE_PROBLEM = "practice_problem"` | `MaterialType` birleşimi, `MATERIAL_LABELS` ("Ödev", "Pratik problem") |
+| İzlence / takvim kolonu | `courses.syllabus`, `courses.calendar` (JSONB, boş olabilir); migration `c4f1d2a8e6b0`, kimlik dalıyla birleştirme `e7b2c9d4f1a3` | — |
+| Yeni endpoint | `GET /courses/{id}/outline` → `CourseOutline`; dersin her üyesi görür, üye olmayana 404, oturumsuza 401 | `api.courseOutline`, `courseService.outline` |
+| Yeni adresler | — | `…/courses/:id/{syllabus,calendar,videos,lecture-notes,quizzes,practice-problems,assignments}` (iki rol) |
+
+```
+CourseOutline   { syllabus: SyllabusBlock[] | null, calendar: CourseCalendar | null }
+SyllabusBlock   { type: "heading" | "paragraph" | "list" | "table", text, items, rows }   # tabloda ilk satır başlık
+CourseCalendar  { intro: str | null, columns: str[], rows: CalendarCell[][] }
+CalendarCell    { lines: str[], span: int }
+```
+
+- Değişmez: izlence ve takvim **düz metindir**; dışarıdan gelen HTML saklanmaz ve sayfaya basılmaz.
+- Şimdilik yalnızca `python -m app.scripts.import_ocw <paket>` doldurur. Eğitmenin düzenlemesi sonraki iştir.
+  Betikle açılan dersin üyesi yoktur; `create_instructor --course <KOD>` ile bir eğitmene bağlanır.
+- Bölüm ↔ tür: Video dersler = `video`, `transcript`; Ders notları = `notes`, `slides`, `textbook`;
+  Sınavlar = `past_exam`; Pratik problemler = `practice_problem`; Ödevler = `assignment`.

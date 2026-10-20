@@ -32,21 +32,23 @@ def main() -> None:
 
 
 def seed_dev_accounts(db: Session, course: Course) -> None:
-    accounts: list[tuple[str, str, str, Role]] = [
+    accounts: list[tuple[str, str | None, str, str, Role]] = [
         (
-            "Geliştirme Eğitmeni",
+            settings.dev_instructor_name,
+            settings.dev_instructor_title or None,
             settings.dev_instructor_email,
             settings.dev_instructor_password,
             "instructor",
         ),
         (
-            "Geliştirme Öğrencisi",
+            settings.dev_student_name,
+            None,
             settings.dev_student_email,
             settings.dev_student_password,
             "student",
         ),
     ]
-    for name, email, password, role in accounts:
+    for name, title, email, password, role in accounts:
         if len(password) < MIN_PASSWORD_LENGTH:
             print(f"{email}: şifre .env'de yok ya da kısa; hesap oluşturulmadı")
             continue
@@ -55,6 +57,7 @@ def seed_dev_accounts(db: Session, course: Course) -> None:
         if user is None:
             user = User(
                 name=name,
+                title=title,
                 email=email,
                 password_hash=hash_password(password),
                 can_create_courses=role == "instructor",
