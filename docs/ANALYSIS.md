@@ -189,7 +189,7 @@ flowchart LR
 ## 8. Kavramsal veri modeli (öneri)
 
 Sunumda tablo şeması yok. Aşağıdaki tablo, gereksinimlerin ihtiyaç duyduğu **asgari varlıkları** gösterir.
-Kodda şu an yalnızca `Course`, `Document`, `Chunk`, `Conversation` ve `Message` (`backend/app/db/models.py`, 2 Alembic migration) vardır;
+Kodda şu an yalnızca `Course`, `Document`, `Chunk`, `Conversation` ve `Message` (`backend/app/db/models.py`, 3 Alembic migration) vardır;
 `User`/`Enrollment`, `PracticeItem`, `Rubric`, `Attempt`, `Claim`/`ClaimCheck`, `InstructorReview` ve `EvalRun` henüz yoktur.
 Kimlik, üyelik ve onay alanlarının önerisi: [DECISIONS.md](DECISIONS.md), [CONTRACTS.md §3](CONTRACTS.md).
 
@@ -338,19 +338,19 @@ Her iterasyon 2 haftalık sprintlerden oluşur ve **aynı değerlendirme koşusu
 
 ## 14. Uygulamanın durumu
 
-> Son uzlaştırma: 2026-10-19 (issue #6), gerçek kodla karşılaştırılarak. Bu bölüm, önceki "iskelet" durumunun yerini alır.
+> Son uzlaştırma: 2026-10-20 (issue #6, aşama 2; PR #68 sonrası), gerçek kodla karşılaştırılarak. Bu bölüm, önceki "iskelet" durumunun yerini alır.
 
 | Parça | Durum |
 |---|---|
 | Klasör yapısı (slayt 18) | ✅ |
 | `docker compose up`: PostgreSQL 16 + pgvector, FastAPI, Vite | ✅ |
 | `GET /health` + test | ✅ |
-| Frontend: tasarım sistemi, giriş/kayıt (sahte), AI Tutor, Materyaller | ✅ AI Tutor ve Materyaller gerçek API; giriş/kayıt **sahte** (localStorage, FR-17). Pratik ve eğitmen sekmeleri "yakında" |
+| Frontend: tasarım sistemi, giriş/kayıt (sahte), ders sayfası, AI Tutor, Materyaller, Etkinlik | ✅ Eğitmen: Genel bakış, Materyaller, Etkinlik; öğrenci: Genel bakış, Materyaller, AI Tutor. Hepsi gerçek API. Giriş/kayıt **sahte** (localStorage, FR-17); tek kalan mock budur. Pratik arayüzü yok (silindi) |
 | CI: ruff + pytest (PostgreSQL ile), eslint + build | ✅ Playwright testleri CI'da **çalışmıyor** (bkz. CONTRACTS.md §6.6) |
 | Issue şablonları (Bug, hallucination alanlarıyla birlikte; Görev) + PR şablonu | ✅ |
-| DB: `courses`, `documents`, `chunks`, `conversations`, `messages` + 2 Alembic migration | ✅ Diğer varlıklar (§8) yok |
-| Çalışan özellik mantığı | ✅ Yükleme hattı (PDF/PPTX), hibrit arama, cite-or-decline cevap + alıntı doğrulama, kaynak görüntüleyici, ders yönetimi |
-| Henüz iskelet (`501` / `NotImplementedError`) | Pratik, değerlendirme, öğrenme kaydı, eğitmen görünümü, rubrik; kimlik/yetki; video/transkript; claim kontrolü; rerank; task router; local LLM; eval harness |
+| DB: `courses` (ders bilgisi alanlarıyla), `documents`, `chunks`, `conversations`, `messages` + 3 Alembic migration | ✅ Diğer varlıklar (§8) yok |
+| Çalışan özellik mantığı | ✅ Yükleme hattı (PDF/PPTX), hibrit arama, cite-or-decline cevap + alıntı doğrulama, kaynak görüntüleyici, ders yönetimi ve ders bilgisi düzenleme (`PATCH /courses/{id}`), eğitmen soru-cevap etkinliği (`GET /instructor/courses/{id}/activity`) |
+| Henüz iskelet (`501` / `NotImplementedError`) | Pratik, değerlendirme, öğrenme kaydı, sık hatalar ve eğitmen onay/düzeltmesi, rubrik; kimlik/yetki; video/transkript; claim kontrolü; rerank; task router; local LLM; eval harness |
 | Playwright UI testleri | ✅ `frontend/e2e/` (#7): AI Tutor ve hata durumları. *Sor → alıntı → pratik → gönder* akışı pratik gelince eklenecek |
 | RAGAs / Locust | ⏳ WP13 / WP14 |
 
@@ -371,24 +371,25 @@ farklıysa gerekçesi dosya sütunundadır.
 | 08 Model gateway | 🟡 | `llm/{base,openrouter,hosted,gateway}.py` (env tabanlı seçim); `llm/local.py`, `select_judge_client` iskelet | Sahte iki adapter ile aynı şemanın döndüğünü gösteren test; kural tabanlı seçim testi |
 | 09 Cite-or-decline | ✅ | `generation/answer.py`, `verification/citations.py`, `qa/service.py`, `api/ask.py` (`/ask`, `/ask/stream`); `AskResponse.outcome` (#5). FE: `pages/student/TutorPage.tsx`, `features/tutor/*` | Mevcut: `test_answer.py` (~24), `test_flow` akış testleri; `frontend/e2e/*`. Ölçüm: 30 kapsam dışı soruda ≥ %90 ret, aşırı ret ≤ %10. Açık: sonuç/hata sözleşmesi eksikleri (CONTRACTS.md §5) |
 | 10 Takip soruları | 🟡 (önceki ✅) | `qa/service.py` (son 3 tur). Sohbet bir kullanıcıya bağlı değil — #11 | Mevcut: `test_follow_up_question_gets_history`. Eklenecek (#11): başka kullanıcının `conversation_id`'si 404 |
-| 11 Pratik üretimi | ⬜ | `generation/question.py` iskelet; `api/practice.py` 501; FE: `pages/student/PracticePage.tsx` yer tutucu | `POST /practice`: `source.source_id` bir chunk'a çözülür. Sözleşme: CONTRACTS.md §2 |
+| 11 Pratik üretimi | ⬜ | `generation/question.py` iskelet; `api/practice.py` 501; FE: yok (`PracticePage` PR #68'de silindi; `/student/practice` → `/student`). Tipler: `schemas/practice.py`, `types.ts` | `POST /practice`: `source.source_id` bir chunk'a çözülür. Sözleşme: CONTRACTS.md §2 |
 | 12 Pratik kontrolleri | ⬜ | `verification/practice_checks.py` iskelet | Kontrolden geçmeyen item'ın dönmediğini gösteren test; eğitmen/TA 40 item'da ≥ %85 kabul |
 | 13 Cevap değerlendirme | ⬜ | `generation/grade.py` iskelet; `api/practice.py` 501 | `POST /practice/{id}/answer` testi; 60 cevapta QWK ≥ 0,70 |
 | 13 Rubrik + referans cevap girişi | ⬜ | `instructor/rubrics.py` iskelet; `api/rubrics.py` 501 | Rubrik oluşturma/listeleme API testi; eğitmen onayı (`approved`) |
 | 14 Claim kontrolü + hallucination log | ⬜ | `verification/{claims,judge,hallucination}.py` iskelet. (Cümle düzeyinde etiket doğrulaması FR-09'dadır; judge değildir) | Gold set üzerinde unsupported oranı ≤ %10; judge–insan κ ≥ 0,6 |
 | 15 Öğrenme kaydı | ⬜ | `learning/record.py` iskelet; `api/learning.py` 501. `messages.meta` yalnızca ret/alıntı bilgisi tutuyor; kullanıcı bağı yok | `research_logging` kapalıyken kayıt yazılmadığını gösteren test (ADR-4) |
-| 16 Eğitmen görünümü | ⬜ (önceki 🟡) | `instructor/{mistakes,review}.py` iskelet; `api/instructor.py` 501; FE: `pages/instructor/CourseSections.tsx` "yakında". *Not:* önceki "doküman listesi, parça önizleme, yükleme raporu" FR-01/02'nin eğitmen arayüzüdür (`MaterialsPage`), FR-16 değil | Onay/düzeltme API testi; Playwright: eğitmen bir cevabı düzeltir |
-| 17 Erişim kontrolü | ⬜ | `auth/dependencies.py` iskelet; hiçbir endpoint kimlik doğrulamıyor. FE: `services/authService.ts` **sahte** (localStorage), `auth/RequireRole.tsx` yalnızca istemci tarafında | Rol matrisi testi (endpoint × rol × üyelik → 200/401/403/404); #11 ve #12. Kararlar: DECISIONS.md ADR-1, 2 |
-| 18 Öğrenci arayüzü | 🟡 | AI Tutor: `pages/student/TutorPage.tsx`, `features/tutor/{AnswerBlock,SourceCards,SourcePanel,SourceViewer,RetrievalDetails,outcome}.ts*`. Kaynak görüntüleyici: `sources/lookup.py`, `ingestion/rendering.py`, `GET /sources/{id}`. Video ve pratik/geri bildirim panelleri yok | Mevcut: `frontend/e2e/{tutor,failures}.spec.ts` (CI'da çalışmıyor). Eksik: *sor → alıntıyı aç → pratik iste → cevap gönder* uçtan uca senaryosu |
-| Ders yönetimi | ✅ | `courses/service.py`, `api/courses.py`; FE: `features/courses/*`. Yetki yok (FR-17) | Mevcut: `test_courses_are_listed`, `test_create_course_normalizes_code_and_rejects_duplicates` |
+| 16 Eğitmen görünümü | 🟡 (önceki ⬜; PR #68 ile) | **Gerçek:** soru-cevap etkinliği: `instructor/activity.py`, `GET /instructor/courses/{id}/activity` (anonim, ders düzeyinde: sayılar, son 14 gün, en çok alıntılanan kaynaklar, materyalde cevabı bulunamayan sorular); FE: `pages/instructor/CourseActivityPage.tsx`, `services/instructorService.ts`. **İskelet:** `instructor/{mistakes,review}.py` (sık hatalar, onay/düzeltme); `api/instructor.py` bu iki uç nokta için 501. *Not:* etkinlik soru-cevap analitiğidir, "sık hata" (FR-16 kabulü) değil; doküman listesi/parça önizleme/yükleme raporu FR-01/02'nin eğitmen arayüzüdür (`MaterialsPage`) | Mevcut: `test_instructor_activity_is_computed_from_real_questions`, `test_instructor_activity_for_unknown_course_is_404`. Eklenecek: onay/düzeltme API testi; Playwright: eğitmen bir cevabı düzeltir. Etkinlik ekranının onay kapsamı: DECISIONS.md açık soru 9 |
+| 17 Erişim kontrolü | ⬜ | `auth/dependencies.py` iskelet; hiçbir endpoint kimlik doğrulamıyor (PR #68'in `PATCH /courses/{id}` ve `GET /instructor/courses/{id}/activity` uç noktaları dahil). Tipler: `schemas/common.py` (`Role`), `schemas/auth.py`, `types.ts` (kullanan endpoint yok). FE: `services/authService.ts` **sahte** (localStorage), `auth/RequireRole.tsx` yalnızca istemci tarafında | Rol matrisi testi (endpoint × rol × üyelik → 200/401/403/404); #11 ve #12. Kararlar: DECISIONS.md ADR-1, 2 |
+| 18 Öğrenci arayüzü | 🟡 | AI Tutor: `pages/student/TutorPage.tsx`, `features/tutor/{AnswerBlock,SourceCards,SourcePanel,SourceViewer,RetrievalDetails,outcome}.ts*`; ders sayfası: `layouts/CourseShell.tsx`, `pages/course/CourseOverview.tsx`, `pages/student/CourseMaterialsPage.tsx`. Kaynak görüntüleyici: `sources/lookup.py`, `ingestion/rendering.py`, `GET /sources/{id}`. Video ve pratik/geri bildirim panelleri yok | Mevcut: `frontend/e2e/{tutor,failures}.spec.ts` (CI'da çalışmıyor). Eksik: *sor → alıntıyı aç → pratik iste → cevap gönder* uçtan uca senaryosu |
+| Ders yönetimi | ✅ | `courses/service.py`, `api/courses.py` (`GET/POST /courses`, `PATCH /courses/{id}`); ders bilgisi alanları `instructor_name, term, level, department, description` (`db/models.py`, migration `b7d21c9e4a10`); FE: `features/courses/*` (`CourseInfoDialog`, `CreateCourseDialog`). Yetki yok (FR-17) | Mevcut: `test_courses_are_listed`, `test_create_course_normalizes_code_and_rejects_duplicates`, `test_course_info_is_created_updated_and_listed`, `test_updating_unknown_course_is_404` |
 | 19 Değerlendirme harness'i | ⬜ | `evaluation/harness/{run,conditions,judge_agreement}.py`, `metrics/*` iskelet (`NotImplementedError`); `gold_sets/` boş | Tek komutla 4 koşulun koşulması ve run log |
 | 20–22 (Iteration 2–4) | ⬜ bilinçli | — | Iteration 1'de kabul kanıtı yok; kapsam dışı |
 
 **Dokümanda kalan çelişkiler (düzeltildi):** §14.1'deki eski frontend yolları (`features/qa/ChatPanel`,
 `pages/StudentPage`, `features/sources/SourceViewer`, `features/video/VideoPlayer`, …) artık yok; yukarıdaki dosyalar gerçektir.
 
-**Açık güvenlik maddesi:** FR-04 satırındaki kaynak/doküman endpoint'leri ve kimliksiz yükleme/silme/ders oluşturma —
-**#11'de kapatılmalı** (DECISIONS.md açık soru 5).
+**Açık güvenlik maddesi:** FR-04 satırındaki kaynak/doküman endpoint'leri; kimliksiz yükleme/silme/ders oluşturma;
+kimliksiz `PATCH /courses/{id}` (herkes herhangi bir dersin bilgisini değiştirebilir) ve `GET /instructor/courses/{id}/activity`
+(herkes herhangi bir dersin öğrenci soru metinlerini görebilir) — **#11'de kapatılmalı** (DECISIONS.md açık soru 5).
 
 API sözleşmeleri `backend/app/schemas/` altında; frontend'deki karşılıkları `frontend/src/api/types.ts`.
 Önerilen değişiklikler ve ortak dosya protokolü: [CONTRACTS.md](CONTRACTS.md). Ekip kararları: [DECISIONS.md](DECISIONS.md).

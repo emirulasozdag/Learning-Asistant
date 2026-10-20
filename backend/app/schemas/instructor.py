@@ -3,6 +3,8 @@ from typing import Literal
 
 from pydantic import BaseModel
 
+from app.schemas.ask import AskOutcome
+
 
 class MistakeSummary(BaseModel):
     """Sınıfın sık yaptığı hata: hangi kavram, hangi hata, hangi kaynak düzeltti."""
@@ -38,8 +40,7 @@ class SourceUsage(BaseModel):
 
 class QuestionItem(BaseModel):
     question: str
-    # answered | insufficient_evidence | unsupported | model_refusal | provider_failure
-    outcome: str
+    outcome: AskOutcome
     asked_at: datetime
 
 

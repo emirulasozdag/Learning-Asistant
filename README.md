@@ -14,7 +14,8 @@ Engineering Design II · Project 8. Pilot ders: Veri Yapıları ve Algoritmalar.
 > - **Hibrit RAG arama:** anlamsal (e5 + pgvector) ve kelime (PostgreSQL tam metin) aramaları RRF ile birleşir. Alakasız sorular modele hiç gitmeden elenir.
 > - **AI chat:** OpenRouter üzerinden Claude; cevap akarak gelir, her bilgi [1], [2] ile kaynağına bağlanır, kaynak yetmezse reddeder. Takip sorularını hatırlar.
 > - **Kaynak gösterme:** alıntıya tıklayınca PDF'in gerçek sayfası açılır, alıntılanan satırlar işaretlenir. "Nasıl bulundu" paneli arama skorlarını gösterir.
-> - **Henüz yok:** video, pratik, değerlendirme, eğitmen analizleri, hallucination ölçümü, gerçek giriş/yetki (arayüzdeki giriş sahtedir; backend hiçbir isteği kimliğe veya ders üyeliğine göre kısıtlamaz). Pratik, eğitmen, öğrenme kaydı ve rubrik endpoint'leri `501` döner.
+> - **Eğitmen etkinliği:** dersin soru-cevap özeti (sayılar, son 14 gün, en çok alıntılanan kaynaklar, materyalde cevabı bulunamayan sorular) kayıtlı mesajlardan hesaplanır.
+> - **Henüz yok:** video, pratik, değerlendirme, sık hatalar ve eğitmen onayı, hallucination ölçümü, gerçek giriş/yetki (arayüzdeki giriş sahtedir; backend hiçbir isteği kimliğe veya ders üyeliğine göre kısıtlamaz). Pratik, eğitmen, öğrenme kaydı ve rubrik endpoint'leri `501` döner.
 >
 > Hangi özelliğin hangi dosyada olduğu ve durumu: [ANALYSIS.md §14.1](docs/ANALYSIS.md).
 > Kapsam, gereksinimler, mimari ve yol haritası: **[docs/ANALYSIS.md](docs/ANALYSIS.md)**
@@ -45,8 +46,8 @@ Learning-Asistent/
 ├── frontend/src/
 │   ├── ui/                tasarım sistemi bileşenleri (docs/UI_GOREVLERI.md)
 │   ├── layouts/           sidebar + topbar iskeleti, giriş düzeni
-│   ├── services/          veri katmanı (gerçek API + mock)
-│   ├── mock/              henüz backend'i olmayan alanlar için örnek veri
+│   ├── services/          veri katmanı (gerçek API; kimlik doğrulama hâlâ mock)
+│   ├── mock/              yalnızca kimlik doğrulama (backend yok; #12)
 │   ├── features/          tutor/, materials/, courses/
 │   └── pages/             route başına sayfa (auth, instructor, student)
 ├── evaluation/            gold set'ler, rubrikler, insan etiketleri, harness/

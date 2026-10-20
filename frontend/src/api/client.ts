@@ -1,5 +1,6 @@
 import type {
   AnswerFeedback,
+  AnswerSubmission,
   AskRequest,
   AskResponse,
   AskStreamEvent,
@@ -167,10 +168,10 @@ export const api = {
   generatePractice: (body: PracticeRequest) =>
     request<PracticeItem>("/practice", { method: "POST", body: JSON.stringify(body) }),
 
-  submitAnswer: (itemId: number, answer: string) =>
+  submitAnswer: (itemId: number, body: AnswerSubmission) =>
     request<AnswerFeedback>(`/practice/${itemId}/answer`, {
       method: "POST",
-      body: JSON.stringify({ answer }),
+      body: JSON.stringify(body),
     }),
 
   learningRecord: (courseId: number) =>

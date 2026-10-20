@@ -1,7 +1,6 @@
 from dataclasses import dataclass
-from typing import Literal
 
-Role = Literal["student", "instructor", "ta"]
+from app.schemas.common import Role
 
 
 @dataclass

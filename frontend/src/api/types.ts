@@ -1,5 +1,31 @@
 // backend/app/schemas ile birebir aynı sözleşmeler.
 
+/** Kullanıcının bir dersteki rolü (ders başına). */
+export type Role = "student" | "instructor" | "ta";
+
+/** Uygulama hatalarının sabit kodu (docs/CONTRACTS.md §5). */
+export type ErrorCode =
+  | "course_not_found"
+  | "source_not_found"
+  | "conversation_not_found"
+  | "document_not_found"
+  | "unsupported_file_type"
+  | "file_too_large"
+  | "ingestion_failed"
+  | "course_exists"
+  | "no_valid_item"
+  | "invalid_video"
+  | "not_authenticated"
+  | "insufficient_role"
+  | "not_implemented"
+  | "validation_error";
+
+/** Hata zarfı: `detail` kullanıcıya gösterilebilir metin, `code` programın kullandığı sabit. */
+export interface ApiErrorBody {
+  detail: string;
+  code: ErrorCode;
+}
+
 export interface Citation {
   source_id: string;
   document_title?: string | null;
@@ -73,24 +99,44 @@ export type AskStreamEvent =
 
 export type PracticeType = "mcq" | "short_answer" | "code_tracing";
 
+export type Difficulty = "easy" | "medium" | "hard";
+
 export interface PracticeRequest {
   course_id: number;
   type: PracticeType;
   topic?: string | null;
   source_id?: string | null;
+  difficulty?: Difficulty | null;
+  /** "Bu eksik üzerine çalış": bu denemenin eksiklerine yönelik yeni soru. */
+  follow_up_of_attempt_id?: number | null;
 }
 
+/** Cevap anahtarı, referans cevap ve açıklama gönderimden önce hiçbir yanıtta dönmez. */
 export interface PracticeItem {
   id: number;
+  course_id: number;
   type: PracticeType;
+  topic: string | null;
+  difficulty: Difficulty;
   prompt: string;
+  /** Yalnızca mcq. */
   options: string[] | null;
   source: Citation;
 }
 
+/** Tam biri dolu olur: short_answer/code_tracing → `answer_text`, mcq → `selected_option`. */
+export interface AnswerSubmission {
+  answer_text?: string | null;
+  /** `PracticeItem.options` içindeki sıra (0'dan başlar). */
+  selected_option?: number | null;
+}
+
 export interface AnswerFeedback {
+  attempt_id: number;
+  item_id: number;
   score: number;
   max_score: number;
+  understood: string[];
   missing_concepts: string[];
   explanation: string;
   citations: Citation[];
@@ -155,7 +201,56 @@ export interface CourseSummary extends CourseInfo {
   code: string;
   name: string;
   language: "tr" | "en";
-  role: "student" | "instructor" | "ta" | null;
+  role: Role | null;
+}
+
+export interface UserOut {
+  id: number;
+  name: string;
+  email: string;
+  title: string | null;
+}
+
+/** Kullanıcının bir dersteki rolü. */
+export interface Membership {
+  course_id: number;
+  role: Role;
+}
+
+/** Araştırma/analiz kaydı için ayrı opt-in (varsayılan kapalı). */
+export interface Consent {
+  research_logging: boolean;
+  consented_at: string | null;
+  policy_version: string;
+}
+
+export interface ConsentUpdate {
+  research_logging: boolean;
+  policy_version: string;
+}
+
+/** `GET /me`: oturumdaki kullanıcı, ders üyelikleri ve onay durumu. */
+export interface Me {
+  user: UserOut;
+  memberships: Membership[];
+  consent: Consent;
+}
+
+/** Katılım kodu ile derse katılma. */
+export interface JoinCourseRequest {
+  code: string;
+}
+
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+/** Rol alanı yoktur: eğitmen/TA rolü kayıtla alınamaz. */
+export interface RegisterRequest {
+  name: string;
+  email: string;
+  password: string;
 }
 
 export interface CourseCreate extends Partial<CourseInfo> {
@@ -206,7 +301,7 @@ export interface SourceDetail {
   source_id: string;
   document_id: number;
   document_title: string;
-  material_type: string;
+  material_type: MaterialType;
   text: string;
   page: number | null;
   t_start: number | null;
