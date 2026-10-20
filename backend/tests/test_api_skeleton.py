@@ -12,7 +12,7 @@ client = TestClient(app)
 
 SKELETON_ENDPOINTS = [
     ("post", "/practice", {"json": {"course_id": 1, "type": "code_tracing"}}),
-    ("post", "/practice/1/answer", {"json": {"answer": "mid = (lo + hi) // 2"}}),
+    ("post", "/practice/1/answer", {"json": {"answer_text": "mid = (lo + hi) // 2"}}),
     ("get", "/courses/1/learning-record", {}),
     ("get", "/instructor/courses/1/mistakes", {}),
     (

@@ -2,6 +2,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
+from app.schemas.common import Role
+
 Level = Literal["undergraduate", "graduate"]
 
 
@@ -31,7 +33,7 @@ class CourseSummary(CourseInfo):
     name: str
     language: Literal["tr", "en"]
     # Kimlik doğrulama gelene kadar boş.
-    role: Literal["student", "instructor", "ta"] | None = None
+    role: Role | None = None
 
 
 class CourseCreate(CourseInfo):
