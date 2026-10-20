@@ -12,7 +12,7 @@ Engineering Design II · Project 8. Pilot ders: Veri Yapıları ve Algoritmalar.
 > - **Ders oluşturma** ve dersler arası tam izolasyon.
 > - **Materyal yükleme hattı:** PDF/PPTX okuma → temizleme → sayfa numaralı parçalama → multilingual-e5 ile vektörleştirme (pgvector). Her yüklemede adım adım rapor.
 > - **Hibrit RAG arama:** anlamsal (e5 + pgvector) ve kelime (PostgreSQL tam metin) aramaları RRF ile birleşir. Alakasız sorular modele hiç gitmeden elenir.
-> - **AI chat:** OpenRouter üzerinden Claude; cevap akarak gelir, her bilgi [1], [2] ile kaynağına bağlanır, kaynak yetmezse reddeder. Takip sorularını hatırlar.
+> - **AI chat:** Gemini (varsayılan) ya da OpenRouter üzerinden Claude; cevap akarak gelir, her bilgi [1], [2] ile kaynağına bağlanır, kaynak yetmezse reddeder. Takip sorularını hatırlar.
 > - **Kaynak gösterme:** alıntıya tıklayınca PDF'in gerçek sayfası açılır, alıntılanan satırlar işaretlenir. "Nasıl bulundu" paneli arama skorlarını gösterir.
 > - **Eğitmen etkinliği:** dersin soru-cevap özeti (sayılar, son 14 gün, en çok alıntılanan kaynaklar, materyalde cevabı bulunamayan sorular) kayıtlı mesajlardan hesaplanır.
 > - **Henüz yok:** video, pratik, değerlendirme, sık hatalar ve eğitmen onayı, hallucination ölçümü, arayüzde gerçek giriş (#12). Backend'de kimlik ve ders düzeyinde yetki var (#11): her istek oturum çerezi ve ders üyeliği ister; arayüzdeki giriş hâlâ sahte olduğu için #12 gelene kadar arayüz backend'e oturumsuz istek atar ve `401` alır. Pratik, sık hatalar, öğrenme kaydı ve rubrik endpoint'leri yetki denetiminden sonra `501` döner.
@@ -135,16 +135,20 @@ yerleşimi anlamı etkiliyorsa orijinal sayfayla karşılaştırılmalıdır.
 yalnızca vektörleri yeniden üretmek metni onarmaz.
 
 ### LLM
-`.env` dosyasında:
+`.env` dosyasında (seçim ve maliyet gerekçesi: [DECISIONS.md ADR-7](docs/DECISIONS.md)):
 
 ```
-LLM_PROVIDER=openrouter
-LLM_API_KEY=<OpenRouter anahtarı>
-LLM_MODEL=anthropic/claude-opus-5.5
+LLM_PROVIDER=gemini
+LLM_API_KEY=<Gemini API anahtarı>
 ```
 
 - Anahtar **yalnızca `.env`** dosyasına yazılır, asla commit'lenmez.
-- `LLM_MODEL` ile model değiştirilebilir. Örneğin `anthropic/claude-haiku-5.5` çok daha ucuzdur.
+- Modeller boş bırakılırsa: üretici `gemini-3.8-flash`, orkestratör `gemini-3.5-flash-lite`
+  (`LLM_MODEL`, `LLM_ORCHESTRATOR_MODEL` ile değiştirilebilir).
+- **Ücretsiz katman yalnızca geliştirme içindir:** gönderilen içerik Google ürünlerini geliştirmede kullanılabilir.
+  Kişisel veri ve onaysız ders materyali gönderilmez; pilot ücretli katmanla yapılır.
+- OpenRouter ile Claude da kullanılabilir: `LLM_PROVIDER=openrouter`, `LLM_MODEL=anthropic/claude-opus-5.5`.
+  Bu sağlayıcıda orkestratör yoktur; AI Tutor sabit akışla çalışır.
 - Anahtar boşsa sistem **LLM'siz** çalışır: cevap yerine en ilgili ders parçasını kaynağıyla gösterir.
 
 ### Transkripsiyonu açmak (isteğe bağlı)
@@ -161,6 +165,11 @@ Sonra `docker compose up --build`. Model ilk açılışta indirilir (~1,6 GB), s
 ders dakikalar sürer; yükleme hemen döner, doküman "İşleniyor" görünür ve bitince "İndekslendi" olur (liste kendiliğinden
 yenilenir). Süren iş sunucu yeniden başlarsa (ör. `--reload`) "Başarısız" olur; dosyayı yeniden yükleyin. Hızlı deneme için
 `TRANSCRIPTION_MODEL=tiny` (düşük doğruluk).
+
+### AI Tutor (orkestratör)
+`POST /api/tutor/turn` (ve `/turn/stream`) bir öğrenci mesajını bir tura dönüştürür: orkestratör modeli araç
+seçer (kaynaklı cevap, netleştirme, bilgilendirme…), öğrenciye giden içerik yalnızca araçlardan gelir ve kökenini
+taşır. Sözleşme: [CONTRACTS.md §9](docs/CONTRACTS.md). Her turun model kullanımı ve tahmini maliyeti `trace`'te.
 
 ### Cevap akışı ve alıntı doğrulama
 `POST /api/ask/stream` sırasıyla şu olayları gönderir:

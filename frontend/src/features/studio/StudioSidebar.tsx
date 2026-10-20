@@ -6,7 +6,6 @@ import type { Course } from "../../services/courseService";
 import ThemeSwitcher from "../../theme/ThemeSwitcher";
 import Avatar from "../../ui/Avatar";
 import { LogoMark, PRODUCT_NAME } from "../../ui/Logo";
-import UniversityLogo from "../../ui/UniversityLogo";
 import ConversationList from "./ConversationList";
 import CourseSwitcher from "./CourseSwitcher";
 import StudioNav from "./StudioNav";
@@ -32,14 +31,11 @@ export default function StudioSidebar({
 
   return (
     <div className="flex h-full flex-col gap-6 overflow-y-auto bg-subtle/60 px-4 pt-5 pb-4">
-      <div className="flex flex-col gap-4">
-        <UniversityLogo className="self-start" />
-        <div className="flex items-center gap-2.5">
-          <LogoMark className="size-8 text-accent" />
-          <div className="min-w-0">
-            <p className="text-base leading-tight font-bold text-ink">{PRODUCT_NAME}</p>
-            <p className="font-mono text-[11px] text-graphite">yalnızca onaylı materyal</p>
-          </div>
+      <div className="flex items-center gap-2.5">
+        <LogoMark className="size-8 text-accent" />
+        <div className="min-w-0">
+          <p className="text-base leading-tight font-bold text-ink">{PRODUCT_NAME}</p>
+          <p className="font-mono text-[11px] text-graphite">yalnızca onaylı materyal</p>
         </div>
       </div>
 

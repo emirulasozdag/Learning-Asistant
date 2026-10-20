@@ -14,6 +14,7 @@ export type ErrorCode =
   | "ingestion_failed"
   | "course_exists"
   | "no_valid_item"
+  | "practice_item_not_found"
   | "invalid_video"
   | "not_authenticated"
   | "insufficient_role"
@@ -86,6 +87,8 @@ export interface AskResponse {
   outcome: AskOutcome;
   /** Kaynağa dayanmadığı için cevaptan çıkarılan cümle sayısı. */
   unsupported_removed: number;
+  /** Kısmi cevapta kaynakların kapsamadığı kısım (alıntısız). */
+  coverage_gap?: string | null;
   citations: Citation[];
   declined: boolean;
   decline_reason: string | null;
@@ -105,6 +108,88 @@ export type AskStreamEvent =
   | { type: "retrieval"; hits: RetrievalHit[] }
   | { type: "delta"; text: string }
   | { type: "done"; response: AskResponse }
+  | { type: "error"; detail: string };
+
+// --- AI Tutor turu (CONTRACTS.md §9, ADR-7) -----------------------------------------------------
+
+export interface TutorTurnRequest {
+  course_id: number;
+  message: string;
+  conversation_id?: number | null;
+  video?: VideoRef | null;
+}
+
+/** Ders materyalinden, alıntılı ve doğrulanmış cevap (ya da gerekçeli ret). */
+export interface CourseAnswerBlock {
+  type: "course_answer";
+  provenance: "course";
+  response: AskResponse;
+}
+
+/** Ders materyalinde yok; genel bilgi. Alıntısız ve her zaman etiketli gösterilir. */
+export interface GeneralExplanationBlock {
+  type: "general_explanation";
+  provenance: "general";
+  text: string;
+  check: "unchecked" | "checked";
+  notice: string;
+  model: string | null;
+}
+
+/** Ders parçasına bağlı, otomatik kontrollerden geçmiş pratik sorusu (anahtarsız). */
+export interface PracticeBlock {
+  type: "practice";
+  provenance: "course";
+  item: PracticeItem;
+}
+
+export interface ClarificationBlock {
+  type: "clarification";
+  provenance: "none";
+  question: string;
+  options: string[];
+}
+
+export type NoticeKind = "greeting" | "off_topic" | "graded_work" | "not_covered" | "unavailable" | "failure";
+
+export interface NoticeBlock {
+  type: "notice";
+  provenance: "none";
+  kind: NoticeKind;
+  text: string;
+}
+
+export interface FollowUpsBlock {
+  type: "follow_ups";
+  provenance: "none";
+  items: { action: "simpler" | "example"; label: string; message: string }[];
+}
+
+export type TutorBlock =
+  | CourseAnswerBlock
+  | GeneralExplanationBlock
+  | PracticeBlock
+  | ClarificationBlock
+  | NoticeBlock
+  | FollowUpsBlock;
+
+export interface TutorTurnResponse {
+  conversation_id: number;
+  blocks: TutorBlock[];
+  /** Değerlendirme ve hata ayıklama içindir; öğrenciye gösterilmez. */
+  trace: Record<string, unknown>;
+}
+
+/**
+ * /tutor/turn/stream olayları. `delta` bir bloğun doğrulanmamış taslağıdır; aynı indeksteki
+ * `block` geldiğinde taslağın yerini alır.
+ */
+export type TutorStreamEvent =
+  | { type: "status"; tool: string; label: string }
+  | { type: "retrieval"; blockIndex: number; hits: RetrievalHit[] }
+  | { type: "delta"; blockIndex: number; text: string }
+  | { type: "block"; index: number; block: TutorBlock }
+  | { type: "done"; response: TutorTurnResponse }
   | { type: "error"; detail: string };
 
 export type PracticeType = "mcq" | "short_answer" | "code_tracing";
@@ -151,6 +236,10 @@ export interface AnswerFeedback {
   explanation: string;
   citations: Citation[];
   follow_up_item_id: number | null;
+  /** MCQ'da doğru şık; açık uçluda örnek tam puanlık cevap ve ölçüt puanları (cevaptan sonra). */
+  correct_option: number | null;
+  reference_answer: string | null;
+  criteria: { description: string; awarded: number; points: number; rationale: string }[];
 }
 
 export interface LearningRecord {

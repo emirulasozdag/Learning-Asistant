@@ -1,6 +1,9 @@
-/** AI Tutor — gerçek API: hibrit arama + cite-or-decline cevap, akışlı (SSE). */
+/**
+ * AI Tutor — gerçek API. `turn`: orkestratörlü tur (/tutor/turn/stream, CONTRACTS.md §9);
+ * `ask`: yalnızca kaynaklı cevap hattı (/ask/stream).
+ */
 import { api } from "../api/client";
-import type { AskStreamEvent } from "../api/types";
+import type { AskStreamEvent, TutorStreamEvent } from "../api/types";
 
 export type QuickAction = "simpler" | "example" | "quiz";
 
@@ -8,10 +11,24 @@ export type QuickAction = "simpler" | "example" | "quiz";
 const QUICK_ACTION_PROMPTS: Record<QuickAction, string> = {
   simpler: "Bunu daha basit, adım adım anlatır mısın?",
   example: "Bunu ders materyalindeki bir örnekle gösterir misin?",
-  quiz: "Bu konuyu anlayıp anlamadığımı görmek için bana ders materyaline dayanan kısa bir soru sorar mısın?",
+  quiz: "Bu konuda beni test et: bana bir soru sor.",
 };
 
 export const tutorService = {
+  turn(
+    courseId: number,
+    message: string,
+    conversationId: number | null,
+    onEvent: (event: TutorStreamEvent) => void,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    return api.tutorStream(
+      { course_id: courseId, message, conversation_id: conversationId },
+      onEvent,
+      signal,
+    );
+  },
+
   ask(
     courseId: number,
     question: string,

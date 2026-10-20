@@ -1,21 +1,33 @@
-import { BookOpen, ChevronLeft, ChevronRight, ServerOff, SquarePen } from "lucide-react";
+import {
+  BookOpen,
+  ChevronLeft,
+  ChevronRight,
+  ClipboardCheck,
+  Library,
+  MessageSquareText,
+  ServerOff,
+  SquarePen,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router";
 
-import type { AskResponse, DocumentOut } from "../../api/types";
+import type { AskResponse, DocumentOut, TutorStreamEvent } from "../../api/types";
 import { useCourse } from "../../features/courses/context";
-import type { ConversationEntry } from "../../features/studio/context";
+import { sortByTitle } from "../../features/materials/sortByTitle";
 import { useStudio } from "../../features/studio/useStudio";
 import AnswerBlock from "../../features/tutor/AnswerBlock";
 import { isStructurable, stripExtractiveIntro, structureAnswer, type Claim, type StructuredAnswer } from "../../features/tutor/claims";
 import Composer from "../../features/tutor/Composer";
-import { classifyFailure, classifyResponse, describeTurn } from "../../features/tutor/outcome";
+import { classifyFailure, classifyResponse, describeTutorTurn } from "../../features/tutor/outcome";
 import SourceViewer from "../../features/tutor/SourceViewer";
 import ClaimAnswer from "../../features/tutor/studio/ClaimAnswer";
 import EvidencePanel from "../../features/tutor/studio/EvidencePanel";
 import EvidenceThread from "../../features/tutor/studio/EvidenceThread";
 import RetrievalMeter from "../../features/tutor/studio/RetrievalMeter";
-import type { Turn } from "../../features/tutor/types";
+import { courseSuggestions } from "../../features/tutor/suggestions";
+import { answerOf, entryState } from "../../features/tutor/turns";
+import TurnExtras from "../../features/tutor/TutorTurnView";
+import type { Segment, TutorTurn } from "../../features/tutor/types";
 import { useIsDesktop } from "../../features/tutor/useIsDesktop";
 import { describeTotals, documentExtent, materialLabel, materialTotals } from "../../labels";
 import { courseService, type Course } from "../../services/courseService";
@@ -59,15 +71,6 @@ function structuredView(response: AskResponse | undefined): StructuredAnswer | n
   return structured.claims.length > 0 || structured.lead ? structured : null;
 }
 
-function entryState(turn: Turn): ConversationEntry["state"] {
-  if (turn.failure || turn.stopped) return "failed";
-  if (!turn.response) return "pending";
-  const outcome = classifyResponse(turn.response);
-  if (outcome === "out_of_scope") return "declined";
-  if (outcome === "not_generated") return "failed";
-  return "answered";
-}
-
 function TutorSession({ course }: { course: Course }) {
   const courseId = course.id;
   const studio = useStudio();
@@ -76,7 +79,7 @@ function TutorSession({ course }: { course: Course }) {
   const [materials, setMaterials] = useState<DocumentOut[] | null>(null);
   const [materialsFailed, setMaterialsFailed] = useState(false);
   const [materialsAttempt, setMaterialsAttempt] = useState(0);
-  const [turns, setTurns] = useState<Turn[]>([]);
+  const [turns, setTurns] = useState<TutorTurn[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [selection, setSelection] = useState<Selection>(NO_SELECTION);
   const [question, setQuestion] = useState("");
@@ -109,7 +112,9 @@ function TutorSession({ course }: { course: Course }) {
 
   const activeTurn = turns.find((turn) => turn.id === activeId) ?? turns[turns.length - 1] ?? null;
   const activeIndex = activeTurn ? turns.indexOf(activeTurn) : -1;
-  const structured = useMemo(() => structuredView(activeTurn?.response), [activeTurn?.response]);
+  // Turun kaynaklı cevabı iddia görünümünde; pratik, genel bilgi gibi bloklar altında (TurnExtras).
+  const activeAnswer = useMemo(() => (activeTurn ? answerOf(activeTurn) : null), [activeTurn]);
+  const structured = useMemo(() => structuredView(activeAnswer?.response), [activeAnswer?.response]);
 
   // Kenar çubuğundaki "Bu sohbet" listesi.
   const { publish, onSelect, queuedQuestion, queueQuestion } = studio;
@@ -125,9 +130,45 @@ function TutorSession({ course }: { course: Course }) {
     return () => onSelect(null);
   }, [onSelect]);
 
-  const updateTurn = useCallback((id: string, change: (turn: Turn) => Turn) => {
+  const updateTurn = useCallback((id: string, change: (turn: TutorTurn) => TutorTurn) => {
     setTurns((list) => list.map((turn) => (turn.id === id ? change(turn) : turn)));
   }, []);
+
+  /** Akış olayını tura işler. Taslaklar `block` gelince, bloklar da `done` ile kesinleşir. */
+  const applyEvent = useCallback(
+    (id: string, event: TutorStreamEvent) => {
+      if (event.type === "status") {
+        // Turu bitirme adımı gösterilmez; yalnızca iş yapan araçlar görünür.
+        updateTurn(id, (t) => ({ ...t, tool: event.tool, status: event.tool === "finish" ? undefined : event.label }));
+      } else if (event.type === "retrieval") {
+        updateTurn(id, (t) => withSegment(t, event.blockIndex, (s) => ({ ...s, hits: event.hits })));
+      } else if (event.type === "delta") {
+        updateTurn(id, (t) =>
+          withSegment(t, event.blockIndex, (s) => ({ ...s, streamText: s.streamText + event.text })),
+        );
+      } else if (event.type === "block") {
+        // Blok geldi: o aracın etiketi bitti; sonraki araç kendi etiketini gönderir.
+        updateTurn(id, (t) => ({
+          ...withSegment(t, event.index, (s) => ({ ...s, block: event.block })),
+          status: undefined,
+        }));
+      } else if (event.type === "done") {
+        const blocks = event.response.blocks;
+        updateTurn(id, (t) => ({
+          ...t,
+          done: true,
+          status: undefined,
+          finishedAt: performance.now(),
+          segments: blocks.map((block, index) => ({ ...(t.segments[index] ?? { tool: "", streamText: "" }), block })),
+        }));
+        setConversationId(event.response.conversation_id);
+      } else {
+        // Akıştaki `error` olayı kod taşımıyor: hepsi "geçici sorun" olarak gösterilir.
+        updateTurn(id, (t) => ({ ...t, failure: { kind: "temporary" } }));
+      }
+    },
+    [updateTurn],
+  );
 
   async function ask(text: string) {
     text = text.trim();
@@ -135,39 +176,21 @@ function TutorSession({ course }: { course: Course }) {
     const id = `${Date.now()}`;
     setQuestion("");
     setBusy(true);
-    setTurns((list) => [...list, { id, question: text, streamText: "", startedAt: performance.now() }]);
+    setTurns((list) => [...list, { id, question: text, segments: [], startedAt: performance.now() }]);
     setActiveId(id);
     setSelection(NO_SELECTION);
     answerScrollRef.current?.scrollTo({ top: 0 });
     const controller = new AbortController();
     abortRef.current = controller;
     try {
-      await tutorService.ask(
-        courseId,
-        text,
-        conversationId,
-        (event) => {
-          if (event.type === "retrieval") updateTurn(id, (t) => ({ ...t, hits: event.hits }));
-          else if (event.type === "delta")
-            updateTurn(id, (t) => ({ ...t, streamText: t.streamText + event.text }));
-          else if (event.type === "done") {
-            updateTurn(id, (t) => ({ ...t, response: event.response, finishedAt: performance.now() }));
-            setConversationId(event.response.conversation_id);
-          } else {
-            // Akıştaki `error` olayı kod taşımıyor: veritabanı, arama ya da üretim hatasını
-            // ayıramayız. Hepsi "geçici sorun" olarak gösterilir, asla "konu derste yok" olarak değil.
-            updateTurn(id, (t) => ({ ...t, failure: { kind: "temporary" } }));
-          }
-        },
-        controller.signal,
-      );
+      await tutorService.turn(courseId, text, conversationId, (event) => applyEvent(id, event), controller.signal);
       updateTurn(id, (t) => {
-        if (t.response || t.failure) return t;
+        if (t.done || t.failure) return t;
         return controller.signal.aborted ? { ...t, stopped: true } : { ...t, failure: { kind: "unavailable" } };
       });
     } catch (reason) {
       updateTurn(id, (t) => {
-        if (t.response || t.failure) return t;
+        if (t.done || t.failure) return t;
         return controller.signal.aborted ? { ...t, stopped: true } : { ...t, failure: classifyFailure(reason) };
       });
     } finally {
@@ -209,7 +232,7 @@ function TutorSession({ course }: { course: Course }) {
   }
 
   /** Başarısız ya da üretilemeyen soruyu aynı metinle yeniden sorar; eski deneme listeden çıkar. */
-  function retry(turn: Turn) {
+  function retry(turn: TutorTurn) {
     if (busy) return;
     setTurns((list) => list.filter((item) => item.id !== turn.id));
     void ask(turn.question);
@@ -219,12 +242,17 @@ function TutorSession({ course }: { course: Course }) {
     void ask(tutorService.quickActionPrompt(action));
   }
 
-  // Seçim aktif tura aittir; tur değişince ilk iddia seçilir.
+  // Seçim aktif tura aittir; tur değişince ilk iddia seçilir. İddialara bölünemeyen cevapta
+  // (kod, tablo) geniş ekranda ilk kaynak açılır.
   const current: Selection =
     selection.turnId === activeTurn?.id
       ? selection
-      : { turnId: activeTurn?.id ?? null, claim: structured?.claims[0]?.number ?? null, sourceOverride: null };
-  const response = activeTurn?.response;
+      : {
+          turnId: activeTurn?.id ?? null,
+          claim: structured?.claims[0]?.number ?? null,
+          sourceOverride: !structured && desktop ? (activeAnswer?.response?.citations[0]?.source_id ?? null) : null,
+        };
+  const response = activeAnswer?.response;
   const selectedClaim = structured?.claims.find((claim) => claim.number === current.claim) ?? null;
   const claimSource = selectedClaim
     ? response?.citations[(selectedClaim.citations[0] ?? 0) - 1]?.source_id
@@ -233,9 +261,21 @@ function TutorSession({ course }: { course: Course }) {
   const sourceId = current.sourceOverride ?? claimSource ?? (structured ? firstCitation : undefined) ?? null;
   const showThread = Boolean(structured && selectedClaim && !current.sourceOverride && desktop);
 
+  /** Kaynağı açan öğe: kaynak kapanınca odak ona döner. */
+  const sourceOpener = useRef<HTMLElement | null>(null);
+
+  function rememberOpener() {
+    const active = document.activeElement;
+    sourceOpener.current = active instanceof HTMLElement && active !== document.body ? active : null;
+  }
+
   function selectClaim(claim: Claim) {
+    rememberOpener();
     // Dar ekranda kaynak yan panelde değil tam ekran açılır; iddiaya dokunmak onu açar.
-    const source = desktop ? null : (response?.citations[(claim.citations[0] ?? 0) - 1]?.source_id ?? null);
+    // LLM'siz alıntıda cümlelerin alıntı işareti yoktur; geniş ekrandaki gibi ilk kaynak açılır.
+    const source = desktop
+      ? null
+      : (response?.citations[(claim.citations[0] ?? 0) - 1]?.source_id ?? firstCitation ?? null);
     setSelection({ turnId: activeTurn?.id ?? null, claim: claim.number, sourceOverride: source });
   }
 
@@ -254,11 +294,17 @@ function TutorSession({ course }: { course: Course }) {
   }
 
   function selectSource(id: string) {
+    rememberOpener();
     setSelection({ ...current, sourceOverride: id });
   }
 
   function closeSource() {
     setSelection({ ...current, claim: null, sourceOverride: null });
+    const opener = sourceOpener.current;
+    sourceOpener.current = null;
+    requestAnimationFrame(() => {
+      if (opener?.isConnected) opener.focus();
+    });
   }
 
   const noMaterials = materials !== null && materials.length === 0;
@@ -316,42 +362,59 @@ function TutorSession({ course }: { course: Course }) {
                   setMaterials(null);
                   setMaterialsAttempt((attempt) => attempt + 1);
                 }}
+                onSuggest={(text) => void ask(text)}
               />
-            ) : structured && response ? (
-              <>
-                {classifyResponse(response) === "ai_unavailable" && (
-                  <p className="mb-4 rounded-panel border border-line bg-surface px-3 py-2 text-sm text-graphite">
-                    Yapay zekâ şu an kullanılamıyor; ders materyalindeki ilgili bölüm olduğu gibi, cümle cümle
-                    gösteriliyor.
-                  </p>
-                )}
-                <ClaimAnswer
-                  question={activeTurn.question}
-                  response={response}
-                  answer={structured}
-                  selectedClaim={current.claim}
-                  onSelectClaim={selectClaim}
-                  claimRef={setClaimElement}
-                  onSelectSource={selectSource}
-                  isLatest={activeIndex === turns.length - 1}
-                  onQuickAction={quickAction}
-                  elapsedMs={
-                    activeTurn.startedAt != null && activeTurn.finishedAt != null
-                      ? activeTurn.finishedAt - activeTurn.startedAt
-                      : null
-                  }
-                />
-              </>
             ) : (
-              <div className="flex flex-col gap-5">
-                <p className="max-w-[46rem] self-start rounded-panel border border-line bg-surface px-4 py-3 text-base text-ink-2 shadow-card">
-                  {activeTurn.question}
-                </p>
-                <AnswerBlock
+              <div className="flex flex-col gap-6">
+                {structured && response ? (
+                  <>
+                    {classifyResponse(response) === "ai_unavailable" && (
+                      <p className="rounded-panel border border-line bg-surface px-3 py-2 text-sm text-graphite">
+                        Yapay zekâ şu an kullanılamıyor; ders materyalindeki ilgili bölüm olduğu gibi, cümle cümle
+                        gösteriliyor.
+                      </p>
+                    )}
+                    <ClaimAnswer
+                      question={activeTurn.question}
+                      response={response}
+                      answer={structured}
+                      selectedClaim={current.claim}
+                      onSelectClaim={selectClaim}
+                      claimRef={setClaimElement}
+                      onSelectSource={selectSource}
+                      isLatest={activeIndex === turns.length - 1}
+                      onQuickAction={quickAction}
+                      elapsedMs={
+                        activeAnswer?.startedAt != null && activeAnswer.finishedAt != null
+                          ? activeAnswer.finishedAt - activeAnswer.startedAt
+                          : null
+                      }
+                    />
+                  </>
+                ) : (
+                  <>
+                    <p className="max-w-[46rem] self-start rounded-panel border border-line bg-surface px-4 py-3 text-base text-ink-2 shadow-card">
+                      {activeTurn.question}
+                    </p>
+                    {activeAnswer && (
+                      <AnswerBlock
+                        turn={activeAnswer}
+                        isLatest={activeIndex === turns.length - 1}
+                        onQuickAction={quickAction}
+                        onRetry={() => retry(activeTurn)}
+                        selectedSourceId={sourceId}
+                        onSelectSource={selectSource}
+                      />
+                    )}
+                  </>
+                )}
+                <TurnExtras
                   turn={activeTurn}
                   isLatest={activeIndex === turns.length - 1}
+                  hasAnswer={activeAnswer !== null}
                   onQuickAction={quickAction}
                   onRetry={() => retry(activeTurn)}
+                  onAsk={(text) => void ask(text)}
                   selectedSourceId={sourceId}
                   onSelectSource={selectSource}
                 />
@@ -401,12 +464,13 @@ function TutorSession({ course }: { course: Course }) {
           busy={busy}
           onStop={stop}
           disabled={noMaterials}
+          prominent={turns.length === 0}
           placeholder={
             noMaterials
               ? "Bu derse henüz materyal yüklenmedi"
               : turns.length > 0
                 ? "Takip sorusu sor"
-                : "Bu ders hakkında bir soru sor"
+                : "Bu ders hakkında bir soru sor ya da \"beni test et\" de"
           }
           hint="Cevaplar ders materyalindeki bölümlere dayandırılır; önemli konularda kaynağı açıp kontrol et."
         />
@@ -416,7 +480,7 @@ function TutorSession({ course }: { course: Course }) {
 
       {/* Ekran okuyucu için durum duyurusu: yalnızca durum değişince güncellenir. */}
       <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
-        {turns.length > 0 ? describeTurn(turns[turns.length - 1]) : ""}
+        {turns.length > 0 ? describeTutorTurn(turns[turns.length - 1]) : ""}
       </div>
     </div>
   );
@@ -426,6 +490,7 @@ const HOW_IT_WORKS = [
   { title: "Soru sor", text: "Dersin materyaline ne merak ediyorsan yaz; cevap yalnızca onaylı materyalden gelir." },
   { title: "Cümleye dokun", text: "Cevabın her cümlesi numaralıdır; dokununca dayandığı sayfa yanda açılır." },
   { title: "Kaynağı kontrol et", text: "İşaretli satırı cevapla karşılaştır; materyalde yoksa asistan bunu söyler." },
+  { title: "Kendini sına", text: "\"Beni test et\" de: dersin materyalinden, kontrol edilmiş soru ve geri bildirim." },
 ];
 
 function TutorWelcome({
@@ -433,12 +498,15 @@ function TutorWelcome({
   materials,
   failed,
   onReload,
+  onSuggest,
 }: {
   course: Course;
   materials: DocumentOut[] | null;
   /** Materyal listesi yüklenemedi: "materyal yok"tan farklı bir durum. */
   failed: boolean;
   onReload: () => void;
+  /** Önerilen soruyu gönderir. */
+  onSuggest: (text: string) => void;
 }) {
   if (failed) {
     return (
@@ -463,6 +531,7 @@ function TutorWelcome({
     );
   }
   const extent = describeTotals(materialTotals(materials ?? []));
+  const suggestions = materials ? courseSuggestions(materials) : [];
   return (
     <div className="max-w-3xl py-10">
       <p className="font-mono text-xs text-graphite">{course.code}</p>
@@ -475,7 +544,30 @@ function TutorWelcome({
           : "Cevaplar bu dersin materyalindeki bölümlere dayandırılır. Her cümlenin kaynağı yanında açılır; önemli konularda kaynağı açıp kontrol et."}
       </p>
 
-      <ol className="mt-8 grid gap-3 sm:grid-cols-3">
+      {suggestions.length > 0 && (
+        <div className="mt-8">
+          <p className="mb-2.5 font-mono text-xs text-graphite">Buradan başlayabilirsin</p>
+          <ul className="grid gap-2.5 sm:grid-cols-2">
+            {suggestions.map((suggestion) => {
+              const Icon = suggestion.kind === "quiz" ? ClipboardCheck : MessageSquareText;
+              return (
+                <li key={suggestion.text}>
+                  <button
+                    type="button"
+                    onClick={() => onSuggest(suggestion.text)}
+                    className="flex h-full w-full items-start gap-3 rounded-panel border border-line bg-surface px-4 py-3 text-left text-base text-ink shadow-card transition-colors hover:border-accent hover:bg-accent-soft/40"
+                  >
+                    <Icon size={16} aria-hidden className="mt-0.5 shrink-0 text-accent" />
+                    <span>{suggestion.text}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+
+      <ol className="mt-8 grid gap-3 sm:grid-cols-2">
         {HOW_IT_WORKS.map((step, index) => (
           <li key={step.title} className="flex gap-3 rounded-panel border border-line bg-surface px-4 py-3 shadow-card">
             <span
@@ -492,27 +584,82 @@ function TutorWelcome({
         ))}
       </ol>
 
-      <h2 className="mt-10 mb-3 text-sm font-medium text-ink-2">Cevapların dayandığı materyal</h2>
-      {materials === null ? (
-        <SkeletonRows rows={2} />
-      ) : (
-        <ul className="grid gap-3 sm:grid-cols-2">
-          {materials.map((document) => (
-            <li
-              key={document.id}
-              className="flex items-center gap-3 rounded-panel border border-line bg-surface px-4 py-3 shadow-card"
-            >
-              <FileBadge filename={document.filename} />
-              <span className="min-w-0">
-                <span className="block truncate text-base font-medium text-ink">{document.title}</span>
-                <span className="block text-sm text-graphite">
-                  {materialLabel(document.material_type)}, {documentExtent(document)}
-                </span>
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
+      <MaterialSummary materials={materials} />
     </div>
   );
+}
+
+// Materyal özetinde türlerin sırası: önce anlatım, sonra alıştırma ve sınavlar.
+const TYPE_ORDER = ["notes", "slides", "textbook", "video", "transcript", "practice_problem", "past_exam", "assignment"];
+// Bu sayıya kadar doküman doğrudan listelenir; fazlası açılır listede.
+const INLINE_DOCUMENTS = 6;
+
+/** Cevapların dayandığı materyal: sayılarla özet, dokümanlar türüne göre gruplu ve doğal sırada. */
+function MaterialSummary({ materials }: { materials: DocumentOut[] | null }) {
+  if (materials === null) {
+    return (
+      <div className="mt-10">
+        <SkeletonRows rows={2} />
+      </div>
+    );
+  }
+  const groups = TYPE_ORDER.map((type) => ({
+    type,
+    documents: sortByTitle(materials.filter((d) => d.material_type === type)),
+  })).filter((group) => group.documents.length > 0);
+  const extent = describeTotals(materialTotals(materials));
+  const counts = groups
+    .map((group) => `${group.documents.length} ${materialLabel(group.type).toLocaleLowerCase("tr")}`)
+    .join(", ");
+  const list = (
+    <div className="mt-3 flex flex-col gap-4">
+      {groups.map((group) => (
+        <div key={group.type}>
+          {groups.length > 1 && <p className="mb-1.5 font-mono text-xs text-graphite">{materialLabel(group.type)}</p>}
+          <ul className="grid gap-x-4 gap-y-1.5 sm:grid-cols-2">
+            {group.documents.map((document) => (
+              <li key={document.id} className="flex min-w-0 items-center gap-2 text-sm">
+                <FileBadge filename={document.filename} />
+                <span className="truncate text-ink">{document.title}</span>
+                <span className="shrink-0 text-faint">{documentExtent(document)}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </div>
+  );
+  return (
+    <section
+      aria-label="Cevapların dayandığı materyal"
+      className="mt-10 rounded-panel border border-line bg-surface px-4 py-3.5 shadow-card"
+    >
+      <p className="flex items-center gap-2 text-sm font-medium text-ink-2">
+        <Library size={15} aria-hidden className="text-graphite" />
+        Cevapların dayandığı materyal
+      </p>
+      <p className="mt-1 font-mono text-xs text-graphite">
+        {materials.length} doküman{extent ? ` · ${extent}` : ""}
+        {groups.length > 1 ? ` — ${counts}` : ""}
+      </p>
+      {materials.length <= INLINE_DOCUMENTS ? (
+        list
+      ) : (
+        <details className="mt-2">
+          <summary className="cursor-pointer text-sm font-medium text-accent select-none hover:underline">
+            Tüm dokümanları göster
+          </summary>
+          {list}
+        </details>
+      )}
+    </section>
+  );
+}
+
+/** `index`'teki bloğu (yoksa çalışan araçla yeni bir taslak açarak) günceller. */
+function withSegment(turn: TutorTurn, index: number, change: (segment: Segment) => Segment): TutorTurn {
+  const segments = [...turn.segments];
+  while (segments.length <= index) segments.push({ tool: turn.tool ?? "", streamText: "" });
+  segments[index] = change(segments[index]);
+  return { ...turn, segments };
 }

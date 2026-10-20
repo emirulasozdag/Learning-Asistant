@@ -57,6 +57,10 @@ def course_activity(db: Session, course_id: int, today: date | None = None) -> C
         if pending is None or pending.conversation_id != message.conversation_id:
             continue
         meta = message.meta or {}
+        if meta.get("counted") is False:
+            # AI Tutor'da kaynaklı cevap içermeyen tur (selamlaşma, netleştirme): soru değil.
+            pending = None
+            continue
         questions.append(
             QuestionItem(
                 question=pending.content, outcome=_outcome(meta), asked_at=pending.created_at

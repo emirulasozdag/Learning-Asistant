@@ -11,8 +11,9 @@ from app.embeddings.base import Embedder
 from app.generation.answer import stream_answer
 from app.llm.base import ChatMessage, LLMClient
 from app.retrieval.hybrid import retrieve
+from app.retrieval.rerank import rerank
 from app.retrieval.types import RetrievalResult, VideoPosition
-from app.schemas.ask import AskRequest, AskResponse, RetrievalHit
+from app.schemas.ask import AskRequest, AskResponse, RetrievalHit, VideoRef
 
 # LLM'e verilen önceki soru-cevap sayısı.
 HISTORY_TURNS = 3
@@ -36,6 +37,8 @@ class DeltaEvent:
 @dataclass
 class DoneEvent:
     response: AskResponse
+    # Cevabın dayandığı arama sonucu (yalnızca `answer_stream`; kaydedilen akışta None).
+    retrieval: RetrievalResult | None = None
 
 
 QAEvent = RetrievalEvent | DeltaEvent | DoneEvent
@@ -79,39 +82,19 @@ def ask_stream(
     LLM'e yalnızca soru, parçalar ve sohbet geçmişi gider; kullanıcı kimliği gitmez (ADR-5).
     """
     conversation = get_conversation(db, course, request.conversation_id, user_id)
-    history = _history(db, conversation)
-
-    # Takip sorusu ("peki karmaşıklığı ne?") tek başına eksik kalabilir; önceki soru
-    # bağlam olarak ayrıca aranır.
-    previous_question = next((m["content"] for m in reversed(history) if m["role"] == "user"), None)
-    retrieval = retrieve(
-        db,
-        course,
-        request.question,
-        video=(
-            VideoPosition(request.video.document_id, request.video.time_s)
-            if request.video
-            else None
-        ),
-        embedder=embedder,
-        context=previous_question,
-    )
-    yield RetrievalEvent(_hits(retrieval, cited=set()))
+    history = conversation_history(db, conversation)
 
     response: AskResponse | None = None
-    for item in stream_answer(course, request.question, history, retrieval, llm):
-        if isinstance(item, AskResponse):
-            response = item
+    for event in answer_stream(
+        db, course, request.question, history, llm, video=request.video, embedder=embedder
+    ):
+        if isinstance(event, DoneEvent):
+            response = event.response
         else:
-            yield DeltaEvent(item)
+            yield event
     assert response is not None
 
-    cited = {c.source_id for c in response.citations}
     response.conversation_id = conversation.id
-    response.retrieval = _hits(retrieval, cited)
-    response.similarity_threshold = settings.retrieval_min_similarity
-    response.best_similarity = retrieval.best_similarity
-
     db.add_all(
         [
             Message(conversation_id=conversation.id, role="user", content=request.question),
@@ -119,18 +102,77 @@ def ask_stream(
                 conversation_id=conversation.id,
                 role="assistant",
                 content=response.answer or response.decline_reason or "",
-                meta={
-                    "declined": response.declined,
-                    "outcome": response.outcome,
-                    "mode": response.mode,
-                    "model": response.model,
-                    "cited_source_ids": sorted(cited),
-                },
+                meta=answer_meta(response),
             ),
         ]
     )
     db.commit()
     yield DoneEvent(response)
+
+
+def answer_stream(
+    db: Session,
+    course: Course,
+    question: str,
+    history: list[ChatMessage],
+    llm: LLMClient | None,
+    video: VideoRef | None = None,
+    embedder: Embedder | None = None,
+    search_query: str | None = None,
+    reranker: LLMClient | None = None,
+) -> Iterator[QAEvent]:
+    """Kaynaklı cevap hattı (arama → üretim → alıntı doğrulama); hiçbir şey kaydetmez.
+
+    `/ask` ve AI Tutor'un `answer_from_course` aracı bunu kullanır. Son olay DoneEvent'tir.
+    `search_query`: aramada sorunun yerine kullanılır (ör. Türkçe soru için materyalin dilinde
+    yazılmış ifade); cevap yine öğrencinin sorusuna göre üretilir.
+    `reranker`: verilirse geniş aday listesi bu modelle yeniden sıralanır (`retrieval/rerank.py`).
+    """
+    # Takip sorusu ("peki karmaşıklığı ne?") tek başına eksik kalabilir; önceki soru
+    # bağlam olarak ayrıca aranır.
+    previous_question = next((m["content"] for m in reversed(history) if m["role"] == "user"), None)
+    use_rerank = reranker is not None and settings.tutor_rerank_candidates > 0
+    retrieval = retrieve(
+        db,
+        course,
+        search_query or question,
+        video=VideoPosition(video.document_id, video.time_s) if video else None,
+        k=settings.tutor_rerank_candidates if use_rerank else 5,
+        embedder=embedder,
+        context=previous_question,
+    )
+    if use_rerank and retrieval.relevant:
+        assert reranker is not None
+        query = f"{question}\n({search_query})" if search_query else question
+        retrieval.passages = rerank(query, retrieval.passages, reranker, settings.tutor_rerank_keep)
+    elif use_rerank:
+        retrieval.passages = retrieval.passages[:5]
+    yield RetrievalEvent(_hits(retrieval, cited=set()))
+
+    response: AskResponse | None = None
+    for item in stream_answer(course, question, history, retrieval, llm):
+        if isinstance(item, AskResponse):
+            response = item
+        else:
+            yield DeltaEvent(item)
+    assert response is not None
+
+    cited = {c.source_id for c in response.citations}
+    response.retrieval = _hits(retrieval, cited)
+    response.similarity_threshold = settings.retrieval_min_similarity
+    response.best_similarity = retrieval.best_similarity
+    yield DoneEvent(response, retrieval)
+
+
+def answer_meta(response: AskResponse) -> dict:
+    """Mesaj kaydındaki cevap özeti; eğitmen etkinliği (`instructor/activity.py`) bunu okur."""
+    return {
+        "declined": response.declined,
+        "outcome": response.outcome,
+        "mode": response.mode,
+        "model": response.model,
+        "cited_source_ids": sorted(c.source_id for c in response.citations),
+    }
 
 
 def ask(
@@ -147,7 +189,7 @@ def ask(
     raise RuntimeError("Soru-cevap akışı sonuçsuz bitti")
 
 
-def _history(db: Session, conversation: Conversation) -> list[ChatMessage]:
+def conversation_history(db: Session, conversation: Conversation) -> list[ChatMessage]:
     """Son birkaç soru-cevap; alıntı numaraları atılır (o turun kaynaklarına aittir)."""
     rows = db.scalars(
         select(Message)

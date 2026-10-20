@@ -99,8 +99,15 @@ tiplerden başlar.
 | `AnswerFeedback` | `attempt_id, item_id, score, max_score, understood, missing_concepts, explanation, citations, follow_up_item_id` | aynı |
 | Pratik arayüzü | — | yok: `PracticePage` ve `mock/practice.ts` PR #68'de silindi; `/student/practice` artık `/student`'a yönleniyor ([router.tsx](../frontend/src/router.tsx)) |
 
-Pratik endpoint'leri (`POST /practice`, `POST /practice/{id}/answer`) hâlâ `501` döner. Issue #3 DoD'si gereği
-çalışma zamanında mock kullanılmaz (bkz. §7); #17 gerçek API'ye bağlanır.
+**Uygulandı (ai-foundation, ADR-7):** `POST /practice` ve `POST /practice/{id}/answer` çalışır; AI Tutor'da
+`generate_practice` aracıyla sohbetin içinde de soru gelir (§9). Kontrolden geçen soru yoksa `422 no_valid_item`;
+soru yok, reddedilmiş ya da üye değilse `404 practice_item_not_found` **[ekleme]**; cevap türü uyuşmazsa `422`;
+açık uçlu cevap değerlendirilemezse `503` (deneme kaydedilmez). `AnswerFeedback`'e **[ekleme]**: `correct_option`,
+`reference_answer`, `criteria[{description, awarded, points, rationale}]` (yalnızca cevaptan sonra). Saklama:
+`practice_questions` (aday + kontrol sonuçları + gizli anahtar), `practice_rubrics` (üretilen rubrik `origin=generated`,
+onaysız), `practice_attempts` (`research_logged` cevap anındaki onay; analitik yalnızca bunları kullanır).
+Kaynak politikası: not verilen ödevler (`material_type=assignment`, çözümleri dahil) pratik kaynağı olmaz
+(`source_id` ile istenirse `422`); pratik problemleri ve yayımlanmış eski sınavlar kullanılır.
 
 **Önerilen sözleşme.**
 
@@ -561,3 +568,56 @@ CalendarCell    { lines: str[], span: int }
   Betikle açılan dersin üyesi yoktur; `create_instructor --course <KOD>` ile bir eğitmene bağlanır.
 - Bölüm ↔ tür: Video dersler = `video`, `transcript`; Ders notları = `notes`, `slides`, `textbook`;
   Sınavlar = `past_exam`; Pratik problemler = `practice_problem`; Ödevler = `assignment`.
+
+---
+
+## 9. AI Tutor turu (ADR-7, öneri)
+
+> §8 numarası PR #75'in ders bölümleri eklemesine ayrıldı. Bu bölüm **[ekleme]**; mevcut sözleşmelerde kırıcı
+> değişiklik yok. Tipler: `backend/app/schemas/tutor.py`. Frontend karşılığı (`types.ts`) arayüz işiyle eklenir.
+
+**Uç noktalar.** `POST /tutor/turn` (tek cevap) ve `POST /tutor/turn/stream` (SSE). Yetki `/ask` ile aynı: ders
+üyeliği, güncel aydınlatma onayı, sohbet sahipliği (404 `conversation_not_found`). Sohbetler `/ask` ile aynı
+tablolardadır.
+
+```text
+TutorTurnRequest  { course_id, message (1–2000), conversation_id?, video?: VideoRef }
+TutorTurnResponse { conversation_id, blocks: TutorBlock[], trace: TurnTrace }
+
+TutorBlock (type ile ayrılır; her biri provenance taşır)
+  course_answer        provenance=course   { response: AskResponse }        // /ask ile aynı içerik
+  general_explanation  provenance=general  { text, check: "unchecked"|"checked", notice, model }
+  practice             provenance=course   { item: PracticeItem }   // anahtarsız; cevap §2 uç noktasıyla
+  clarification        provenance=none     { question (≤300), options (≤4) }
+  notice               provenance=none     { kind, text }  // greeting | off_topic | graded_work
+                                                           // | not_covered | unavailable | failure
+  follow_ups           provenance=none     { items: [{action, label, message}] }  // simpler | example
+
+TurnTrace { mode: "orchestrated"|"direct", orchestrator_model, fallback_reason,
+            steps: [{tool, args, status, duration_ms}],
+            usage: [{model, purpose, input_tokens, output_tokens, thought_tokens, cached_tokens, cost_usd}],
+            cost_usd }
+```
+
+**SSE olayları.** `status {tool, label}` → `retrieval {block_index, hits}` → `delta {block_index, text}` (taslak)
+→ `block {index, block}` (doğrulanmış; aynı indeksteki taslağın yerini alır) → … → `done TutorTurnResponse`;
+hata olursa `error {detail}`.
+
+**Arama.** `answer_from_course` ve `generate_practice` argümanlarında `search_query`: sorunun ders materyalinin
+dilindeki karşılığı (Türkçe soru, İngilizce not). Arama bununla, cevap öğrencinin sorusuyla yapılır. Kaynaklı cevapta
+20 aday hızlı modelle yeniden sıralanır, en iyi 6'sı üreticiye gider (`retrieval/rerank.py`). `AskResponse`'a
+**[ekleme]** `coverage_gap`: kısmi cevapta kaynakların kapsamadığı kısım (alıntısız not).
+
+**Pratik turu.** `generate_practice` çalışırken `status` olayları gerçek adımları bildirir: "Konuyu anlatan bölüm
+seçiliyor…" → "Soru yazılıyor…" → "Soru bağımsız çözümle kontrol ediliyor…" (aday elenirse "yeni bir soru
+yazılıyor…"). "Bu konuda beni test et" isteğinde önce bu turun ya da sohbetteki son kaynaklı cevabın alıntıladığı
+parçalar denenir (hızlı modelle 2+ puan alan varsa arama yapılmaz); yoksa normal arama.
+
+**Değişmezler.**
+- Öğrenciye görünen içerik yalnızca bloklardan gelir; orkestratörün serbest metni hiçbir yanıtta yoktur.
+- Pratik sorusunun anahtarı, referans cevabı ve açıklaması hiçbir tur yanıtında ve orkestratöre giden sonuçta yoktur.
+- `general_explanation` her zaman `notice` ile, alıntısız gösterilir; kaynaklı cevap gibi sunulmaz.
+- `follow_ups` metinleri sabittir; tıklanınca `message` yeni tur olarak gönderilir.
+- `trace` değerlendirme ve hata ayıklama içindir; öğrenci arayüzünde gösterilmez.
+- Asistan mesajının `meta`'sı: kaynaklı cevap özeti (`outcome`, `declined`, `cited_source_ids`; eğitmen etkinliği
+  okur), `tutor: true`, `blocks`, `trace`. Kaynaklı cevap içermeyen tur `counted: false` taşır ve soru sayılmaz.

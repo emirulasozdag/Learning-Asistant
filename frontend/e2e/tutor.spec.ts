@@ -5,12 +5,13 @@ import { PRIVACY_POLICY_VERSION } from "../src/services/authService";
 import {
   ask,
   course,
-  firstCitation,
+  firstClaim,
   liveRegion,
   loginAsStudent,
   openTutor,
   questionBox,
   submitLogin,
+  switchCourse,
   waitForAnswer,
 } from "./helpers";
 
@@ -29,23 +30,24 @@ test("soru sorulur; kaynaklı cevap, incelenen bölümler ve duyuru gelir", asyn
   await waitForAnswer(page);
 
   await expect(
-    page.getByText("Yapay zekâ şu an kullanılamıyor; ders materyalindeki ilgili bölüm olduğu gibi gösteriliyor.", {
-      exact: true,
-    }),
+    page.getByText(
+      "Yapay zekâ şu an kullanılamıyor; ders materyalindeki ilgili bölüm olduğu gibi, cümle cümle gösteriliyor.",
+      { exact: true },
+    ),
   ).toBeVisible();
   // Aynı metin otomatik açılan kaynak panelinde de bulunur; cevap DOM'da önce gelir.
   await expect(page.getByText("sağ yarı atılır").first()).toBeVisible();
-  await expect(firstCitation(page)).toBeVisible();
+  await expect(firstClaim(page)).toBeVisible();
   await expect(liveRegion(page)).toHaveText(/ilgili bölüm gösterildi/);
 
-  // Geniş ekranda ilk kaynak yanda kendiliğinden açılır.
+  // Geniş ekranda ilk iddianın kaynağı yanda kendiliğinden açılır.
   const panel = page.getByRole("complementary", { name: "Kaynak" });
-  await expect(panel.getByText(algorithms.documentTitle)).toBeVisible();
+  await expect(panel.getByText(algorithms.documentTitle, { exact: true }).first()).toBeVisible();
 
-  await page.getByText("İncelenen bölümler").click();
-  await expect(page.getByText(/bölüm incelendi, 1 tanesi cevapta kullanıldı/)).toBeVisible();
-  // Teknik tanılama bilgisi öğrenciye gösterilmez.
-  await expect(page.getByText(/e5|eşik|benzerlik/i)).toHaveCount(0);
+  // "Nasıl bulundu" geniş ekranda açık gelir.
+  await expect(page.getByText(/İncelenen bölümler: \d+, 1 tanesi cevapta/)).toBeVisible();
+  // İç model adları öğrenciye gösterilmez.
+  await expect(page.getByText(/\be5\b/i)).toHaveCount(0);
 });
 
 test("kaynak açılır ve kapanınca odak açan düğmeye döner", async ({ page }) => {
@@ -58,7 +60,7 @@ test("kaynak açılır ve kapanınca odak açan düğmeye döner", async ({ page
   await panel.getByRole("button", { name: "Kaynağı kapat" }).click();
   await expect(panel).toHaveCount(0);
 
-  const card = page.getByRole("button", { name: new RegExp(algorithms.documentTitle) }).first();
+  const card = firstClaim(page);
   await card.click();
   await expect(panel.getByRole("img", { name: new RegExp(algorithms.documentTitle) })).toBeVisible();
   await expect(panel.getByText(/Cevapla karşılaştır/)).toBeVisible();
@@ -77,7 +79,7 @@ test("@dar-ekran kaynak diyalog olarak açılır; odak içeride kalır, Escape k
   const dialog = page.getByRole("dialog", { name: "Kaynak" });
   await expect(dialog).toHaveCount(0);
 
-  const citation = firstCitation(page);
+  const citation = firstClaim(page);
   await citation.click();
   await expect(dialog).toBeVisible();
   await expect(dialog).toHaveAttribute("aria-modal", "true");
@@ -102,7 +104,7 @@ test("Durdur süren cevabı iptal eder; Tekrar sor yeniden sorar", async ({ page
 
   // Gerçek API cevabı değişmeden geçer; yalnızca ilk istek geciktirilir ki durdurulabilsin.
   let slow = true;
-  await page.route("**/api/ask/stream", async (route) => {
+  await page.route("**/api/tutor/turn/stream", async (route) => {
     if (slow) await new Promise((resolve) => setTimeout(resolve, 4_000));
     await route.continue().catch(() => {});
   });
@@ -110,18 +112,19 @@ test("Durdur süren cevabı iptal eder; Tekrar sor yeniden sorar", async ({ page
   await ask(page, "İkili arama nasıl çalışır?");
   const stop = page.getByRole("button", { name: "Durdur" });
   await expect(stop).toBeVisible();
-  await expect(page.getByText("Ders materyalinde aranıyor", { exact: true })).toBeVisible();
+  // Tutor henüz ne yapacağına karar vermedi (ilk durum olayı gelmeden).
+  await expect(page.getByText("Mesajın inceleniyor", { exact: true })).toBeVisible();
 
   await stop.click();
   await expect(page.getByText("Durduruldu", { exact: true })).toBeVisible();
-  await expect(page.getByText("Ders materyalinde aranıyor")).toHaveCount(0);
+  await expect(page.getByText("Mesajın inceleniyor")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Gönder" })).toBeVisible();
   await expect(liveRegion(page)).toHaveText("Durduruldu.");
 
   slow = false;
   await page.getByRole("button", { name: "Tekrar sor" }).click();
   await waitForAnswer(page);
-  await expect(firstCitation(page)).toBeVisible();
+  await expect(firstClaim(page)).toBeVisible();
   await expect(page.getByText("Durduruldu")).toHaveCount(0);
 });
 
@@ -133,7 +136,7 @@ test("ders değiştirince sohbet ve kaynak sıfırlanır; yeni derste ilk soru h
   await waitForAnswer(page);
   await expect(page.getByRole("complementary", { name: "Kaynak" })).toBeVisible();
 
-  await page.getByRole("link", { name: dataStructures.name }).click();
+  await switchCourse(page, algorithms, dataStructures);
   await expect(page).toHaveURL(new RegExp(`/student/courses/${dataStructures.id}/tutor$`));
   await expect(page.getByRole("heading", { name: `${dataStructures.name} dersine sor` })).toBeVisible();
   await expect(page.getByText("İkili arama nasıl çalışır?")).toHaveCount(0);
@@ -146,15 +149,15 @@ test("ders değiştirince sohbet ve kaynak sıfırlanır; yeni derste ilk soru h
   await expect(page.getByText(/Soru gönderilemedi|Sohbet bulunamadı/)).toHaveCount(0);
 
   // Soru sürerken ders değiştirilirse istek iptal edilir; ekran takılı kalmaz.
-  await page.route("**/api/ask/stream", async (route) => {
+  await page.route("**/api/tutor/turn/stream", async (route) => {
     await new Promise((resolve) => setTimeout(resolve, 4_000));
     await route.continue().catch(() => {});
   });
   await ask(page, "Kuyruk nasıl çalışır?");
   await expect(page.getByRole("button", { name: "Durdur" })).toBeVisible();
-  await page.getByRole("link", { name: algorithms.name }).click();
+  await switchCourse(page, dataStructures, algorithms);
   await expect(page.getByRole("heading", { name: `${algorithms.name} dersine sor` })).toBeVisible();
-  await expect(page.getByText("Ders materyalinde aranıyor")).toHaveCount(0);
+  await expect(page.getByText("Mesajın inceleniyor")).toHaveCount(0);
   await expect(questionBox(page)).toBeEnabled();
   await expect(page.getByRole("button", { name: "Durdur" })).toHaveCount(0);
 });

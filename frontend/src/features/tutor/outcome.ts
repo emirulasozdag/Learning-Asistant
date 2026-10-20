@@ -1,6 +1,6 @@
 import { ApiError } from "../../api/client";
 import type { AskResponse } from "../../api/types";
-import type { TutorFailure, Turn } from "./types";
+import type { TutorFailure, TutorTurn, Turn } from "./types";
 
 /** Öğrenciye gösterilen sonucun türü. Her tür farklı bir şey söyler ve farklı bir şey önerir. */
 export type ResponseOutcome =
@@ -71,6 +71,36 @@ export function describeTurn(turn: Turn): string {
   if (turn.streamText) return "Cevap yazılıyor.";
   if (turn.hits) return "İlgili bölümler bulundu, cevap hazırlanıyor.";
   return "Ders materyalinde aranıyor.";
+}
+
+/** AI Tutor turu için ekran okuyucu duyurusu: son içerik bloğuna göre. */
+export function describeTutorTurn(turn: TutorTurn): string {
+  if (turn.failure) return "";
+  if (turn.stopped) return "Durduruldu.";
+  const segments = turn.segments.filter((s) => s.block?.type !== "follow_ups");
+  const last = segments[segments.length - 1];
+  if (!last) return turn.status ?? "Mesajın inceleniyor.";
+  const { block } = last;
+  if (!block) {
+    if (last.tool === "answer_from_course") {
+      return describeTurn({ id: turn.id, question: turn.question, hits: last.hits, streamText: last.streamText });
+    }
+    return turn.status ?? "Cevap hazırlanıyor.";
+  }
+  switch (block.type) {
+    case "course_answer":
+      return describeTurn({ id: turn.id, question: turn.question, streamText: "", response: block.response });
+    case "general_explanation":
+      return "Genel bilgi açıklaması hazır; ders materyalinden değildir.";
+    case "practice":
+      return "Pratik sorusu hazır.";
+    case "clarification":
+      return `Netleştirme sorusu: ${block.question}`;
+    case "notice":
+      return block.text;
+    default:
+      return "";
+  }
 }
 
 /**

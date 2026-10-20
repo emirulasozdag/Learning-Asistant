@@ -1,4 +1,4 @@
-import { FlaskConical, HelpCircle, PlayCircle, WandSparkles } from "lucide-react";
+import { FlaskConical, HelpCircle, PlayCircle, SearchX, WandSparkles } from "lucide-react";
 
 import type { AskResponse, Citation } from "../../../api/types";
 import { citationLabel } from "../../../labels";
@@ -6,7 +6,11 @@ import type { QuickAction } from "../../../services/tutorService";
 import Button from "../../../ui/Button";
 import { cx } from "../../../ui/cx";
 import { distinctDocuments, type Claim, type StructuredAnswer } from "../claims";
+import RichText from "../RichText";
 import VerificationStrip from "./VerificationStrip";
+
+/** Bundan uzun ilk cümle daha küçük puntoyla gösterilir. */
+const LONG_LEAD = 80;
 
 interface ClaimAnswerProps {
   question: string;
@@ -49,8 +53,16 @@ export default function ClaimAnswer({
       </p>
 
       {answer.lead && (
-        <h2 className="max-w-[24ch] text-[2.125rem] leading-[1.12] font-semibold tracking-tight text-balance text-ink">
-          {answer.lead.text}
+        <h2
+          className={cx(
+            "font-semibold tracking-tight text-balance text-ink",
+            // Uzun ilk cümle dev bir başlık bloğuna dönüşmesin.
+            answer.lead.text.length > LONG_LEAD
+              ? "max-w-[36ch] text-[1.625rem] leading-[1.2]"
+              : "max-w-[24ch] text-[2.125rem] leading-[1.12]",
+          )}
+        >
+          <RichText text={answer.lead.text} inline />
           <CitationChips claim={answer.lead} resolve={resolve} onSelectSource={onSelectSource} />
         </h2>
       )}
@@ -83,7 +95,7 @@ export default function ClaimAnswer({
                 <span className="flex min-w-0 flex-col gap-1.5">
                   <span className="text-md leading-7 text-ink">
                     <span className={selected ? "rounded-[2px] bg-marker-soft box-decoration-clone px-0.5 shadow-[inset_0_-2px_0_var(--color-marker)]" : undefined}>
-                      {claim.text}
+                      <RichText text={claim.text} inline />
                     </span>
                   </span>
                   {selected && sources.length > 0 && (
@@ -97,6 +109,16 @@ export default function ClaimAnswer({
           );
         })}
       </ol>
+
+      {response.coverage_gap && (
+        <p className="flex max-w-[46rem] items-start gap-2 rounded-panel border border-line bg-surface px-3 py-2 text-sm text-graphite">
+          <SearchX size={14} aria-hidden className="mt-0.5 shrink-0" />
+          <span>
+            <span className="font-medium text-ink-2">Materyalde olmayan kısım: </span>
+            {response.coverage_gap}
+          </span>
+        </p>
+      )}
 
       <div className="flex flex-col gap-3 border-t border-line pt-4">
         <VerificationStrip

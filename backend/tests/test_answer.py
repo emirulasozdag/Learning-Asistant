@@ -167,6 +167,25 @@ def test_answer_without_any_valid_citation_is_declined() -> None:
     assert response.answer is None
 
 
+def test_partial_answer_keeps_the_cited_part_and_reports_the_gap() -> None:
+    llm = FakeLLM(
+        ["Dizi sirali oldugu icin sag yari elenir [S1].\n\n", "EKSİK: Karmasikligin ispati yok."]
+    )
+
+    _, response = run(llm)
+
+    assert response.outcome == "answered"
+    assert response.answer == "Dizi sirali oldugu icin sag yari elenir [1]."
+    assert response.coverage_gap == "Karmasikligin ispati yok."
+
+
+def test_only_a_gap_line_means_the_material_does_not_cover_it() -> None:
+    _, response = run(FakeLLM(["EKSİK: Materyalde bu konu yok."]))
+
+    assert response.declined and response.outcome == "insufficient_evidence"
+    assert response.decline_reason == "Materyalde bu konu yok."
+
+
 def test_refusal_is_reported_as_decline() -> None:
     _, response = run(FakeLLM(error=LLMRefusal("x")))
 
@@ -240,6 +259,17 @@ def test_valid_label_next_to_invented_one_is_repaired() -> None:
 
     assert result.text == "Sag yari elenir [1]. Arama O(log n) surer [2]."
     assert result.invalid_labels == ["S8", "S9"]
+    assert result.dropped_claims == [] and result.accepted
+
+
+def test_several_labels_in_one_bracket_count_as_citations() -> None:
+    """Gemini "[S1, S2]" yazıyor; açılmazsa doğru cevaplar "doğrulanamadı" diye reddediliyordu."""
+    result = verify_answer(
+        "Sag yari elenir [S1, S2]. Arama O(log n) surer [S2; S9]. Dizi siralidir [S1 ,S2].", LABELS
+    )
+
+    assert result.text == "Sag yari elenir [1][2]. Arama O(log n) surer [2]. Dizi siralidir [1][2]."
+    assert result.invalid_labels == ["S9"]
     assert result.dropped_claims == [] and result.accepted
 
 

@@ -17,6 +17,8 @@ ErrorCode = Literal[
     "ingestion_failed",
     "course_exists",
     "no_valid_item",
+    # Pratik sorusu yok, kontrolden geçmemiş ya da kullanıcı dersin üyesi değil.
+    "practice_item_not_found",
     "invalid_video",
     "not_authenticated",
     "insufficient_role",

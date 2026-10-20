@@ -45,9 +45,15 @@ export async function ask(page: Page, text: string) {
   await questionBox(page).press("Enter");
 }
 
-/** Son cevaptaki ilk kaynak numarası (cevap metnindeki sarı [1]). */
-export function firstCitation(page: Page) {
-  return page.getByRole("button", { name: /^Kaynak 1:/ }).last();
+/** Cevabın ilk numaralı iddiası (çalışma alanının iddia görünümü): dokununca dayandığı kaynak açılır. */
+export function firstClaim(page: Page) {
+  return page.getByRole("list", { name: /Cevabın iddiaları/ }).getByRole("button").first();
+}
+
+/** Kenar çubuğundaki ders seçiciyle başka derse geçer. */
+export async function switchCourse(page: Page, from: SetupCourse, to: SetupCourse) {
+  await page.locator("button[aria-expanded]").filter({ hasText: from.name }).click();
+  await page.getByRole("link", { name: to.name }).click();
 }
 
 /** Cevap tamamlanana kadar bekler: "Durdur" kaybolur. */

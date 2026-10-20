@@ -32,15 +32,37 @@ const ABBREVIATIONS = new Set([
 ]);
 const MAX_HEADING_LENGTH = 60;
 
+const LIST_ITEM = /^\s*(?:[-*•]|\d+[.)])\s+/;
+
 /**
- * Kod bloğu, madde işaretli liste ya da başlık içeren cevaplar cümlelere bölünmez; bölünürse
- * kod ve liste yapısı bozulur. Bunlar düz metin olarak gösterilir.
+ * Kod bloğu, tablo, başlık ya da biçimi boşluklara dayanan metin (LLM'siz modda alıntılanan
+ * girintili kod, hizalı sütunlar) cümlelere bölünmez; bölünürse yapıları bozulur. Bunlar düz metin
+ * olarak gösterilir. Madde işaretli listeler bölünür: her madde kendi iddiasıdır.
  */
 export function isStructurable(answer: string): boolean {
   if (answer.includes("```")) return false;
-  if (/^\s*(?:[-*•]|\d+[.)])\s+/m.test(answer)) return false;
+  if (/^\s*\|.*\|\s*$/m.test(answer)) return false;
+  if (/^(?: {2,}|\t)\S/m.test(answer) || /\S {3,}\S/.test(answer)) return false;
   if (/^#{1,6}\s/m.test(answer)) return false;
   return splitSentences(answer).length > 0;
+}
+
+/** Boş satırla ayrılan paragraflar; liste maddeleri (işareti atılarak) ayrı paragraf sayılır. */
+function paragraphsOf(answer: string): string[] {
+  const paragraphs: string[] = [];
+  for (const block of answer.split(/\n{2,}/)) {
+    let current: string[] = [];
+    for (const line of block.split("\n")) {
+      if (LIST_ITEM.test(line)) {
+        if (current.length > 0) paragraphs.push(current.join("\n"));
+        current = [line.replace(LIST_ITEM, "")];
+      } else {
+        current.push(line);
+      }
+    }
+    if (current.length > 0) paragraphs.push(current.join("\n"));
+  }
+  return paragraphs.map((paragraph) => paragraph.trim()).filter(Boolean);
 }
 
 /** Noktanın önündeki kelime bir kısaltma ya da tek harfli baş harf mi ("Dr.", "A. Yılmaz")? */
@@ -51,13 +73,20 @@ function endsWithAbbreviation(text: string): boolean {
   return ABBREVIATIONS.has(key) || /^\p{Lu}$/u.test(word);
 }
 
+/** `end` noktadan hemen sonrası: önünde rakam, ardında küçük harfle süren kelime varsa sıra sayısıdır. */
+function isOrdinal(paragraph: string, end: number): boolean {
+  return /\d\.$/.test(paragraph.slice(0, end)) && /^\s+\p{Ll}/u.test(paragraph.slice(end));
+}
+
 export function splitSentences(paragraph: string): string[] {
   const sentences: string[] = [];
   let start = 0;
   for (const match of paragraph.matchAll(SENTENCE_END)) {
     const end = (match.index ?? 0) + match[0].length;
-    // Alıntı işareti yoksa ve nokta bir kısaltmaya aitse cümle sürüyordur.
+    // Alıntı işareti yoksa ve nokta bir kısaltmaya ya da sıra sayısına ("2. durum") aitse
+    // cümle sürüyordur.
     if (!match[1] && match[0] === "." && endsWithAbbreviation(paragraph.slice(start, end))) continue;
+    if (!match[1] && match[0] === "." && isOrdinal(paragraph, end)) continue;
     const sentence = paragraph.slice(start, end).trim();
     if (sentence) sentences.push(sentence);
     start = end;
@@ -101,7 +130,7 @@ function isHeading(paragraph: string): boolean {
 
 export function structureAnswer(answer: string): StructuredAnswer {
   const rows: { text: string; citations: number[] }[] = [];
-  for (const paragraph of answer.split(/\n{2,}/)) {
+  for (const paragraph of paragraphsOf(answer)) {
     if (isHeading(paragraph)) continue;
     const paragraphRows = splitSentences(paragraph.replace(/\n/g, " "))
       .map((sentence) => ({ text: stripCitations(sentence), citations: citationsOf(sentence) }))
@@ -109,8 +138,15 @@ export function structureAnswer(answer: string): StructuredAnswer {
     inheritCitations(paragraphRows);
     rows.push(...paragraphRows);
   }
+  // Listeyi açan "…şöyledir:" cümlesi kendi paragrafında alıntısız kalır; ilk maddenin kaynağını
+  // paylaşır. Başlık olarak gösterilmez: cevabın kendisi değil, girişidir.
+  rows.forEach((row, index) => {
+    if (row.citations.length > 0 || !row.text.endsWith(":")) return;
+    row.citations = [...(rows.slice(index + 1).find((next) => next.citations.length > 0)?.citations ?? [])];
+  });
+  const intro = rows[0]?.text.endsWith(":") ?? false;
 
-  const hasLead = rows.length >= LEAD_MIN_SENTENCES;
+  const hasLead = rows.length >= LEAD_MIN_SENTENCES && !intro;
   const [first, ...rest] = rows;
   const body = hasLead ? rest : rows;
   return {

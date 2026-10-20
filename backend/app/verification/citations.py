@@ -20,6 +20,8 @@ from dataclasses import dataclass, field
 from app.retrieval.types import RetrievedPassage
 
 _LABEL = re.compile(r"\[(S\d+)\]")
+# Tek parantezde birden fazla etiket ("[S1, S3]", "[S2; S5]"): ayrı etiketlere açılır.
+_GROUPED_LABELS = re.compile(r"\[\s*(S\d+(?:\s*[,;]\s*S\d+)+)\s*\]")
 # Etiket ve önündeki tek boşluk: bilinmeyen etiket silinirken çift boşluk kalmasın.
 _LABEL_WITH_SPACE = re.compile(r"( ?)\[(S\d+)\]")
 _FENCE = re.compile(r"```.*?(?:```|\Z)", re.DOTALL)
@@ -65,6 +67,7 @@ class _Sentence:
 
 def verify_answer(answer: str, labels: dict[str, RetrievedPassage]) -> Verification:
     """Cevaptaki desteksiz iddiaları çıkarır, kalan etiketleri doğrulayıp numaralandırır."""
+    answer = expand_grouped_labels(answer)
     pieces: list[str] = []
     cursor = 0
     supported = 0
@@ -112,6 +115,15 @@ def verify_answer(answer: str, labels: dict[str, RetrievedPassage]) -> Verificat
         supported_claims=supported,
         dropped_claims=dropped,
         invalid_labels=sorted(set(invalid)),
+    )
+
+
+def expand_grouped_labels(answer: str) -> str:
+    """ "[S1, S3]" → "[S1][S3]". Modeller birden fazla kaynağı çoğu zaman tek parantezde yazar;
+    açılmazsa bu cümleler alıntısız sayılıp doğru cevaplar reddedilir."""
+    return _GROUPED_LABELS.sub(
+        lambda match: "".join(f"[{label}]" for label in re.findall(r"S\d+", match.group(1))),
+        answer,
     )
 
 

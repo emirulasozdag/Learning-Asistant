@@ -1,8 +1,8 @@
 """ORM modelleri.
 
 Sprint 1: Course, Document, Chunk, Conversation, Message. #11: User, AuthSession, Enrollment
-(DECISIONS.md ADR-1, 2, 4). Kalan varlıklar (PracticeItem, Rubric, Attempt, ClaimCheck, ...)
-ilgili özelliklerle eklenecek — docs/ANALYSIS.md §8.
+(DECISIONS.md ADR-1, 2, 4). #15: PracticeQuestion, PracticeRubric, PracticeAttempt. Kalan
+varlıklar (ClaimCheck, InstructorReview, ...) ilgili özelliklerle eklenecek — docs/ANALYSIS.md §8.
 
 Model değişince: `alembic revision --autogenerate -m "açıklama"`.
 """
@@ -209,3 +209,110 @@ class Message(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     conversation: Mapped[Conversation] = relationship(back_populates="messages")
+
+
+class PracticeQuestion(Base):
+    """Kaynak pasaja bağlı pratik sorusu (#15, #16; CONTRACTS.md §2).
+
+    Kontrolden geçmeyen sorular da `status="rejected"` olarak saklanır (kabul oranı ölçümü);
+    öğrenciye yalnızca `released` sorular gösterilir. `answer_key` ve `explanation` öğrenci
+    cevap vermeden hiçbir yanıtta dönmez.
+    """
+
+    __tablename__ = "practice_questions"
+    __table_args__ = (
+        CheckConstraint("status IN ('released', 'rejected')", name="ck_practice_status"),
+        Index("ix_practice_questions_course_id", "course_id"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    course_id: Mapped[int] = mapped_column(ForeignKey("courses.id", ondelete="CASCADE"))
+    # Sorunun dayandığı ders parçası; doküman silinirse soru da silinir.
+    chunk_id: Mapped[int] = mapped_column(ForeignKey("chunks.id", ondelete="CASCADE"), index=True)
+    # İsteyen kullanıcı (tutor sohbetinden ya da pratik ekranından); hesap silinirse boşalır.
+    requested_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    # "mcq" | "short_answer" | "code_tracing"
+    type: Mapped[str] = mapped_column(String(20))
+    topic: Mapped[str | None] = mapped_column(String(300))
+    # "easy" | "medium" | "hard"
+    difficulty: Mapped[str] = mapped_column(String(10))
+    prompt: Mapped[str] = mapped_column(Text)
+    options: Mapped[list | None] = mapped_column(JSONB)
+    # Gizli: {"correct_option": int} (mcq) ya da {"reference_answer": str}.
+    answer_key: Mapped[dict] = mapped_column(JSONB)
+    explanation: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(16))
+    # Otomatik kontrollerin sonuçları: [{"name", "passed", "detail"}].
+    checks: Mapped[list] = mapped_column(JSONB)
+    generator_model: Mapped[str | None] = mapped_column(String(100))
+    # Bu soru bir denemenin eksiklerine yönelik takip sorusuysa o deneme.
+    follow_up_of_attempt_id: Mapped[int | None] = mapped_column(
+        ForeignKey(
+            "practice_attempts.id",
+            ondelete="SET NULL",
+            use_alter=True,
+            name="fk_practice_questions_follow_up_attempt",
+        )
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    chunk: Mapped[Chunk] = relationship()
+    rubric: Mapped["PracticeRubric | None"] = relationship(
+        back_populates="question", cascade="all, delete-orphan", uselist=False
+    )
+
+
+class PracticeRubric(Base):
+    """Bir sorunun (ya da kavramın) referans cevabı ve rubriği (#15; CONTRACTS.md §2).
+
+    Üretilen soruların rubriği soruyla birlikte üretilir (`origin="generated"`, onaysız);
+    eğitmen girdiği ya da onayladığı rubrik `approved=True` taşır. Öğrenciye gösterilmez.
+    """
+
+    __tablename__ = "practice_rubrics"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    course_id: Mapped[int] = mapped_column(ForeignKey("courses.id", ondelete="CASCADE"), index=True)
+    question_id: Mapped[int | None] = mapped_column(
+        ForeignKey("practice_questions.id", ondelete="CASCADE"), unique=True
+    )
+    concept: Mapped[str] = mapped_column(String(300))
+    reference_answer: Mapped[str] = mapped_column(Text)
+    # [{"description": str, "points": float}]
+    criteria: Mapped[list] = mapped_column(JSONB)
+    source_ids: Mapped[list] = mapped_column(JSONB, server_default="[]")
+    # "generated" | "instructor"
+    origin: Mapped[str] = mapped_column(String(16))
+    approved: Mapped[bool] = mapped_column(Boolean, server_default="false")
+    approved_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    question: Mapped[PracticeQuestion | None] = relationship(back_populates="rubric")
+
+
+class PracticeAttempt(Base):
+    """Öğrencinin bir soruya cevabı ve aldığı formatif geri bildirim (resmî not değildir).
+
+    Öğrencinin kendi pratiği için saklanır (geri bildirim, takip sorusu). Öğrenme kaydına ve
+    eğitmen analitiğine yalnızca `research_logged` olanlar girer (ADR-4: cevap anındaki onay).
+    """
+
+    __tablename__ = "practice_attempts"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    question_id: Mapped[int] = mapped_column(
+        ForeignKey("practice_questions.id", ondelete="CASCADE"), index=True
+    )
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    answer_text: Mapped[str | None] = mapped_column(Text)
+    selected_option: Mapped[int | None]
+    score: Mapped[float]
+    max_score: Mapped[float]
+    # {"understood", "missing_concepts", "explanation", "criteria": [...], "citations": [...]}
+    feedback: Mapped[dict] = mapped_column(JSONB)
+    grader_model: Mapped[str | None] = mapped_column(String(100))
+    research_logged: Mapped[bool] = mapped_column(Boolean, server_default="false")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    question: Mapped[PracticeQuestion] = relationship(foreign_keys=[question_id])

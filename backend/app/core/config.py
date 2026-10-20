@@ -20,13 +20,36 @@ class Settings(BaseSettings):
     public_api_prefix: str = "/api"
 
     # LLM: anahtar boşsa sistem LLM'siz çalışır (en ilgili parçayı alıntılar).
-    # openrouter | anthropic
-    llm_provider: str = "openrouter"
+    # gemini (doğrudan Gemini API) | openrouter | anthropic. Seçim: DECISIONS.md ADR-7.
+    llm_provider: str = "gemini"
     llm_api_key: str = ""
-    # OpenRouter model kimliği (ör. anthropic/claude-opus-5.5, anthropic/claude-haiku-5.5).
-    llm_model: str = "anthropic/claude-opus-5.5"
+    # Öğretim içeriğini üreten model (cevap, açıklama; sonra pratik ve değerlendirme).
+    # Boşsa sağlayıcının varsayılanı (`generator_model`). OpenRouter'da "anthropic/claude-…" gibi.
+    llm_model: str = ""
+    # Konuşmayı yöneten orkestratör: araç seçer, öğretim içeriği yazmaz; hızlı ve ucuz model yeter.
+    # Boşsa sağlayıcının varsayılanı. Araç çağırma şimdilik yalnızca gemini sağlayıcısında var.
+    llm_orchestrator_model: str = ""
+    # Gemini düşünme seviyesi: minimal | low | medium | high. Model desteklemiyorsa en yakın
+    # desteklenen seviye kullanılır (`llm/catalog.py`). Düşünme token'ları çıktı olarak ücretlenir.
+    llm_thinking_level: str = "low"
+    llm_orchestrator_thinking_level: str = "minimal"
+    # Bağımsız kontrolcü (pratik sorusunu anahtarı görmeden çözer). Boşsa üretici modeli; ayrı
+    # çağrı ve bağlamla çalışır. Judge (iddia kontrolü, #10) bundan ayrıdır: farklı model ailesi.
+    llm_checker_model: str = ""
+    llm_checker_thinking_level: str = "low"
+    llm_timeout_s: float = 90.0
     # OpenAI uyumlu uç nokta (openrouter sağlayıcısı için). Yerel model: http://localhost:11434/v1
     llm_base_url: str = "https://openrouter.ai/api/v1"
+
+    # AI Tutor (orkestratör, `app/tutor/`). Bir turda en fazla bu kadar araç adımı.
+    tutor_max_steps: int = 4
+    # Kaynaklı cevapta yeniden sıralama (`retrieval/rerank.py`): aramanın bu kadar adayı hızlı
+    # modelle puanlanır, en iyi `keep` parça üreticiye gider. 0 = kapalı (aramanın ilk 5'i).
+    tutor_rerank_candidates: int = 20
+    tutor_rerank_keep: int = 6
+    # Materyalde olmayan ama ders alanı içindeki sorulara "genel bilgi" etiketli açıklama
+    # (ADR-7, köken politikası). Eğitmen/ekip kararı verilene kadar kapalı.
+    tutor_general_knowledge: bool = False
 
     # e5 (yerel model) | fake (testler; model indirmez)
     embedding_provider: str = "e5"
@@ -79,6 +102,32 @@ class Settings(BaseSettings):
         if isinstance(value, str):
             return [origin.strip() for origin in value.split(",") if origin.strip()]
         return value
+
+    @property
+    def generator_model(self) -> str:
+        return self.llm_model or _DEFAULT_MODELS.get(self.llm_provider, ("", ""))[0]
+
+    @property
+    def orchestrator_model(self) -> str:
+        return self.llm_orchestrator_model or _DEFAULT_MODELS.get(self.llm_provider, ("", ""))[1]
+
+    @property
+    def llm_endpoint(self) -> str:
+        """Kayıtlarda (eval run) gösterilen, isteklerin gittiği uç nokta."""
+        if self.llm_provider == "gemini":
+            return "https://generativelanguage.googleapis.com"
+        if self.llm_provider == "anthropic":
+            return "https://api.anthropic.com"
+        return self.llm_base_url
+
+
+# Sağlayıcı başına (üretici, orkestratör) varsayılan modeller. Gerekçe ve fiyatlar: ADR-7,
+# `llm/catalog.py`. Orkestratör boşsa o sağlayıcıda araç çağırma yok: tutor doğrudan akışa düşer.
+_DEFAULT_MODELS = {
+    "gemini": ("gemini-3.8-flash", "gemini-3.5-flash-lite"),
+    "openrouter": ("anthropic/claude-opus-5.5", ""),
+    "anthropic": ("claude-opus-5-5", ""),
+}
 
 
 settings = Settings()
