@@ -2,6 +2,14 @@ from dataclasses import dataclass, field
 
 
 @dataclass
+class VideoPosition:
+    """Öğrencinin izlediği video (doküman kimliği) ve durdurduğu an (saniye)."""
+
+    document_id: int
+    time_s: float
+
+
+@dataclass
 class RetrievedPassage:
     """Arama sonucu bir ders parçası. `source_id` alıntılarda kullanılan kimliktir (chunk id)."""
 

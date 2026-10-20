@@ -28,6 +28,11 @@ class IngestionReport(BaseModel):
     embedding_model: str
     # Adım süreleri (ms): parse, clean, chunk, embed
     timings_ms: dict[str, int]
+    # Video / altyazı yüklemesinde doldurulur (sayfa tabanlı dosyalarda None).
+    duration_s: float | None = None
+    cues_read: int | None = None
+    cues_skipped: int | None = None
+    warnings: list[str] = []
 
 
 class DocumentOut(BaseModel):
@@ -42,6 +47,9 @@ class DocumentOut(BaseModel):
     chunk_count: int
     created_at: datetime
     file_url: str
+    # Yalnızca video dokümanında (material_type = "video").
+    duration_s: float | None = None
+    media_url: str | None = None
     # Yalnızca yükleme cevabında dolu.
     report: IngestionReport | None = None
 

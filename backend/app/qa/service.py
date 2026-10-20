@@ -11,7 +11,7 @@ from app.embeddings.base import Embedder
 from app.generation.answer import stream_answer
 from app.llm.base import ChatMessage, LLMClient
 from app.retrieval.hybrid import retrieve
-from app.retrieval.types import RetrievalResult
+from app.retrieval.types import RetrievalResult, VideoPosition
 from app.schemas.ask import AskRequest, AskResponse, RetrievalHit
 
 # LLM'e verilen önceki soru-cevap sayısı.
@@ -76,7 +76,11 @@ def ask_stream(
         db,
         course,
         request.question,
-        request.video_time_s,
+        video=(
+            VideoPosition(request.video.document_id, request.video.time_s)
+            if request.video
+            else None
+        ),
         embedder=embedder,
         context=previous_question,
     )
@@ -150,6 +154,8 @@ def _hits(retrieval: RetrievalResult, cited: set[str]) -> list[RetrievalHit]:
             source_id=p.source_id,
             document_title=p.document_title,
             page=p.page,
+            t_start=p.t_start,
+            t_end=p.t_end,
             dense_score=round(p.dense_score, 4) if p.dense_score is not None else None,
             lexical_rank=p.lexical_rank,
             used=p.source_id in cited,

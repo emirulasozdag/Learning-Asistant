@@ -9,7 +9,7 @@ from app.embeddings.provider import get_embedder
 from app.retrieval.dense import dense_search
 from app.retrieval.fusion import RRF_K, reciprocal_rank_fusion
 from app.retrieval.lexical import lexical_search
-from app.retrieval.types import RetrievalResult, RetrievedPassage
+from app.retrieval.types import RetrievalResult, RetrievedPassage, VideoPosition
 
 # Her yöntemden alınan aday sayısı; RRF sonrası ilk `k` tanesi kullanılır.
 CANDIDATES_PER_METHOD = 10
@@ -74,7 +74,7 @@ def retrieve(
     db: Session,
     course: Course,
     query: str,
-    video_time_s: float | None = None,
+    video: VideoPosition | None = None,
     k: int = 5,
     embedder: Embedder | None = None,
     context: str | None = None,
@@ -91,6 +91,8 @@ def retrieve(
     Kapı önce yeni soruya tek başına bakar. Geçemezse önceki soruyla birlikte geçmesi yalnızca
     yeni soru da derse yakınsa (benzerlik >= `follow_up_min_similarity`) kabul edilir: konu
     değiştiren alakasız bir soru, önceki sorunun eşleşmeleriyle içeri sızmaz.
+
+    `video`: oynatma konumu önceliği sonraki PR'da (#14 c); şimdilik yok sayılır.
 
     Sonraki adımlar: video-zaman önceliği (`video_time.py`); rerank ölçülen fayda olmadığı
     için kapalı (`rerank.py`).

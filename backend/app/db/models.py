@@ -48,6 +48,9 @@ class Document(Base):
     filename: Mapped[str] = mapped_column(String(300))
     file_path: Mapped[str] = mapped_column(String(500))
     page_count: Mapped[int] = mapped_column(default=0)
+    # Yalnızca video: süre (saniye) ve harici, opak oynatma URL'si (yalnızca https kabul edilir).
+    duration_s: Mapped[float | None]
+    media_url: Mapped[str | None] = mapped_column(String(1000))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     course: Mapped[Course] = relationship(back_populates="documents")
@@ -61,6 +64,7 @@ class Chunk(Base):
     __table_args__ = (
         Index("ix_chunks_search_vector", "search_vector", postgresql_using="gin"),
         Index("ix_chunks_course_id", "course_id"),
+        Index("ix_chunks_document_id_t_start", "document_id", "t_start"),
         Index(
             "ix_chunks_embedding_hnsw",
             "embedding",

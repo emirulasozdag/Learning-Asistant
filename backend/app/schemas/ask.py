@@ -5,13 +5,27 @@ from pydantic import BaseModel, Field
 from app.schemas.common import Citation
 
 
+class VideoRef(BaseModel):
+    """Öğrencinin izlediği ders videosu ve durdurduğu an.
+
+    `document_id`: videonun `Document` kimliği (zaman damgası değil, kimlik videoyu ayırt eder).
+    `time_s`: videonun başından itibaren saniye.
+    """
+
+    document_id: int
+    time_s: float = Field(ge=0)
+
+
 class AskRequest(BaseModel):
-    """Grounded Q&A isteği. video_time_s: öğrencinin videoyu durdurduğu an (saniye)."""
+    """Grounded Q&A isteği. video: öğrencinin izlediği video ve durdurduğu an (isteğe bağlı).
+
+    Oynatma konumu önceliği henüz uygulanmadı (#14'ün sonraki PR'ları); alan kabul edilir.
+    """
 
     course_id: int
     question: str = Field(min_length=1, max_length=2000)
-    video_time_s: float | None = None
     conversation_id: int | None = None
+    video: VideoRef | None = None
 
 
 class RetrievalHit(BaseModel):
@@ -20,6 +34,9 @@ class RetrievalHit(BaseModel):
     source_id: str
     document_title: str
     page: int | None = None
+    # Video parçasında saniye cinsinden aralık (sayfa yerine).
+    t_start: float | None = None
+    t_end: float | None = None
     # Anlamsal benzerlik (0–1); anlamsal aramanın ilk adayları arasında değilse None.
     dense_score: float | None = None
     # Kelime aramasındaki sıra (1 = en iyi); kelime eşleşmesi yoksa None.
