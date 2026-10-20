@@ -15,6 +15,7 @@ class FakeEmbedder:
 
     name = "fake"
     dim = EMBEDDING_DIM
+    identity = "fake/bow-blake2b/v1"
 
     def embed_passages(self, texts: list[str]) -> list[list[float]]:
         return [self._vector(text) for text in texts]

@@ -17,6 +17,8 @@ class RetrievedPassage:
     dense_score: float | None = None
     # Kelime aramasındaki sıra (1 = en iyi); kelime eşleşmesi yoksa None.
     lexical_rank: int | None = None
+    # Sorunun anahtar kelimelerinden bu parçada geçenlerin IDF ağırlıklı payı (0–1).
+    keyword_coverage: float | None = None
 
 
 @dataclass
@@ -24,6 +26,10 @@ class RetrievalResult:
     """Birleştirilmiş sonuç + sorunun dersle ilgili sayılıp sayılmadığı."""
 
     passages: list[RetrievedPassage] = field(default_factory=list)
-    # Alakasızlık kapısı: hiç kelime eşleşmesi yok ve anlamsal benzerlik eşiğin altındaysa False.
+    # Alakasızlık kapısı (bkz. `hybrid.retrieve`); False ise LLM çağrılmaz.
     relevant: bool = False
+    # Sorunun kendisi için en iyi anlamsal benzerlik ve anahtar kelime kapsaması.
     best_similarity: float | None = None
+    keyword_coverage: float | None = None
+    # Soru tek başına kapıdan geçemedi, önceki soruyla birlikte geçti (eksik takip sorusu).
+    admitted_by_context: bool = False

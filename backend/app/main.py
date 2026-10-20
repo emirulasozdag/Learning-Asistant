@@ -18,16 +18,37 @@ from app.api import (
     sources,
 )
 from app.core.config import settings
+from app.db.session import SessionLocal
 from app.embeddings.provider import get_embedder
+from app.retrieval.index import stale_chunk_count
 
 logger = logging.getLogger(__name__)
 
 
 def _warm_up_embedder() -> None:
     try:
-        get_embedder().embed_query("ısınma")
+        embedder = get_embedder()
+        embedder.embed_query("ısınma")
     except Exception:
         logger.exception("Embedding modeli önceden yüklenemedi; ilk istekte yeniden denenecek")
+        return
+    _warn_stale_vectors(embedder.identity)
+
+
+def _warn_stale_vectors(identity: str) -> None:
+    """Model değiştiyse ya da eski vektörler kimliksizse anlamsal arama onları kullanmaz."""
+    try:
+        with SessionLocal() as db:
+            stale = stale_chunk_count(db, identity)
+    except Exception:
+        return  # Veritabanı henüz hazır değil; sorun ilk istekte görünür.
+    if stale:
+        logger.warning(
+            "%d parça etkin embedder'la (%s) vektörleştirilmemiş; anlamsal arama bunları "
+            "kullanmaz. Yeniden üretmek için: python -m app.scripts.reembed",
+            stale,
+            identity,
+        )
 
 
 @asynccontextmanager

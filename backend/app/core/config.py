@@ -32,10 +32,15 @@ class Settings(BaseSettings):
     embedding_provider: str = "e5"
     embedding_model: str = "intfloat/multilingual-e5-base"
 
-    # Hiç kelime eşleşmesi yokken, en iyi anlamsal benzerlik bunun altındaysa soru
-    # "materyalde yok" sayılır ve LLM çağrılmaz. e5 ile ölçüm: ders soruları 0.81–0.88,
-    # alakasız sorular 0.72–0.76; dersle ilgili ama materyalde olmayanlara LLM karar verir.
+    # Alakasızlık kapısı (`retrieval/hybrid.py`): soru, en iyi anlamsal benzerlik ya da en iyi
+    # parçanın anahtar kelime kapsaması (IDF ağırlıklı, 0–1) eşiğin üstündeyse dersle ilgili
+    # sayılır; değilse "materyalde yok" denir ve LLM çağrılmaz. Eşikler kalibrasyon split'inde
+    # ayarlanır (`python -m harness.retrieval_sweep`), held-out yalnızca raporlanır.
     retrieval_min_similarity: float = 0.78
+    retrieval_min_keyword_coverage: float = 0.5
+    # Takip sorusu tek başına kapıdan geçemezse önceki soruyla birlikte geçebilir, ama yalnızca
+    # kendi benzerliği en az bu kadarsa (konu değiştiren alakasız soru içeri sızmasın).
+    retrieval_follow_up_min_similarity: float = 0.77
 
     @field_validator("cors_origins", mode="before")
     @classmethod

@@ -76,6 +76,56 @@ DATABASE_URL=postgresql+psycopg://learning:learning@localhost:5432/learning_assi
   docker-compose'un `./data` bağlaması).
 - Şimdilik yalnızca `full` koşulu var; `no_rag`, `basic_rag` ve `full_video_time` sonraki işlerde.
 
+## Arama kalibrasyonu (#9)
+
+```bash
+# Yöntem karşılaştırması (yalnız anlamsal / yalnız kelime / hibrit, aday sayısı, RRF k) ve kapı ızgarası.
+# LLM çağrılmaz. Eşik yalnızca calibration koşusunda önerilir; held-out yalnızca raporlanır.
+python -m harness.retrieval_sweep --gold gold_sets/BLM2512/gold_set.json --split calibration \
+    --files-root .. --out runs/ [--follow-ups takip.json]
+```
+
+- **Kapı:** soru, en iyi anlamsal benzerlik `RETRIEVAL_MIN_SIMILARITY` (0,78) ya da en iyi parçanın IDF
+  ağırlıklı anahtar kelime kapsaması `RETRIEVAL_MIN_KEYWORD_COVERAGE` (0,5) üstündeyse dersle ilgili
+  sayılır. Eskiden tek bir ortak kelime yetiyordu; ders dili `tr` olup materyal İngilizce olunca
+  "what/is/the" her parçayla eşleşiyor ve her soru içeri alınıyordu.
+- **Takip sorusu:** soru tek başına geçemezse önceki soruyla birlikte geçebilir, ama yalnızca kendi
+  benzerliği `RETRIEVAL_FOLLOW_UP_MIN_SIMILARITY` (0,77) üstündeyse.
+- **İndeks kimliği:** her parça kendi embedder kimliğiyle saklanır (`chunks.embedding_model`), anlamsal arama
+  yalnızca etkin embedder'ın vektörlerini kullanır. Koşu kaydı `embedding_identity` ve `index_fingerprint`
+  tutar. Model değişince ya da migration'dan sonra: `python -m app.scripts.reembed [--dry-run|--all]`.
+- **Filtreli arama:** anlamsal arama ders içinde kesin (exact) yapılır; HNSW + ders filtresi küçük bir dersin
+  adaylarını kaybediyordu (20 000 + 60 parçalık denemede 0 sonuç). Kelime aramasının IDF'i de yalnızca
+  dersin parçalarından hesaplanır.
+
+Ölçüm (2026-10-20, Git_1 notu, e5-base, LLM kapalı). **Taslak setler, eğitmen onayı yok:** kalibrasyon
+seti ekip taslağı (20 cevaplanabilir + 12 kapsam dışı), held-out kullanıcının deneme seti (8 + 3).
+
+| Set | Metrik | Önce | Sonra |
+|---|---|---|---|
+| Kalibrasyon | Recall@5 | 0,925 | 0,975 |
+| | Kapsam dışı reddetme | 0,25 | 0,83 |
+| | Aşırı reddetme | 0 | 0,05 |
+| Held-out | Recall@5 | 0,75 | 0,875 |
+| | Kapsam dışı reddetme | 0,67 | 1,00 |
+| | Aşırı reddetme | 0 | 0 |
+
+Yöntem karşılaştırması (kalibrasyon / held-out Recall@5): hibrit 0,97 / 0,88, yalnız anlamsal 0,93 / 0,81,
+yalnız kelime 0,82 / 0,69. Aday sayısı 5→20 ve RRF k 60→20 fark yaratmadı. Aday recall'u Recall@5'e
+eşit ya da çok yakın olduğu için reranker eklenmedi. Izgarada 0,79 eşiği kalibrasyonda kapsam dışı
+reddetmeyi 0,92'ye çıkarıyor ama aşırı reddetmeyi tam sınıra (0,10) getiriyor; 20 soruda bu tek soruluk fark,
+gerçek gold set gelene kadar 0,78 korundu.
+
+Açık kalanlar: gerçek gold set (BLM2512, eğitmen incelemeli) yok, sayılar yalnızca taslak kanıt. Türkçe soru →
+İngilizce not (held-out git-08) hâlâ kaçıyor: doğru sayfa anlamsal aramada 32. sırada, öndekiler yalnızca
+başlıktan oluşan slaytlar; aynı soru İngilizce sorulunca 1. sırada. Çözüm ingestion (başlık-sadece slaytlar)
+ya da daha güçlü çok dilli model; bu işte yapılmadı.
+
+Bilinen tavizler: (1) Benzerliği 0,77–0,78 arasında kalan yeni bir soru, önceki soruyla birlikte kapıyı
+geçebilir; taslak takip denemelerinde gerçek takip soruları da bu aralıkta (0,776–0,779). (2) Embedder
+kimliği model adını içerir, model revizyonunu (ağırlık sürümü) içermez; aynı ad altında ağırlık
+değişirse `--all` ile yeniden üretmek gerekir.
+
 ## Metrikler ve hedefler (hipotez)
 
 | Boyut | Metrik | Hedef | Durum |

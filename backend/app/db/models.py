@@ -81,6 +81,9 @@ class Chunk(Base):
     search_vector: Mapped[str | None] = mapped_column(TSVECTOR)
     # multilingual-e5 vektörü (birim uzunlukta); anlamsal arama kosinüs mesafesiyle yapılır.
     embedding: Mapped[list[float] | None] = mapped_column(Vector(EMBEDDING_DIM))
+    # Vektörü üreten embedder'ın kimliği (`Embedder.identity`). Arama yalnızca etkin
+    # embedder'la aynı kimlikteki vektörleri kullanır; None = kimliği bilinmeyen eski vektör.
+    embedding_model: Mapped[str | None] = mapped_column(String(200))
 
     document: Mapped[Document] = relationship(back_populates="chunks")
 

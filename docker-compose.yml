@@ -28,8 +28,11 @@ services:
       EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-e5}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-intfloat/multilingual-e5-base}
       RETRIEVAL_MIN_SIMILARITY: ${RETRIEVAL_MIN_SIMILARITY:-0.78}
+      RETRIEVAL_MIN_KEYWORD_COVERAGE: ${RETRIEVAL_MIN_KEYWORD_COVERAGE:-0.5}
+      RETRIEVAL_FOLLOW_UP_MIN_SIMILARITY: ${RETRIEVAL_FOLLOW_UP_MIN_SIMILARITY:-0.77}
     # Açılışta (hepsi tekrar çalıştırılabilir): şemayı güncelle, demo dersini oluştur,
-    # embedding modelini hazırla (ilk seferde ~1 GB indirir), vektörü eksik parçaları tamamla.
+    # embedding modelini hazırla (ilk seferde ~1 GB indirir), vektörü eksik ya da başka
+    # embedder'la üretilmiş parçaları yeniden üret.
     # Model indirildikten sonra internet gerekmez (HF_HUB_OFFLINE): sunumda bağlantı olmasa da açılır.
     command: >
       sh -c "alembic upgrade head && python -m app.scripts.seed_demo &&

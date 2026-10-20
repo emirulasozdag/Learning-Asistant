@@ -347,6 +347,8 @@ def _run_config(
             "candidates_per_method": hybrid.CANDIDATES_PER_METHOD,
             "context_weight": hybrid.CONTEXT_WEIGHT,
             "rrf_k": fusion.RRF_K,
+            "min_keyword_coverage": settings.retrieval_min_keyword_coverage,
+            "follow_up_min_similarity": settings.retrieval_follow_up_min_similarity,
         },
     )
 
@@ -364,7 +366,9 @@ def run_baseline(args: argparse.Namespace) -> RunRecord:
     from sqlalchemy.orm import Session
 
     from app.core.config import settings
+    from app.embeddings.provider import get_embedder
     from app.llm.gateway import select_client
+    from app.retrieval.index import inventory
     from harness.corpus import CorpusError, Locator, find_course, snapshot
 
     condition = Condition(args.condition)
@@ -394,11 +398,21 @@ def run_baseline(args: argparse.Namespace) -> RunRecord:
                 + ", ".join(corpus.unapproved_indexed)
                 + " (envantere ekleyin ya da dersten silin)"
             )
+        identity = get_embedder().identity
+        index = inventory(db, course.id)
+        config = config.model_copy(
+            update={"embedding_identity": identity, "index_fingerprint": index.fingerprint}
+        )
         results = evaluate(items, _backend_ask(engine, course.id, select_client()), locator.locate)
     metrics, metric_gaps = compute_metrics(items, results)
 
     gaps = selection_gaps + item_gaps(gold) + metric_gaps + _corpus_gaps(corpus)
     gaps += [f"Eksik girdi: {m.what} (sorumlu: {m.owner})" for m in manifest.missing_inputs]
+    if index.stale(identity):
+        gaps.append(
+            f"{index.stale(identity)} parça etkin embedder'la ({identity}) vektörleştirilmemiş; "
+            "anlamsal arama bunları görmedi (python -m app.scripts.reembed)"
+        )
     if config.git_dirty:
         gaps.append("Çalışma ağacında commit'lenmemiş değişiklik var; koşu tam tekrarlanamaz")
     if not config.llm_enabled:
