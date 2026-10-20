@@ -16,7 +16,7 @@ from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient
 from pptx import Presentation
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, make_url, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.api.deps import get_session_factory
@@ -88,7 +88,14 @@ def sample_pptx(tmp_path: Path) -> Path:
 @pytest.fixture(scope="session")
 def db_engine():
     if not TEST_DATABASE_URL:
+        if os.environ.get("REQUIRE_DB_TESTS"):
+            pytest.fail(
+                "REQUIRE_DB_TESTS ayarlı ama TEST_DATABASE_URL yok: veritabanı testleri atlanamaz"
+            )
         pytest.skip("TEST_DATABASE_URL tanımlı değil; veritabanı testleri atlandı")
+    if not make_url(TEST_DATABASE_URL).database.endswith("_test"):
+        # Tablolar her testte boşaltılır: geliştirme veritabanı yanlışlıkla silinmesin.
+        pytest.fail("TEST_DATABASE_URL'deki veritabanı adı '_test' ile bitmeli")
     config = Config(str(BACKEND_DIR / "alembic.ini"))
     config.set_main_option("script_location", str(BACKEND_DIR / "migrations"))
     config.set_main_option("sqlalchemy.url", TEST_DATABASE_URL)
