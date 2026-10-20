@@ -1,6 +1,7 @@
 import { Link } from "react-router";
 
 import type { DocumentOut } from "../../api/types";
+import { documentExtent, materialTotals, totalsHeading } from "../../labels";
 import { formatRelative } from "../../text";
 import FileBadge from "../../ui/FileBadge";
 import { Table, TD, TH, THead, TR } from "../../ui/Table";
@@ -19,7 +20,7 @@ export default function CourseDocumentTable({
       <THead>
         <tr>
           <TH>Doküman</TH>
-          <TH className="hidden text-right sm:table-cell">Sayfa</TH>
+          <TH className="hidden text-right sm:table-cell">{totalsHeading(materialTotals(documents))}</TH>
           <TH className="hidden md:table-cell">Eklendi</TH>
           {tutorPath && (
             <TH className="text-right">
@@ -39,7 +40,9 @@ export default function CourseDocumentTable({
                 </a>
               </div>
             </TD>
-            <TD className="hidden text-right text-ink-2 tabular-nums sm:table-cell">{document.page_count}</TD>
+            <TD className="hidden text-right text-ink-2 tabular-nums sm:table-cell">
+              {document.material_type === "video" ? documentExtent(document) : document.page_count}
+            </TD>
             <TD className="hidden whitespace-nowrap text-graphite md:table-cell">
               {formatRelative(document.created_at)}
             </TD>

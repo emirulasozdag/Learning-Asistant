@@ -5,6 +5,9 @@ Kullanım: python -m app.scripts.import_ocw /code/data/ocw/6-006-spring-2020
 Ders yoksa oluşturur, varsa bilgisini, izlencesini ve takvimini günceller. PDF'leri normal
 yükleme hattından geçirir (parse → temizle → parçala → vektörleştir). Tekrar çalıştırılabilir:
 aynı başlıkta dokümanı olan dosyalar atlanır.
+
+Betikle açılan dersin üyesi yoktur; dersi görebilmek için bir eğitmene bağlayın:
+    python -m app.scripts.create_instructor --email ... --name "..." --course 6.006
 """
 
 import argparse
@@ -85,6 +88,10 @@ def main() -> None:
         print(
             f"İzlence: {len(course.syllabus or [])} blok, "
             f"takvim: {len((course.calendar or {}).get('rows', []))} hafta."
+        )
+        print(
+            "Dersi görmek için bir eğitmene bağlayın: python -m app.scripts.create_instructor "
+            f'--email ... --name "..." --course {course.code}'
         )
 
 

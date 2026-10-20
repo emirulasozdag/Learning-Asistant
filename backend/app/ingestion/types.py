@@ -1,6 +1,10 @@
 from dataclasses import dataclass
 
 
+class IngestionError(ValueError):
+    """Kullanıcıya gösterilecek, düzeltilebilir bir yükleme hatası."""
+
+
 @dataclass
 class RawSegment:
     """Parser çıktısı: konumu (sayfa veya zaman aralığı) bilinen ham metin."""

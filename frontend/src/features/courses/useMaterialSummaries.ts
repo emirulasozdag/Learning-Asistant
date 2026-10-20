@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 
 import type { DocumentOut } from "../../api/types";
+import { materialTotals, type MaterialTotals } from "../../labels";
 import { courseService, type Course } from "../../services/courseService";
 
 /** Bir dersin bilgi tabanının özeti: tamamı gerçek materyal listesinden hesaplanır. */
 export interface MaterialSummary {
   documents: number;
-  pages: number;
+  totals: MaterialTotals;
   chunks: number;
   /** En son yüklenen dokümanın zamanı (ISO); doküman yoksa null. */
   lastUpload: string | null;
@@ -18,7 +19,7 @@ export type MaterialSummaries = Record<number, MaterialSummary | null | undefine
 export function summarize(documents: DocumentOut[]): MaterialSummary {
   return {
     documents: documents.length,
-    pages: documents.reduce((sum, d) => sum + d.page_count, 0),
+    totals: materialTotals(documents),
     chunks: documents.reduce((sum, d) => sum + d.chunk_count, 0),
     lastUpload: documents.reduce<string | null>(
       (latest, d) => (latest === null || d.created_at > latest ? d.created_at : latest),

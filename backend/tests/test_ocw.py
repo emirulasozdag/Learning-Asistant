@@ -1,16 +1,17 @@
 """OCW "Download Course" paketi okuma: ders bilgisi, dosya türleri, izlence ve takvim."""
 
 import json
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from app.db.models import Course
+from app.db.models import Course, User
 from app.ingestion import ocw
 from app.schemas.materials import MaterialType
-from tests.conftest import SAMPLE_PAGES, TEST_DATABASE_URL, make_pdf
+from tests.conftest import SAMPLE_PAGES, TEST_DATABASE_URL, enroll, make_pdf, make_user
 
 SYLLABUS_HTML = """
     <h3 id="prerequisites">Prerequisites</h3>
@@ -164,3 +165,17 @@ def test_outline_endpoint(client: TestClient, course: Course, db: Session, packa
     }
     assert outline["calendar"]["rows"][1][1] == {"lines": ["Final Exam"], "span": 2}
     assert client.get("/courses/999999/outline").status_code == 404
+
+
+@needs_db
+def test_outline_is_for_course_members_only(
+    client_for: Callable[[User | None], TestClient], course: Course, db: Session
+) -> None:
+    student = make_user(db, "ogrenci@example.com")
+    enroll(db, student, course, "student")
+    outsider = make_user(db, "baska@example.com")
+    path = f"/courses/{course.id}/outline"
+
+    assert client_for(student).get(path).status_code == 200
+    assert client_for(outsider).get(path).status_code == 404
+    assert client_for(None).get(path).status_code == 401

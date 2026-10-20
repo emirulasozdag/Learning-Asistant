@@ -6,7 +6,7 @@ import { useAuth } from "../../auth/useAuth";
 import AskBox from "../../features/courses/AskBox";
 import { useCourses } from "../../features/courses/context";
 import { useMaterialSummaries, type MaterialSummary } from "../../features/courses/useMaterialSummaries";
-import { courseMetaParts } from "../../labels";
+import { courseMetaParts, describeTotals } from "../../labels";
 import type { Course } from "../../services/courseService";
 import { greeting } from "../../text";
 import Button from "../../ui/Button";
@@ -113,7 +113,7 @@ function CourseRow({ course, summary }: { course: Course; summary: MaterialSumma
           ) : summary.documents === 0 ? (
             "Henüz materyal yüklenmedi"
           ) : (
-            `${summary.documents} doküman, ${summary.pages} sayfa`
+            `${[`${summary.documents} doküman`, describeTotals(summary.totals)].filter(Boolean).join(", ")}`
           )}
         </p>
       </div>

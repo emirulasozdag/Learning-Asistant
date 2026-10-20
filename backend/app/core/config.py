@@ -42,6 +42,24 @@ class Settings(BaseSettings):
     # kendi benzerliği en az bu kadarsa (konu değiştiren alakasız soru içeri sızmasın).
     retrieval_follow_up_min_similarity: float = 0.77
 
+    # Oturum (ADR-1): httpOnly çerez. Üretimde HTTPS arkasında SESSION_COOKIE_SECURE=true.
+    session_cookie_name: str = "la_session"
+    session_cookie_secure: bool = False
+    session_ttl_hours: int = 24 * 7
+    # Katılım kodunun geçerlilik süresi (gün); eğitmen yenileyince yeniden başlar (ADR-2).
+    join_code_ttl_days: int = 120
+    # Aydınlatma metninin güncel sürümü (ADR-4). Metin değişince artırılır; kullanıcı yeni
+    # sürümü kabul edene kadar soru soramaz.
+    privacy_policy_version: str = "2026-10-20"
+
+    # Geliştirme hesapları (`python -m app.scripts.seed_demo`). Varsayılan kapalı; üretimde
+    # açılmaz. Şifreler yalnızca .env'den gelir; boşsa hesap oluşturulmaz.
+    seed_dev_accounts: bool = False
+    dev_instructor_email: str = "egitmen@example.com"
+    dev_instructor_password: str = ""
+    dev_student_email: str = "ogrenci@example.com"
+    dev_student_password: str = ""
+
     @field_validator("cors_origins", mode="before")
     @classmethod
     def split_origins(cls, value: str | list[str]) -> list[str]:

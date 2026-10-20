@@ -6,8 +6,9 @@ import { useAuth } from "../../auth/useAuth";
 import { useCourses } from "../../features/courses/context";
 import { useCourseActivities } from "../../features/courses/useCourseActivities";
 import { useMaterialSummaries, type MaterialSummary } from "../../features/courses/useMaterialSummaries";
+import { compactTotals } from "../../labels";
 import type { Course } from "../../services/courseService";
-import { formatRelative, greeting } from "../../text";
+import { formatRelative, formatTime, greeting } from "../../text";
 import Badge from "../../ui/Badge";
 import Button from "../../ui/Button";
 import EmptyState from "../../ui/EmptyState";
@@ -62,7 +63,17 @@ export default function InstructorDashboard() {
           stats={[
             { label: "Ders", value: courses.length },
             { label: "Doküman", value: known.reduce((sum, s) => sum + s.documents, 0) },
-            { label: "Sayfa", value: known.reduce((sum, s) => sum + s.pages, 0) },
+            ...(known.some((s) => s.totals.hasPages)
+              ? [{ label: "Sayfa", value: known.reduce((sum, s) => sum + s.totals.pages, 0) }]
+              : []),
+            ...(known.some((s) => s.totals.hasVideo)
+              ? [
+                  {
+                    label: "Video süresi",
+                    value: formatTime(known.reduce((sum, s) => sum + s.totals.videoSeconds, 0)),
+                  },
+                ]
+              : []),
             {
               label: "Öğrenci sorusu",
               value: courses.reduce((sum, course) => sum + (activities[course.id]?.questions ?? 0), 0),
@@ -104,7 +115,7 @@ export default function InstructorDashboard() {
               <TH>Ders</TH>
               <TH className="hidden md:table-cell">Dönem</TH>
               <TH className="hidden text-right sm:table-cell">Doküman</TH>
-              <TH className="hidden text-right lg:table-cell">Sayfa</TH>
+              <TH className="hidden text-right lg:table-cell">Sayfa / süre</TH>
               <TH className="text-right">Soru</TH>
             </tr>
           </THead>
@@ -177,7 +188,7 @@ function CourseRow({
         {number(summary === null ? null : summary?.documents)}
       </TD>
       <TD className="hidden text-right tabular-nums lg:table-cell">
-        {number(summary === null ? null : summary?.pages)}
+        {summary ? compactTotals(summary.totals) : number(summary === null ? null : undefined)}
       </TD>
       <TD className="text-right tabular-nums">{number(questions)}</TD>
     </TR>

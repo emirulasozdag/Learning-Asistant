@@ -10,6 +10,7 @@ from app.retrieval.dense import dense_search
 from app.retrieval.fusion import RRF_K, reciprocal_rank_fusion
 from app.retrieval.lexical import lexical_search
 from app.retrieval.types import RetrievalResult, RetrievedPassage, VideoPosition
+from app.retrieval.video_time import video_neighbors
 
 # Her yöntemden alınan aday sayısı; RRF sonrası ilk `k` tanesi kullanılır.
 CANDIDATES_PER_METHOD = 10
@@ -31,6 +32,10 @@ class RetrievalParams:
     candidates_per_method: int = CANDIDATES_PER_METHOD
     rrf_k: int = RRF_K
     context_weight: float = CONTEXT_WEIGHT
+    # Oynatma konumu önceliği: durdurulan anın ±video_window_s saniyesindeki parçalar RRF'e ayrı
+    # bir sıralama olarak video_weight ağırlığıyla girer (0 = kapalı). Eval'de kalibre edilecek.
+    video_window_s: float = 120.0
+    video_weight: float = 0.5
     min_similarity: float | None = None
     min_keyword_coverage: float | None = None
     follow_up_min_similarity: float | None = None
@@ -92,10 +97,14 @@ def retrieve(
     yeni soru da derse yakınsa (benzerlik >= `follow_up_min_similarity`) kabul edilir: konu
     değiştiren alakasız bir soru, önceki sorunun eşleşmeleriyle içeri sızmaz.
 
-    `video`: oynatma konumu önceliği sonraki PR'da (#14 c); şimdilik yok sayılır.
+    `video`: öğrencinin izlediği video ve durdurduğu an. Verilirse, o videonun durdurulan ana
+    yakın parçaları (`video_neighbors`) RRF'e ayrı bir sıralama olarak `video_weight` ağırlığıyla
+    eklenir: pencere içindeki parça sıralamada yukarı çıkar, ama hiçbir parça elenmez; pencere
+    dışındaki kanıt ve diğer videolar yine bulunur. Alakasızlık kapısı videodan etkilenmez, yalnızca
+    soru metninden hesaplanır. Bilinen sınırlama: "bu adımı açıklar mısın" gibi bağlamsız sorular
+    kapıda takılabilir (kapı kalibrasyonu #9'u bozmamak için değiştirilmedi).
 
-    Sonraki adımlar: video-zaman önceliği (`video_time.py`); rerank ölçülen fayda olmadığı
-    için kapalı (`rerank.py`).
+    Rerank ölçülen fayda olmadığı için kapalı (`rerank.py`).
     """
     params = (params or RetrievalParams()).resolved()
     embedder = embedder or get_embedder()
@@ -115,6 +124,14 @@ def retrieve(
                 and current.best_similarity >= params.follow_up_min_similarity
             )
             relevant = admitted_by_context = near_course
+
+    if video is not None and params.video_weight > 0:
+        neighbors = video_neighbors(
+            db, course, video, params.video_window_s, params.candidates_per_method
+        )
+        if neighbors:
+            rankings.append(neighbors)
+            weights.append(params.video_weight)
 
     return RetrievalResult(
         passages=reciprocal_rank_fusion(rankings, k=params.rrf_k, weights=weights)[:k],

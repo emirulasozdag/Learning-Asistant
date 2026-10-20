@@ -10,7 +10,7 @@ import { classifyFailure, describeTurn } from "../../features/tutor/outcome";
 import SourceViewer from "../../features/tutor/SourceViewer";
 import type { Turn } from "../../features/tutor/types";
 import { isDesktopNow } from "../../features/tutor/useIsDesktop";
-import { materialLabel } from "../../labels";
+import { describeTotals, documentExtent, materialLabel, materialTotals } from "../../labels";
 import { courseService, type Course } from "../../services/courseService";
 import { tutorService, type QuickAction } from "../../services/tutorService";
 import Button from "../../ui/Button";
@@ -323,13 +323,13 @@ function TutorWelcome({
       />
     );
   }
-  const pages = materials?.reduce((sum, d) => sum + d.page_count, 0) ?? 0;
+  const extent = describeTotals(materialTotals(materials ?? []));
   return (
     <div className="py-14">
       <h1 className="text-2xl font-semibold tracking-tight text-balance text-ink">{course.name} dersine sor</h1>
       <p className="mt-2 text-md text-graphite">
         {materials
-          ? `Cevaplar bu dersin ${materials.length} dokümanındaki (${pages} sayfa) bölümlere dayandırılır ve kaynak sayfaları gösterilir. Yine de önemli konularda kaynağı açıp kontrol et.`
+          ? `Cevaplar bu dersin ${materials.length} dokümanındaki${extent ? ` (${extent})` : ""} bölümlere dayandırılır ve kaynak sayfaları gösterilir. Yine de önemli konularda kaynağı açıp kontrol et.`
           : "Cevaplar bu dersin materyalindeki bölümlere dayandırılır ve kaynak sayfaları gösterilir. Önemli konularda kaynağı açıp kontrol et."}
       </p>
 
@@ -353,7 +353,7 @@ function TutorWelcome({
                 <span className="min-w-0">
                   <span className="block truncate text-base font-medium text-ink">{document.title}</span>
                   <span className="block text-sm text-graphite">
-                    {materialLabel(document.material_type)}, {document.page_count} sayfa
+                    {materialLabel(document.material_type)}, {documentExtent(document)}
                   </span>
                 </span>
               </li>

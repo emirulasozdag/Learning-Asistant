@@ -46,6 +46,7 @@ export const courseService = {
 /** Dosya adından materyal türü tahmini (yükleme sonrası değiştirilebilir hale getirilecek). */
 export function guessMaterialType(filename: string): MaterialType {
   const name = filename.toLocaleLowerCase("tr");
+  if (name.endsWith(".vtt")) return "video";
   if (name.endsWith(".pptx") || /slayt|slide|sunum/.test(name)) return "slides";
   if (/sınav|sinav|midterm|final|vize|exam|quiz/.test(name)) return "past_exam";
   if (/ödev|odev|homework|assignment|problem set|pset|ps\d/.test(name)) return "assignment";

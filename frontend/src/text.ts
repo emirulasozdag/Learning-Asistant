@@ -40,3 +40,17 @@ export function greeting(now: Date = new Date()): string {
   if (hour < 18) return "İyi günler";
   return "İyi akşamlar";
 }
+
+/** Saniye → "m:ss" (bir saat ve üstü için "h:mm:ss"): videoda konum göstermek için. */
+export function formatTime(seconds: number): string {
+  const total = Math.max(0, Math.floor(seconds));
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const secs = String(total % 60).padStart(2, "0");
+  return hours > 0 ? `${hours}:${String(minutes).padStart(2, "0")}:${secs}` : `${minutes}:${secs}`;
+}
+
+/** Video parçasının aralığı: "12:34–13:20" (bitiş yoksa yalnızca başlangıç). */
+export function formatTimeRange(start: number, end: number | null | undefined): string {
+  return end == null ? formatTime(start) : `${formatTime(start)}–${formatTime(end)}`;
+}

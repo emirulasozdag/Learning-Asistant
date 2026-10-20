@@ -1,7 +1,8 @@
 """ORM modelleri.
 
-Sprint 1: Course, Document, Chunk, Conversation, Message. Kalan varlıklar (PracticeItem,
-Rubric, Attempt, ClaimCheck, ...) ilgili özelliklerle eklenecek — docs/ANALYSIS.md §8.
+Sprint 1: Course, Document, Chunk, Conversation, Message. #11: User, AuthSession, Enrollment
+(DECISIONS.md ADR-1, 2, 4). Kalan varlıklar (PracticeItem, Rubric, Attempt, ClaimCheck, ...)
+ilgili özelliklerle eklenecek — docs/ANALYSIS.md §8.
 
 Model değişince: `alembic revision --autogenerate -m "açıklama"`.
 """
@@ -9,7 +10,17 @@ Model değişince: `alembic revision --autogenerate -m "açıklama"`.
 from datetime import datetime
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import DateTime, ForeignKey, Index, String, Text, func
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -17,6 +28,57 @@ from app.db.base import Base
 
 # multilingual-e5-base çıktı boyutu.
 EMBEDDING_DIM = 768
+
+
+class User(Base):
+    """Hesap (ADR-1). Rol kullanıcıda değil, ders üyeliğindedir (`Enrollment`)."""
+
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(200))
+    # Küçük harfe çevrilmiş olarak saklanır.
+    email: Mapped[str] = mapped_column(String(320), unique=True)
+    password_hash: Mapped[str] = mapped_column(String(255))
+    title: Mapped[str | None] = mapped_column(String(100))
+    # Ders açabilir mi (açınca o dersin eğitmeni olur). Kayıtla alınamaz: seed ya da
+    # `python -m app.scripts.create_instructor` ile verilir (ADR-1).
+    can_create_courses: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    # Aydınlatma metni (ADR-4): kabul edilen sürüm ve zamanı; None = henüz kabul edilmedi.
+    policy_version: Mapped[str | None] = mapped_column(String(32))
+    consented_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Araştırma/analiz kaydı için ayrı opt-in; varsayılan kapalı.
+    research_logging: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class AuthSession(Base):
+    """Sunucu tarafı oturum. Çerezde rastgele belirteç durur, burada yalnızca SHA-256 özeti."""
+
+    __tablename__ = "sessions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class Enrollment(Base):
+    """Ders üyeliği (ADR-2). Yetki yalnızca buradan gelir; satır silinince erişim biter."""
+
+    __tablename__ = "enrollments"
+    __table_args__ = (
+        UniqueConstraint("user_id", "course_id"),
+        CheckConstraint("role IN ('student', 'instructor', 'ta')", name="ck_enrollments_role"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    course_id: Mapped[int] = mapped_column(ForeignKey("courses.id", ondelete="CASCADE"), index=True)
+    # "student" | "instructor" | "ta"
+    role: Mapped[str] = mapped_column(String(16))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class Course(Base):
@@ -34,6 +96,9 @@ class Course(Base):
     level: Mapped[str | None] = mapped_column(String(16))
     department: Mapped[str | None] = mapped_column(String(200))
     description: Mapped[str | None] = mapped_column(Text)
+    # Katılım kodu (ADR-2); eğitmen yeniler. Süresi dolmuşsa ya da yoksa kodla katılınamaz.
+    join_code: Mapped[str | None] = mapped_column(String(32), unique=True)
+    join_code_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # Ders izlencesi ve takvimi (OCW "Syllabus" / "Calendar"): HTML değil, yapılandırılmış veri.
     # Biçim: app.schemas.courses.SyllabusBlock listesi ve CourseCalendar.
     syllabus: Mapped[list | None] = mapped_column(JSONB)
@@ -56,6 +121,10 @@ class Document(Base):
     duration_s: Mapped[float | None]
     media_url: Mapped[str | None] = mapped_column(String(1000))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # ADR-3: yükleyen eğitmen ve beyan zamanı. Arama yalnızca onaylı dokümanlarda yapılır.
+    # Hesaplardan önce yüklenenler için approved_by boştur.
+    approved_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     course: Mapped[Course] = relationship(back_populates="documents")
     chunks: Mapped[list["Chunk"]] = relationship(
@@ -97,12 +166,19 @@ class Chunk(Base):
 
 
 class Conversation(Base):
-    """Bir öğrencinin bir dersteki sohbeti; takip soruları için geçmiş tutulur."""
+    """Bir kullanıcının bir dersteki sohbeti; takip soruları için geçmiş tutulur.
+
+    Yalnızca sahibi devam ettirebilir. Hesaplardan önceki sohbetlerde user_id boştur ve
+    kimse erişemez.
+    """
 
     __tablename__ = "conversations"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     course_id: Mapped[int] = mapped_column(ForeignKey("courses.id", ondelete="CASCADE"))
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     messages: Mapped[list["Message"]] = relationship(

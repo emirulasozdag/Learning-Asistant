@@ -1,6 +1,7 @@
 import { ChevronDown, SearchCheck } from "lucide-react";
 
 import type { AskResponse } from "../../api/types";
+import { formatTime } from "../../text";
 import { cx } from "../../ui/cx";
 import type { SelectSourceProps } from "./types";
 
@@ -51,6 +52,9 @@ export default function RetrievalDetails({
                     <span className="w-5 shrink-0 text-faint tabular-nums">{index + 1}</span>
                     <span className="min-w-0 flex-1 truncate text-ink">{hit.document_title}</span>
                     {hit.page && <span className="shrink-0 text-graphite">sayfa {hit.page}</span>}
+                    {!hit.page && hit.t_start != null && (
+                      <span className="shrink-0 text-graphite tabular-nums">{formatTime(hit.t_start)}</span>
+                    )}
                     {hit.used && (
                       <span className="shrink-0 rounded-[3px] bg-marker-soft px-1 text-xs text-ink">
                         cevapta

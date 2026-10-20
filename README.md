@@ -15,7 +15,7 @@ Engineering Design II · Project 8. Pilot ders: Veri Yapıları ve Algoritmalar.
 > - **AI chat:** OpenRouter üzerinden Claude; cevap akarak gelir, her bilgi [1], [2] ile kaynağına bağlanır, kaynak yetmezse reddeder. Takip sorularını hatırlar.
 > - **Kaynak gösterme:** alıntıya tıklayınca PDF'in gerçek sayfası açılır, alıntılanan satırlar işaretlenir. "Nasıl bulundu" paneli arama skorlarını gösterir.
 > - **Eğitmen etkinliği:** dersin soru-cevap özeti (sayılar, son 14 gün, en çok alıntılanan kaynaklar, materyalde cevabı bulunamayan sorular) kayıtlı mesajlardan hesaplanır.
-> - **Henüz yok:** video, pratik, değerlendirme, sık hatalar ve eğitmen onayı, hallucination ölçümü, gerçek giriş/yetki (arayüzdeki giriş sahtedir; backend hiçbir isteği kimliğe veya ders üyeliğine göre kısıtlamaz). Pratik, eğitmen, öğrenme kaydı ve rubrik endpoint'leri `501` döner.
+> - **Henüz yok:** video, pratik, değerlendirme, sık hatalar ve eğitmen onayı, hallucination ölçümü, arayüzde gerçek giriş (#12). Backend'de kimlik ve ders düzeyinde yetki var (#11): her istek oturum çerezi ve ders üyeliği ister; arayüzdeki giriş hâlâ sahte olduğu için #12 gelene kadar arayüz backend'e oturumsuz istek atar ve `401` alır. Pratik, sık hatalar, öğrenme kaydı ve rubrik endpoint'leri yetki denetiminden sonra `501` döner.
 >
 > Hangi özelliğin hangi dosyada olduğu ve durumu: [ANALYSIS.md §14.1](docs/ANALYSIS.md).
 > Kapsam, gereksinimler, mimari ve yol haritası: **[docs/ANALYSIS.md](docs/ANALYSIS.md)**
@@ -76,9 +76,21 @@ Portlar doluysa `.env` içindeki `WEB_PORT`, `API_PORT`, `POSTGRES_PORT` değiş
 İlk açılışta API embedding modelini (multilingual-e5-base, ~1 GB) indirir; birkaç dakika sürebilir.
 Sonraki açılışlarda model `models` volume'undan yüklenir, internet gerekmez.
 
+### Hesaplar (DECISIONS.md ADR-1, 2, 4)
+- Öğrenci kendi hesabını açar (`POST /auth/register`), derse eğitmenin verdiği **katılım koduyla** katılır.
+- Eğitmen rolü kayıtla alınamaz. Eğitmen hesabı sunucuda açılır:
+  `docker compose exec api python -m app.scripts.create_instructor --email ... --name "..."` (şifre sorulur).
+  Bu hesabın açtığı dersin eğitmeni olur; katılım kodunu `GET /courses/{id}/join-code` verir. Hesaplardan önce
+  açılmış dersler (ör. BLM2512) eğitmensizdir: `--course BLM2512` hesabı o dersin eğitmeni yapar.
+- Geliştirme hesapları yalnızca `.env`'de `SEED_DEV_ACCOUNTS=true` ve `DEV_INSTRUCTOR_PASSWORD` /
+  `DEV_STUDENT_PASSWORD` verilmişse açılış betiğiyle oluşturulur (demo dersin eğitmeni ve öğrencisi). Üretimde kapalıdır.
+- Soru sormadan önce aydınlatma metni onaylanır (`PUT /me/consent`); araştırma kaydı ayrı ve varsayılan kapalıdır.
+  Eğitmen etkinliği yalnızca araştırma kaydını açan öğrencilerden, toplu hesaplanır; 3 öğrenciden az veri varsa boş döner. `DELETE /me/data` sohbetleri,
+  `DELETE /me` hesabı siler.
+
 ### Demo
-Giriş ekranındaki **demo hesaplarıyla** tek tıkla girilir (sahte giriş: kimlik doğrulama ve erişim kontrolü henüz yok, oturum yalnızca tarayıcıda tutulur; bkz. [docs/DECISIONS.md](docs/DECISIONS.md)):
-**Dr. Ayşe Demir** (eğitmen) ve **Elif Kaya** (öğrenci).
+Arayüzdeki giriş #12'ye kadar sahtedir (oturum yalnızca tarayıcıda; backend bu oturumu tanımaz):
+**Dr. Ayşe Demir** (eğitmen) ve **Elif Kaya** (öğrenci). Aşağıdaki akış #12 ile gerçek hesaplarla çalışır.
 
 1. Eğitmen olarak gir. Sol menüdeki **+** ile bir ders oluştur (ya da hazır BLM2512'yi kullan).
 2. Dersin **Materyaller** sekmesine PDF sürükle. Yükleme sonrası dokümana tıklayınca, yükleme raporu (okunan sayfa, temizlenen satırlar, parça ve vektör sayısı) ve sistemin çıkardığı parçalar sayfa numaralarıyla görünür.

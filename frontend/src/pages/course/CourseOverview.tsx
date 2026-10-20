@@ -6,7 +6,8 @@ import type { CourseActivity, DocumentOut } from "../../api/types";
 import { useAuth } from "../../auth/useAuth";
 import CourseInfoDialog from "../../features/courses/CourseInfoDialog";
 import { useCourseOutlet } from "../../features/courses/courseOutlet";
-import { MATERIAL_LABELS, TYPE_ORDER } from "../../labels";
+import { MATERIAL_LABELS, TYPE_ORDER, materialTotals, totalsHeading } from "../../labels";
+import { formatTime } from "../../text";
 import { instructorService } from "../../services/instructorService";
 import { buttonClasses } from "../../ui/buttonStyles";
 import Button from "../../ui/Button";
@@ -113,7 +114,7 @@ function MaterialSummary({
   }
   const rows = TYPE_ORDER.map((type) => {
     const ofType = documents.filter((d) => d.material_type === type);
-    return { type, count: ofType.length, pages: ofType.reduce((sum, d) => sum + d.page_count, 0) };
+    return { type, count: ofType.length, totals: materialTotals(ofType) };
   }).filter((row) => row.count > 0);
   return (
     <Table label="Materyal türleri">
@@ -121,7 +122,7 @@ function MaterialSummary({
         <tr>
           <TH>Tür</TH>
           <TH className="text-right">Doküman</TH>
-          <TH className="text-right">Sayfa</TH>
+          <TH className="text-right">{totalsHeading(materialTotals(documents))}</TH>
         </tr>
       </THead>
       <tbody>
@@ -129,7 +130,7 @@ function MaterialSummary({
           <TR key={row.type}>
             <TD className="font-medium text-ink">{MATERIAL_LABELS[row.type]}</TD>
             <TD className="text-right tabular-nums">{row.count}</TD>
-            <TD className="text-right tabular-nums">{row.pages}</TD>
+            <TD className="text-right tabular-nums">{row.totals.hasVideo ? formatTime(row.totals.videoSeconds) : row.totals.pages}</TD>
           </TR>
         ))}
       </tbody>

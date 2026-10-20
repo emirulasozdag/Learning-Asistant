@@ -30,7 +30,15 @@ services:
       RETRIEVAL_MIN_SIMILARITY: ${RETRIEVAL_MIN_SIMILARITY:-0.78}
       RETRIEVAL_MIN_KEYWORD_COVERAGE: ${RETRIEVAL_MIN_KEYWORD_COVERAGE:-0.5}
       RETRIEVAL_FOLLOW_UP_MIN_SIMILARITY: ${RETRIEVAL_FOLLOW_UP_MIN_SIMILARITY:-0.77}
-    # Açılışta (hepsi tekrar çalıştırılabilir): şemayı güncelle, demo dersini oluştur,
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
+      # Geliştirme hesapları: yalnızca SEED_DEV_ACCOUNTS=true ve şifreler .env'de verilmişse.
+      SEED_DEV_ACCOUNTS: ${SEED_DEV_ACCOUNTS:-false}
+      DEV_INSTRUCTOR_EMAIL: ${DEV_INSTRUCTOR_EMAIL:-egitmen@example.com}
+      DEV_INSTRUCTOR_PASSWORD: ${DEV_INSTRUCTOR_PASSWORD:-}
+      DEV_STUDENT_EMAIL: ${DEV_STUDENT_EMAIL:-ogrenci@example.com}
+      DEV_STUDENT_PASSWORD: ${DEV_STUDENT_PASSWORD:-}
+    # Açılışta (hepsi tekrar çalıştırılabilir): şemayı güncelle, demo dersini (ve açıksa
+    # geliştirme hesaplarını) oluştur,
     # embedding modelini hazırla (ilk seferde ~1 GB indirir), vektörü eksik ya da başka
     # embedder'la üretilmiş parçaları yeniden üret.
     # Model indirildikten sonra internet gerekmez (HF_HUB_OFFLINE): sunumda bağlantı olmasa da açılır.
