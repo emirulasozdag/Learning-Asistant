@@ -27,6 +27,9 @@ services:
       LLM_BASE_URL: ${LLM_BASE_URL:-https://openrouter.ai/api/v1}
       EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-e5}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-intfloat/multilingual-e5-base}
+      # Boş = transkripsiyon kapalı (video için .vtt yüklenir). Örn. large-v3-turbo; model ilk
+      # açılışta indirilir (download_models), sonrası internetsiz çalışır.
+      TRANSCRIPTION_MODEL: ${TRANSCRIPTION_MODEL:-}
       RETRIEVAL_MIN_SIMILARITY: ${RETRIEVAL_MIN_SIMILARITY:-0.78}
       RETRIEVAL_MIN_KEYWORD_COVERAGE: ${RETRIEVAL_MIN_KEYWORD_COVERAGE:-0.5}
       RETRIEVAL_FOLLOW_UP_MIN_SIMILARITY: ${RETRIEVAL_FOLLOW_UP_MIN_SIMILARITY:-0.77}
@@ -61,7 +64,7 @@ services:
       - ./backend/migrations:/code/migrations
       # Yüklenen ders materyalleri ve sayfa görüntüleri (git'e girmez)
       - ./data:/code/data
-      # Embedding modeli: bir kez indirilir, sonra internetsiz kullanılır
+      # Embedding (ve açıksa transkripsiyon) modeli: bir kez indirilir, sonra internetsiz kullanılır
       - models:/models
     depends_on:
       db:

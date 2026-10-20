@@ -1,14 +1,15 @@
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
 
-from app.api.deps import DbSession, get_course_for
+from app.api.deps import DbSession, SessionFactory, TranscriberDep, get_course_for
 from app.api.errors import ApiError
 from app.auth.dependencies import AuthUser, CurrentUser, not_found_error, require_course_role
 from app.db.models import Document
 from app.ingestion.documents import chunk_previews, list_documents, to_document_out
+from app.ingestion.media import create_media_document, is_media, run_transcription
 from app.ingestion.pipeline import IngestionError, ingest_document
 from app.ingestion.rendering import page_image_path, remove_cached_pages
 from app.schemas.common import Role
@@ -32,6 +33,9 @@ def upload_material(
     course_id: int,
     user: AuthUser,
     db: DbSession,
+    background: BackgroundTasks,
+    session_factory: SessionFactory,
+    transcriber: TranscriberDep,
     material_type: Annotated[MaterialType, Form()],
     file: Annotated[UploadFile, File()],
     declaration: Annotated[bool, Form()] = False,
@@ -44,6 +48,10 @@ def upload_material(
     adresidir. Yalnızca dersin eğitmeni yükler ve beyanı (`declaration`) işaretler: "Bu
     materyali bu derste kullanma yetkim var; aktif sınav içeriği değil." Yükleme onay
     sayılır (ADR-3). Cevaptaki `report`, hattın her adımında ne olduğunu gösterir.
+
+    Ders videosu/sesi (.mp4 .webm .mkv .mov .mp3 .m4a .wav) yalnızca sunucuda transkripsiyon
+    açıksa (`TRANSCRIPTION_MODEL`) kabul edilir: dosya diske akıtılır, doküman `processing`
+    olarak 201 döner (rapor yok) ve transkripsiyon arka planda sürer. Kapalıyken 422.
     """
     course = get_course_for(db, user, course_id, "instructor")
     if not declaration:
@@ -53,11 +61,29 @@ def upload_material(
             "içeriği olmadığını onaylayın.",
             "validation_error",
         )
+    filename = file.filename or "dosya"
+    if is_media(filename):
+        try:
+            document, media_path = create_media_document(
+                db,
+                course,
+                filename,
+                file.file,
+                title=title,
+                media_url=media_url,
+                approved_by=user.id,
+            )
+        except IngestionError as exc:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
+        background.add_task(
+            run_transcription, session_factory, document.id, media_path, transcriber
+        )
+        return to_document_out(document, 0)
     try:
         document, report = ingest_document(
             db,
             course,
-            filename=file.filename or "dosya",
+            filename=filename,
             content=file.file.read(),
             material_type=material_type,
             title=title,
@@ -128,14 +154,15 @@ def document_file(document_id: int, user: AuthUser, db: DbSession) -> FileRespon
 def _get_document(db: DbSession, user: CurrentUser, document_id: int, *roles: Role) -> Document:
     """Kullanıcının üye olduğu dersin dokümanı; değilse 404 (varlık sızdırılmaz).
 
-    Onaysız doküman (ADR-3, B'ye geçilirse) yalnızca eğitmene görünür.
+    Onaysız doküman (ADR-3, B'ye geçilirse) ve hazır olmayan (işleniyor / başarısız) doküman
+    yalnızca eğitmene görünür.
     """
     document = db.get(Document, document_id)
     if document is None:
         raise not_found_error("document_not_found")
     # Sıra: üyelik → onaysız dokümanın görünürlüğü → işlem için rol.
     role = require_course_role(user, document.course_id, not_found="document_not_found")
-    if document.approved_at is None and role != "instructor":
+    if (document.approved_at is None or document.status != "ready") and role != "instructor":
         raise not_found_error("document_not_found")
     require_course_role(user, document.course_id, *roles, not_found="document_not_found")
     return document

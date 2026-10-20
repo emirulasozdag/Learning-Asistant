@@ -40,7 +40,7 @@ _SEARCH = text(
     SELECT c.id, sum(w.idf) AS score, sum(w.idf) / qt.idf AS coverage
     FROM chunks c
     JOIN documents doc ON doc.id = c.document_id AND doc.course_id = :course_id
-        AND doc.approved_at IS NOT NULL
+        AND doc.approved_at IS NOT NULL AND doc.status = 'ready'
     JOIN weights w ON c.search_vector @@ w.q
     CROSS JOIN query_total qt
     WHERE c.course_id = :course_id

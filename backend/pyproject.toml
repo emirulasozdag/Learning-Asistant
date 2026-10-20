@@ -25,6 +25,13 @@ dependencies = [
 embeddings = [
     "sentence-transformers>=6,<7",
 ]
+# Yerel transkripsiyon (faster-whisper, ADR-6). Docker'da kurulur; CI ve testler sahte
+# transkriptör kullanır, modül yalnızca transkripsiyon çağrılınca içe aktarılır.
+transcription = [
+    "faster-whisper>=1.1,<2",
+    # faster-whisper 1.2.x PyAV 19 ile çalışmıyor (av.open metadata_errors hatası); gerçek modelle doğrulandı.
+    "av>=14,<19",
+]
 dev = [
     "pytest>=8.3",
     "httpx2>=2.13",

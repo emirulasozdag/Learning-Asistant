@@ -147,12 +147,14 @@ def test_video_type_with_a_non_vtt_file_is_rejected(
     video = tmp_path / "ders.mp4"
     video.write_bytes(b"\x00\x00\x00\x18ftypmp42")
 
-    for path in (sample_pdf, video):
-        response = upload_vtt(client, course.id, path)
-        assert response.status_code == 422
-        assert response.json()["detail"] == (
-            "Video dosyası henüz yüklenemiyor; altyazı (.vtt) yükleyin."
-        )
+    response = upload_vtt(client, course.id, sample_pdf)
+    assert response.status_code == 422
+    assert "yalnızca altyazı (.vtt)" in response.json()["detail"]
+
+    # Medya dosyası: transkripsiyon kapalıyken (varsayılan) .vtt istenir (bkz. test_transcription).
+    response = upload_vtt(client, course.id, video)
+    assert response.status_code == 422
+    assert "transkripsiyon kapalı" in response.json()["detail"]
 
 
 @pytest.mark.parametrize(

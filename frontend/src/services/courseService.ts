@@ -57,10 +57,13 @@ export const courseService = {
   },
 };
 
+/** Altyazısız ders videosu/sesi; sunucuda transkripsiyon açıksa yerelde yazıya çevrilir. */
+export const MEDIA_EXTENSIONS = [".mp4", ".webm", ".mkv", ".mov", ".mp3", ".m4a", ".wav"];
+
 /** Dosya adından materyal türü tahmini (yükleme sonrası değiştirilebilir hale getirilecek). */
 export function guessMaterialType(filename: string): MaterialType {
   const name = filename.toLocaleLowerCase("tr");
-  if (name.endsWith(".vtt")) return "video";
+  if (name.endsWith(".vtt") || MEDIA_EXTENSIONS.some((ext) => name.endsWith(ext))) return "video";
   if (name.endsWith(".pptx") || /slayt|slide|sunum/.test(name)) return "slides";
   if (/sınav|sinav|midterm|final|vize|exam|quiz/.test(name)) return "past_exam";
   if (/ödev|odev|homework|assignment|problem set|pset|ps\d/.test(name)) return "assignment";

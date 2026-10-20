@@ -38,13 +38,14 @@ def validate_media_url(url: str) -> None:
 
 
 def list_documents(db: Session, course_id: int, approved_only: bool = False) -> list[DocumentOut]:
-    """Dersin dokümanları. `approved_only`: eğitmen dışındakiler onaysızları görmez (ADR-3)."""
+    """Dersin dokümanları. `approved_only`: eğitmen dışındakiler onaysız (ADR-3) ve hazır olmayan
+    (işleniyor / başarısız) dokümanları görmez."""
     chunk_count = (
         select(func.count(Chunk.id)).where(Chunk.document_id == Document.id).scalar_subquery()
     )
     query = select(Document, chunk_count).where(Document.course_id == course_id)
     if approved_only:
-        query = query.where(Document.approved_at.is_not(None))
+        query = query.where(Document.approved_at.is_not(None), Document.status == "ready")
     rows = db.execute(query.order_by(Document.created_at.desc(), Document.id.desc()))
     return [to_document_out(document, count) for document, count in rows]
 
@@ -62,6 +63,10 @@ def to_document_out(document: Document, chunk_count: int) -> DocumentOut:
         file_url=file_url(document.id),
         duration_s=document.duration_s,
         media_url=document_media_url(document),
+        status=document.status,
+        error=document.error,
+        transcript_source=document.transcript_source,
+        transcript_model=document.transcript_model,
     )
 
 

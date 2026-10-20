@@ -24,6 +24,7 @@ from app.api.errors import ApiError, api_error_handler
 from app.core.config import settings
 from app.db.session import SessionLocal
 from app.embeddings.provider import get_embedder
+from app.ingestion.media import fail_interrupted_documents
 from app.retrieval.index import stale_chunk_count
 
 logger = logging.getLogger(__name__)
@@ -55,10 +56,24 @@ def _warn_stale_vectors(identity: str) -> None:
         )
 
 
+def _fail_interrupted_transcriptions() -> None:
+    """Önceki süreç transkripsiyon sürerken durduysa doküman "işleniyor"da takılı kalmasın."""
+    try:
+        count = fail_interrupted_documents(SessionLocal)
+    except Exception:
+        logger.exception("Yarıda kalan transkripsiyonlar işaretlenemedi")
+        return
+    if count:
+        logger.warning(
+            "%d doküman işlem sürerken yarıda kaldı; başarısız olarak işaretlendi", count
+        )
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     # Embedding modeli arka planda belleğe alınır; ilk soru/yükleme beklemesin.
     threading.Thread(target=_warm_up_embedder, daemon=True).start()
+    _fail_interrupted_transcriptions()
     yield
 
 

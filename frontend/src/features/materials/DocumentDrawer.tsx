@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 
 import type { ChunkPreview, DocumentOut, IngestionReport as Report } from "../../api/types";
 import Sheet from "../../components/Sheet";
-import { documentExtent, materialLabel } from "../../labels";
+import { documentExtent, documentIndexStatus, materialLabel } from "../../labels";
 import { courseService } from "../../services/courseService";
 import { formatRelative, reflow } from "../../text";
 import { StatusBadge } from "../../ui/Badge";
@@ -57,7 +57,7 @@ function DocumentDetail({ document, report }: { document: DocumentOut; report?: 
     <div className="flex flex-col gap-8">
       <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-base sm:grid-cols-4">
         <Meta label="Durum">
-          <StatusBadge status="indexed" />
+          <StatusBadge status={documentIndexStatus(document)} />
         </Meta>
         <Meta label="Tür">{materialLabel(document.material_type)}</Meta>
         <Meta label="İçerik">

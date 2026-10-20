@@ -349,6 +349,12 @@ export interface DocumentOut {
   /** Yalnızca video dokümanında (material_type = "video"). */
   duration_s: number | null;
   media_url: string | null;
+  /** processing: transkripsiyon sürüyor (parça yok); failed: `error` nedeni söyler. Öğrenciler yalnızca ready görür. */
+  status: "processing" | "ready" | "failed";
+  error: string | null;
+  /** Video: "vtt" (yüklenen altyazı) | "asr" (yerel transkripsiyon); asr için model kimliği. */
+  transcript_source: "vtt" | "asr" | null;
+  transcript_model: string | null;
   /** Yalnızca yükleme cevabında: hattın adım adım özeti. */
   report: IngestionReport | null;
 }
