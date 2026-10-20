@@ -8,6 +8,7 @@
 @import "@fontsource/ibm-plex-sans/300.css";
 @import "@fontsource/source-serif-4/400.css";
 @import "@fontsource/source-serif-4/600.css";
+@import "./theme/themes.css";
 
 /*
  * Tasarım sistemi — "akademik, güvenilir, sakin".
@@ -52,6 +53,8 @@
   --color-accent-hover: #7f182c;
   --color-accent-soft: #fbedf0;
   --color-accent-line: #efc3cc;
+  /* Vurgu zemini üzerindeki metin (koyu temada koyu). */
+  --color-on-accent: #ffffff;
 
   /* Kurumsal üst bar: siyah */
   --color-nav: #0b0b0c;
@@ -74,6 +77,13 @@
 
   /* Kaynak görünümündeki defter kenar çizgisi */
   --color-margin: #f0c4bf;
+
+  /* Çalışma alanı: kaynak kartı, zemin ızgarası, kanıt izi, arama ölçeği */
+  --color-sheet: #ffffff;
+  --color-grid: rgb(30 40 60 / 0.06);
+  --color-thread: #9a1f36;
+  --color-meter: #c97a89;
+  --color-meter-dim: #d5d9e0;
 
   --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
   --font-serif: "Source Serif 4", ui-serif, Georgia, serif;

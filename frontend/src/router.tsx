@@ -5,6 +5,8 @@ import AppShell from "./layouts/AppShell";
 import AuthLayout from "./layouts/AuthLayout";
 import { MATERIAL_SECTIONS } from "./features/courses/sections";
 import CourseShell from "./layouts/CourseShell";
+import StudioShell from "./layouts/StudioShell";
+import CoursesProvider from "./features/courses/CoursesProvider";
 import CalendarPage from "./pages/course/CalendarPage";
 import CourseOverview from "./pages/course/CourseOverview";
 import CourseSectionPage from "./pages/course/CourseSectionPage";
@@ -30,7 +32,7 @@ import { NotFound, RootRedirect } from "./pages/system";
  *   /student                                 öğrenci: derslerim
  *   /student/courses/:id                     ders genel bakış
  *   /student/courses/:id/materials           ders materyalleri
- *   /student/courses/:id/tutor               AI Tutor
+ *   /student/courses/:id/tutor               AI Tutor (tam ekran çalışma alanı)
  * Her iki rolde ders içeriği (OCW düzeni):
  *   …/courses/:id/syllabus, /calendar        izlence, takvim
  *   …/courses/:id/videos, /lecture-notes, /quizzes, /practice-problems, /assignments
@@ -78,6 +80,18 @@ export const router = createBrowserRouter([
     ],
   },
   {
+    // AI Tutor kendi çalışma alanında açılır: kurum, ders ve araçlar solda, üst bar yok.
+    path: "/student/courses/:courseId/tutor",
+    element: (
+      <RequireRole role="student">
+        <CoursesProvider>
+          <StudioShell />
+        </CoursesProvider>
+      </RequireRole>
+    ),
+    children: [{ index: true, element: <TutorPage /> }],
+  },
+  {
     path: "/student",
     element: (
       <RequireRole role="student">
@@ -94,7 +108,6 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <CourseOverview /> },
           { path: "materials", element: <CourseMaterialsPage /> },
-          { path: "tutor", element: <TutorPage /> },
           ...contentRoutes,
         ],
       },

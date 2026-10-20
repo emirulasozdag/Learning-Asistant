@@ -62,7 +62,7 @@ export default function AskBox({ courses }: { courses: Course[] }) {
         <button
           type="submit"
           aria-label="Sor"
-          className="flex h-14 w-14 shrink-0 items-center justify-center bg-accent text-white transition-colors hover:bg-accent-hover"
+          className="flex h-14 w-14 shrink-0 items-center justify-center bg-accent text-on-accent transition-colors hover:bg-accent-hover"
         >
           <ArrowRight size={20} aria-hidden />
         </button>

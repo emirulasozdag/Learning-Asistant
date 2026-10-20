@@ -1,0 +1,190 @@
+/*
+ * Tema paletleri. Her tema index.css'teki `@theme` değişkenlerinin üzerine yazar; Tailwind
+ * araç sınıfları bu değişkenleri okuduğu için bileşenlerde tema bilgisi gerekmez.
+ *
+ * Kurallar her temada aynıdır:
+ * - Metin zeminde en az 4.5:1 (ikincil metin dahil), ipucu metni en az 3:1.
+ * - Vurgu rengi butonda `on-accent` metniyle en az 4.5:1.
+ * - Sarı işaret (marker) yalnızca "bu bilgi ders materyalinden alıntılandı" demektir.
+ */
+
+html[data-theme="bordo-pastel"] {
+  --color-canvas: #f4f1ec;
+  --color-surface: #fcfaf7;
+  --color-subtle: #efebe4;
+  --color-muted-bg: #e6e0d7;
+  --color-ink: #26211e;
+  --color-ink-2: #3f3833;
+  --color-graphite: #5d554e;
+  --color-faint: #8a8178;
+  --color-line: #e4ddd3;
+  --color-line-strong: #cec5b8;
+  --color-banner: #7b2134;
+  --color-banner-soft: #f6e9ec;
+  --color-link: #8c2439;
+  --color-link-hover: #6e1a2c;
+  --color-accent: #9a1f36;
+  --color-accent-hover: #7f182c;
+  --color-accent-soft: #f7e5e8;
+  --color-accent-line: #ecc7cf;
+  --color-on-accent: #ffffff;
+  --color-marker: #f6d36b;
+  --color-marker-soft: #fbedc4;
+  --color-margin: #ecc2bc;
+  --color-sheet: #fffdfa;
+  --color-grid: rgb(120 96 80 / 0.07);
+  --color-thread: #b8475d;
+  --color-meter: #d48a99;
+  --color-meter-dim: #d9cfc6;
+}
+
+html[data-theme="pastel-acik"] {
+  --color-canvas: #f6f5fb;
+  --color-surface: #ffffff;
+  --color-subtle: #efeef8;
+  --color-muted-bg: #e5e3f2;
+  --color-ink: #1f1d2e;
+  --color-ink-2: #3a3750;
+  --color-graphite: #57536f;
+  --color-faint: #86829e;
+  --color-line: #e3e1f0;
+  --color-line-strong: #cbc8e0;
+  --color-banner: #4b47b3;
+  --color-banner-soft: #ecebfb;
+  --color-link: #4a46b0;
+  --color-link-hover: #36328f;
+  --color-accent: #5b57c9;
+  --color-accent-hover: #4844ae;
+  --color-accent-soft: #edecfb;
+  --color-accent-line: #cfcdf3;
+  --color-on-accent: #ffffff;
+  --color-marker: #ffe08a;
+  --color-marker-soft: #fff1c7;
+  --color-margin: #d9d3f2;
+  --color-sheet: #ffffff;
+  --color-grid: rgb(80 76 150 / 0.07);
+  --color-thread: #6d69d6;
+  --color-meter: #9d99e3;
+  --color-meter-dim: #d8d6ea;
+}
+
+html[data-theme="kagit"] {
+  --color-canvas: #f7f6f1;
+  --color-surface: #fffefb;
+  --color-subtle: #f0eee6;
+  --color-muted-bg: #e6e3d8;
+  --color-ink: #22201b;
+  --color-ink-2: #3b3830;
+  --color-graphite: #57534a;
+  --color-faint: #858073;
+  --color-line: #e5e1d5;
+  --color-line-strong: #cdc7b7;
+  --color-banner: #2b5a8a;
+  --color-banner-soft: #e7eef6;
+  --color-link: #2b5a8a;
+  --color-link-hover: #1d4268;
+  --color-accent: #2b5a8a;
+  --color-accent-hover: #1f4670;
+  --color-accent-soft: #e6eef7;
+  --color-accent-line: #c3d5e8;
+  --color-on-accent: #ffffff;
+  --color-marker: #fde68a;
+  --color-marker-soft: #fdf3c8;
+  --color-margin: #efc5bf;
+  --color-sheet: #fffefb;
+  --color-grid: rgb(43 90 138 / 0.08);
+  --color-thread: #3f72a8;
+  --color-meter: #7fa3c8;
+  --color-meter-dim: #dcd8cc;
+}
+
+html[data-theme="pastel-koyu"] {
+  --color-canvas: #1f1e27;
+  --color-surface: #27262f;
+  --color-subtle: #2e2d38;
+  --color-muted-bg: #383744;
+  --color-ink: #ecebf2;
+  --color-ink-2: #d6d4e0;
+  --color-graphite: #b0adbf;
+  --color-faint: #8b8899;
+  --color-line: #36353f;
+  --color-line-strong: #4b4957;
+  --color-banner: #3a3550;
+  --color-banner-soft: #2f2c3d;
+  --color-link: #e9b3c5;
+  --color-link-hover: #f4cfdb;
+  --color-accent: #e3a3b8;
+  --color-accent-hover: #ecbccb;
+  --color-accent-soft: #3a2c34;
+  --color-accent-line: #5c3f4c;
+  --color-on-accent: #241c22;
+  --color-nav: #17161d;
+  --color-nav-raised: #23222b;
+  --color-nav-line: #34333d;
+  /* Açık metin işaretin üstünde okunur kalsın (≈4.9:1). */
+  --color-marker: #7a6326;
+  --color-marker-soft: #3e3624;
+  --color-success: #7ccaa0;
+  --color-success-soft: #22332b;
+  --color-warning: #e2b56b;
+  --color-warning-soft: #3a3122;
+  --color-danger: #f09a92;
+  --color-danger-soft: #3d2627;
+  --color-margin: #5c3f4c;
+  --color-sheet: #2b2a34;
+  --color-grid: rgb(220 215 240 / 0.05);
+  --color-thread: #e3a3b8;
+  --color-meter: #c98aa0;
+  --color-meter-dim: #45434f;
+  --shadow-float: 0 1px 2px rgb(0 0 0 / 0.3), 0 12px 32px -12px rgb(0 0 0 / 0.6);
+  --shadow-page: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px -12px rgb(0 0 0 / 0.55);
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.25), 0 2px 8px -2px rgb(0 0 0 / 0.3);
+  --shadow-lift: 0 2px 4px rgb(0 0 0 / 0.3), 0 16px 32px -16px rgb(0 0 0 / 0.6);
+}
+
+/* Koyu temada PDF sayfası parlak beyaz kalmasın: renkleri ters çevrilir, işaretler parlar. */
+html[data-scheme="dark"] .page-image {
+  filter: invert(0.88) hue-rotate(180deg) contrast(0.92);
+}
+html[data-scheme="dark"] .marker-box {
+  mix-blend-mode: screen;
+  background: color-mix(in srgb, var(--color-marker) 80%, transparent);
+}
+html[data-scheme="dark"] .marker-sweep {
+  color: var(--color-ink);
+}
+
+/* Çalışma alanının zemini: ince nokta ızgarası (hareketsiz, dekor değil yön duygusu verir). */
+.studio-grid {
+  background-color: var(--color-canvas);
+  background-image: radial-gradient(var(--color-grid) 1px, transparent 1.4px);
+  background-size: 24px 24px;
+}
+
+/* Kanıt izi: seçilen iddiadan kaynak satırına çizilen kesik çizgi. */
+.evidence-thread {
+  fill: none;
+  stroke: var(--color-thread);
+  stroke-width: 1.5;
+  stroke-dasharray: 5 4;
+  stroke-linecap: round;
+}
+.evidence-thread-draw {
+  animation: thread-draw 520ms cubic-bezier(0.3, 0.7, 0.2, 1) both;
+}
+@keyframes thread-draw {
+  from {
+    stroke-dashoffset: 120;
+    opacity: 0;
+  }
+  to {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .evidence-thread-draw {
+    animation: none;
+  }
+}
