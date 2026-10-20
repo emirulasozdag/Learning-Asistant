@@ -1,22 +1,3 @@
-/**
- * PDF'ten gelen metinde satır sonları sayfadaki kırılımlardır. Okurken paragraf içindeki
- * satırları birleştirir; paragraf aralarını, madde ve numaralı satırları korur.
- */
-export function reflow(text: string): string {
-  return text
-    .split(/\n{2,}/)
-    .map((paragraph) =>
-      paragraph
-        .split("\n")
-        .reduce((joined, line, index) => {
-          if (index === 0) return line;
-          const startsItem = /^\s*([-•*–]|\d+[.)])\s/.test(line);
-          return startsItem ? `${joined}\n${line}` : `${joined} ${line.trimStart()}`;
-        }, ""),
-    )
-    .join("\n\n");
-}
-
 const RELATIVE = new Intl.RelativeTimeFormat("tr", { numeric: "auto" });
 const SHORT_DATE = new Intl.DateTimeFormat("tr", { day: "numeric", month: "short" });
 

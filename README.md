@@ -116,6 +116,24 @@ yazılır. İlk girişte aydınlatma metni onaylanır.
 
 Arayüzün tasarım kuralları ve ekibe kalan ekranlar: **[docs/UI_GOREVLERI.md](docs/UI_GOREVLERI.md)**.
 
+### Metin ve yapı korunumu
+
+PDF/PPTX yüklemelerinde kod girintileri, satır/sütun aralıkları, sayılar ve formül işaretleri
+korunur. Tekrarlanan gövde satırları silinmez; üst/alt bilgi temizliği yalnızca ayrıştırıcının
+sayfa kenarı konumuyla doğruladığı satırlara uygulanır. Belirsiz satırlar tutulur.
+Kaynak metni, materyal önizlemesinde ve alıntılarda satırları birleştirilmeden gösterilir.
+
+Parçaların bütçesi etkin embedder'dan alınır. E5 için gerçek tokenizer, `passage:` öneki ve özel
+token'lar dahil girdiyi ölçer (varsayılan modelde en çok 512 token); uzun satırlar metin kaybetmeden
+bölünür. Bütçeyi aşan parçalar sessizce kırpılmak yerine reddedilir. Uzun altyazı satırları da
+bölünür; kelime zamanları bilinmediğinden her parça özgün satırın zaman aralığını korur.
+
+PDF'in metin katmanı okunur; OCR, şekil yorumlama veya matematiksel ifade tanıma yapılmaz.
+Eksik sayfalar, görseller ve karmaşık yerleşimler yükleme raporunda belirtilir. Tablo/formülün
+yerleşimi anlamı etkiliyorsa orijinal sayfayla karşılaştırılmalıdır.
+Önceden yüklenmiş materyalin kaybolan metnini geri getirmek için orijinal dosya yeniden yüklenmelidir;
+yalnızca vektörleri yeniden üretmek metni onarmaz.
+
 ### LLM
 `.env` dosyasında:
 
@@ -193,6 +211,15 @@ docker compose exec db createdb -U learning learning_assistant_test
 
 ```bash
 TEST_DATABASE_URL=postgresql+psycopg://learning:learning@localhost:5432/learning_assistant_test pytest
+```
+
+Gerçek E5 tokenizer/model regresyonları ve izinli yerel OCW pilot dosyaları (kaynak içerik repoya eklenmez):
+
+```bash
+# [dev,embeddings] kurulu olmalı; yalnızca ayrı _test veritabanıyla çalıştırın.
+RUN_E5_TESTS=1 PILOT_MATERIAL_DIR=/path/to/approved/mit_ocw \
+TEST_DATABASE_URL=postgresql+psycopg://learning:learning@localhost:5432/learning_assistant_test \
+pytest -q tests/test_ingestion_e5.py
 ```
 
 Frontend (Node ≥ 20.19):

@@ -289,7 +289,10 @@ yönteminden bağımsız, opak bir URL'dir.
   YouTube kayan satır tekrarı atılır, bozuk cue atlanıp `cues_skipped`e sayılır; dosya bütünüyle bozuksa ya da cue'ların
   %50'sinden fazlası atlandıysa `422`.
 - Video dokümanı: `page_count = 0`, `duration_s` = en geç cue bitişi; parçalar `page = null`, `t_start/t_end` dolu
-  (`chunk_timed_segments`: en çok 480 token / 60 sn, cue bölünmez). `IngestionReport`: `pages_read = 0`, `empty_pages = 0`,
+  (`chunk_timed_segments`: etkin embedder'ın gerçek token bütçesi, E5'te önek/özel token dahil 512;
+  ardışık cue birleştirmede 60 sn tavanı). Tek başına token bütçesini aşan cue metin kaybetmeden bölünür;
+  kelime zamanları bilinmediğinden her parça cue'nun özgün aralığını taşır (bu aralık 60 sn'yi aşabilir).
+  `IngestionReport`: `pages_read = 0`, `empty_pages = 0`,
   `duration_s`, `cues_read`, `cues_skipped`; atlanan cue varsa `warnings`te Türkçe uyarı.
 - `media_url` (isteğe bağlı form alanı): yalnızca `.vtt`/video yüklemesinde; yalnızca `https`, dolu ana makine, en çok 1000 karakter,
   değilse `422`. Değer opak saklanır ve `DocumentOut.media_url` ile video `SourceDetail.media_url` olarak aynen döner

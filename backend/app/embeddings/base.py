@@ -13,6 +13,9 @@ class Embedder(Protocol):
     # Vektör uzayının kimliği (sağlayıcı + model + girdi biçimi). Kimliği farklı vektörler
     # karşılaştırılamaz: her parça kendi kimliğiyle saklanır, arama yalnızca eşleşenleri kullanır.
     identity: str
+    max_passage_tokens: int
+
+    def count_passage_tokens(self, text: str) -> int: ...
 
     def embed_passages(self, texts: list[str]) -> list[list[float]]: ...
 

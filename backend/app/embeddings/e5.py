@@ -33,7 +33,26 @@ class E5Embedder:
         return f"e5/{self.model_name}/v1"
 
     def embed_passages(self, texts: list[str]) -> list[list[float]]:
+        for index, text in enumerate(texts):
+            count = self.count_passage_tokens(text)
+            if count > self.max_passage_tokens:
+                raise ValueError(
+                    f"Passage {index} exceeds the embedding token budget: "
+                    f"{count} > {self.max_passage_tokens}. Re-ingest the source to split it."
+                )
         return self._encode([f"passage: {text}" for text in texts])
+
+    @property
+    def max_passage_tokens(self) -> int:
+        model = _load(self.model_name)
+        return min(model.max_seq_length, model.tokenizer.model_max_length)
+
+    def count_passage_tokens(self, text: str) -> int:
+        return len(
+            _load(self.model_name).tokenizer.encode(
+                f"passage: {text}", add_special_tokens=True, truncation=False
+            )
+        )
 
     def embed_query(self, text: str) -> list[float]:
         return self._encode([f"query: {text}"])[0]

@@ -147,10 +147,10 @@ def _transcribe_document(
     for warning in warnings:
         logger.warning("Doküman %s: %s", document_id, warning)
     cleaned, _ = normalize_timed_segments(segments)
-    drafts = chunk_timed_segments(cleaned)
+    embedder = embedder or get_embedder()
+    drafts = chunk_timed_segments(cleaned, embedder)
     if not drafts:
         raise TranscriptionError("Medyada konuşma bulunamadı.")
-    embedder = embedder or get_embedder()
     vectors = embedder.embed_passages([draft.text for draft in drafts])
 
     vtt_path = settings.upload_dir / str(course.id) / f"{document.id}.vtt"

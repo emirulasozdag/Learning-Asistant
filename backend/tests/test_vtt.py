@@ -2,7 +2,8 @@
 
 import pytest
 
-from app.ingestion.chunking import MAX_CHUNK_SECONDS, chunk_timed_segments, estimate_tokens
+from app.embeddings.fake import FakeEmbedder
+from app.ingestion.chunking import MAX_CHUNK_SECONDS, chunk_timed_segments
 from app.ingestion.cleaning import clean_segments, normalize_timed_segments
 from app.ingestion.parsers import vtt_parser
 from app.ingestion.parsers.vtt_parser import ParsedVtt, parse_vtt_bytes
@@ -176,7 +177,7 @@ def cue(start: float, end: float, text: str) -> RawSegment:
 def test_timed_chunker_merges_consecutive_cues() -> None:
     cues = [cue(0, 5, "bir iki"), cue(5, 10, "uc dort"), cue(10, 15, "bes alti")]
 
-    chunks = chunk_timed_segments(cues)
+    chunks = chunk_timed_segments(cues, FakeEmbedder())
 
     assert len(chunks) == 1
     assert chunks[0].text == "bir iki uc dort bes alti"
@@ -186,39 +187,44 @@ def test_timed_chunker_merges_consecutive_cues() -> None:
 def test_timed_chunker_breaks_at_the_duration_ceiling() -> None:
     cues = [cue(i * 20, i * 20 + 20, f"cue{i}") for i in range(6)]  # 20 sn'lik 6 cue
 
-    chunks = chunk_timed_segments(cues, overlap_tokens=0)
+    chunks = chunk_timed_segments(cues, FakeEmbedder(), overlap_tokens=0)
 
     assert MAX_CHUNK_SECONDS == 60
     assert [(c.t_start, c.t_end) for c in chunks] == [(0, 60), (60, 120)]
     # Sınır dahil: tam 60 sn sığar, 60,001 sığmaz.
-    edge = chunk_timed_segments([cue(0, 30, "a"), cue(30, 60.001, "b")], overlap_tokens=0)
+    edge = chunk_timed_segments(
+        [cue(0, 30, "a"), cue(30, 60.001, "b")], FakeEmbedder(), overlap_tokens=0
+    )
     assert len(edge) == 2
 
 
 def test_timed_chunker_breaks_at_the_token_ceiling_and_never_splits_a_cue() -> None:
-    words = " ".join(f"w{i}" for i in range(10))  # 15 token
+    words = " ".join(f"w{i}" for i in range(10))  # 10 test tokens
     cues = [cue(i, i + 1, words) for i in range(4)]
 
-    chunks = chunk_timed_segments(cues, max_tokens=40, overlap_tokens=0)
+    chunks = chunk_timed_segments(cues, FakeEmbedder(), max_tokens=20, overlap_tokens=0)
 
     assert [c.text for c in chunks] == [f"{words} {words}", f"{words} {words}"]
-    assert all(estimate_tokens(c.text) <= 40 for c in chunks)
+    assert all(FakeEmbedder().count_passage_tokens(c.text) <= 20 for c in chunks)
 
 
-def test_a_single_cue_over_the_ceiling_becomes_its_own_chunk() -> None:
+def test_a_single_oversized_cue_is_split_with_its_original_interval() -> None:
     huge = " ".join(f"k{i}" for i in range(100))
     cues = [cue(0, 5, "kisa bir"), cue(5, 200, huge), cue(200, 205, "kisa iki")]
 
-    chunks = chunk_timed_segments(cues, max_tokens=40, overlap_tokens=0)
+    chunks = chunk_timed_segments(cues, FakeEmbedder(), max_tokens=20, overlap_tokens=0)
 
-    assert [c.text for c in chunks] == ["kisa bir", huge, "kisa iki"]
-    assert [(c.t_start, c.t_end) for c in chunks] == [(0, 5), (5, 200), (200, 205)]
+    assert all(FakeEmbedder().count_passage_tokens(c.text) <= 20 for c in chunks)
+    assert huge == "".join(c.text for c in chunks[1:-1])
+    assert (chunks[0].t_start, chunks[0].t_end) == (0, 5)
+    assert (chunks[-1].t_start, chunks[-1].t_end) == (200, 205)
+    assert all((c.t_start, c.t_end) == (5, 200) for c in chunks[1:-1])
 
 
 def test_timed_chunks_overlap_by_whole_cues() -> None:
-    cues = [cue(i * 30, i * 30 + 30, f"c{i} x") for i in range(5)]  # cue başına 3 token
+    cues = [cue(i * 30, i * 30 + 30, f"c{i} x") for i in range(5)]  # 2 test tokens per cue
 
-    chunks = chunk_timed_segments(cues, max_seconds=60, overlap_tokens=3)
+    chunks = chunk_timed_segments(cues, FakeEmbedder(), max_seconds=60, overlap_tokens=3)
 
     assert [c.text for c in chunks] == ["c0 x c1 x", "c1 x c2 x", "c2 x c3 x", "c3 x c4 x"]
     assert [(c.t_start, c.t_end) for c in chunks] == [(0, 60), (30, 90), (60, 120), (90, 150)]
@@ -227,7 +233,7 @@ def test_timed_chunks_overlap_by_whole_cues() -> None:
 def test_overlap_never_pushes_a_chunk_past_the_ceilings() -> None:
     cues = [cue(i * 25, i * 25 + 25, "a b") for i in range(8)]
 
-    chunks = chunk_timed_segments(cues, max_seconds=60, overlap_tokens=60)
+    chunks = chunk_timed_segments(cues, FakeEmbedder(), max_seconds=60, overlap_tokens=60)
 
     assert len(chunks) > 1
     for chunk in chunks:
@@ -236,8 +242,8 @@ def test_overlap_never_pushes_a_chunk_past_the_ceilings() -> None:
 
 
 def test_timed_chunker_edge_inputs() -> None:
-    assert chunk_timed_segments([]) == []
-    only = chunk_timed_segments([cue(3, 3, "anlik")])
+    assert chunk_timed_segments([], FakeEmbedder()) == []
+    only = chunk_timed_segments([cue(3, 3, "anlik")], FakeEmbedder())
     assert [(c.text, c.t_start, c.t_end) for c in only] == [("anlik", 3, 3)]
 
 
@@ -252,9 +258,9 @@ def test_timed_cleaning_only_normalizes_and_keeps_repeats_and_numbers() -> None:
     assert stats.empty_segments_dropped == 1
 
 
-def test_page_cleaning_still_removes_repeated_lines_and_page_numbers() -> None:
+def test_page_cleaning_without_layout_preserves_repeated_lines_and_numbers() -> None:
     pages = [RawSegment(text=f"Ust bilgi\nicerik {i}\n{i}", page=i) for i in range(1, 7)]
 
     cleaned = clean_segments(pages)
 
-    assert [s.text for s in cleaned] == [f"icerik {i}" for i in range(1, 7)]
+    assert [s.text for s in cleaned] == [s.text for s in pages]
