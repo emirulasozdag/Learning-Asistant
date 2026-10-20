@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 
 import type { ChunkPreview, DocumentOut, IngestionReport as Report } from "../../api/types";
 import Sheet from "../../components/Sheet";
-import { materialLabel } from "../../labels";
+import { documentExtent, materialLabel } from "../../labels";
 import { courseService } from "../../services/courseService";
 import { formatRelative, reflow } from "../../text";
 import { StatusBadge } from "../../ui/Badge";
@@ -61,7 +61,7 @@ function DocumentDetail({ document, report }: { document: DocumentOut; report?: 
         </Meta>
         <Meta label="Tür">{materialLabel(document.material_type)}</Meta>
         <Meta label="İçerik">
-          {document.page_count} sayfa, {document.chunk_count} parça
+          {documentExtent(document)}, {document.chunk_count} parça
         </Meta>
         <Meta label="Yüklendi">{formatRelative(document.created_at)}</Meta>
       </dl>

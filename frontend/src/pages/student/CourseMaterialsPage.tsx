@@ -3,7 +3,7 @@ import { Link } from "react-router";
 
 import type { DocumentOut, MaterialType } from "../../api/types";
 import { useCourseOutlet } from "../../features/courses/courseOutlet";
-import { MATERIAL_LABELS } from "../../labels";
+import { MATERIAL_LABELS, documentExtent, materialTotals, totalsHeading } from "../../labels";
 import { formatRelative } from "../../text";
 import Button from "../../ui/Button";
 import EmptyState from "../../ui/EmptyState";
@@ -64,7 +64,7 @@ function MaterialTable({ documents, tutorPath }: { documents: DocumentOut[]; tut
       <THead>
         <tr>
           <TH>Doküman</TH>
-          <TH className="hidden text-right sm:table-cell">Sayfa</TH>
+          <TH className="hidden text-right sm:table-cell">{totalsHeading(materialTotals(documents))}</TH>
           <TH className="hidden md:table-cell">Eklendi</TH>
           <TH className="text-right">
             <span className="sr-only">İşlem</span>
@@ -82,7 +82,7 @@ function MaterialTable({ documents, tutorPath }: { documents: DocumentOut[]; tut
                 </a>
               </div>
             </TD>
-            <TD className="hidden text-right text-ink-2 tabular-nums sm:table-cell">{document.page_count}</TD>
+            <TD className="hidden text-right text-ink-2 tabular-nums sm:table-cell">{document.material_type === "video" ? documentExtent(document) : document.page_count}</TD>
             <TD className="hidden whitespace-nowrap text-graphite md:table-cell">
               {formatRelative(document.created_at)}
             </TD>

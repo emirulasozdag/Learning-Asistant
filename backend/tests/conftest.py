@@ -142,3 +142,21 @@ def course(db: Session) -> Course:
     db.add(course)
     db.commit()
     return course
+
+
+def vtt_text(cues: list[tuple[float, float, str]]) -> str:
+    """(başlangıç, bitiş, metin) listesinden geçerli bir WebVTT dosyası metni."""
+
+    def stamp(seconds: float) -> str:
+        total_ms = round(seconds * 1000)
+        hours, rest = divmod(total_ms, 3_600_000)
+        minutes, rest = divmod(rest, 60_000)
+        return f"{hours:02}:{minutes:02}:{rest // 1000:02}.{rest % 1000:03}"
+
+    blocks = [f"{stamp(start)} --> {stamp(end)}\n{text}" for start, end, text in cues]
+    return "WEBVTT\n\n" + "\n\n".join(blocks) + "\n"
+
+
+def make_vtt(path: Path, cues: list[tuple[float, float, str]]) -> Path:
+    path.write_text(vtt_text(cues), encoding="utf-8")
+    return path

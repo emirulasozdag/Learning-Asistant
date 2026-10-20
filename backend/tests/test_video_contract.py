@@ -50,23 +50,35 @@ def test_negative_video_time_is_rejected_by_api(client: TestClient, course: Cour
     assert response.status_code == 422
 
 
-def test_ask_with_video_is_answered_like_without(
+def test_old_video_time_s_request_is_answered_like_without_video(
     client: TestClient, course: Course, sample_pdf: Path
 ) -> None:
-    document = upload(client, course.id, sample_pdf).json()
+    upload(client, course.id, sample_pdf)
     question = {"course_id": course.id, "question": "Neden sag yari elenir?"}
 
     plain = client.post("/ask", json=question)
-    with_video = client.post(
-        "/ask", json={**question, "video": {"document_id": document["id"], "time_s": 90.0}}
-    )
     legacy = client.post("/ask", json={**question, "video_time_s": 90.0})
 
-    assert plain.status_code == with_video.status_code == legacy.status_code == 200
-    for response in (with_video, legacy):
-        body, expected = response.json(), plain.json()
-        for key in ("answer", "outcome", "declined", "citations", "retrieval"):
-            assert body[key] == expected[key], key
+    assert plain.status_code == legacy.status_code == 200
+    for key in ("answer", "outcome", "declined", "citations", "retrieval"):
+        assert legacy.json()[key] == plain.json()[key], key
+
+
+def test_pdf_document_cannot_be_sent_as_video(
+    client: TestClient, course: Course, sample_pdf: Path
+) -> None:
+    document = upload(client, course.id, sample_pdf).json()
+
+    response = client.post(
+        "/ask",
+        json={
+            "course_id": course.id,
+            "question": "Neden sag yari elenir?",
+            "video": {"document_id": document["id"], "time_s": 90.0},
+        },
+    )
+
+    assert response.status_code == 422
 
 
 def test_pdf_upload_has_no_video_fields(

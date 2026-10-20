@@ -1,6 +1,7 @@
 import { FileText } from "lucide-react";
 
 import type { Citation } from "../../api/types";
+import { formatTime } from "../../text";
 import { cx } from "../../ui/cx";
 import type { SelectSourceProps } from "./types";
 
@@ -42,7 +43,11 @@ export default function SourceCards({
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-base font-medium text-ink">{title}</span>
                 <span className="block text-sm text-graphite">
-                  {citation.page ? `Sayfa ${citation.page}` : "Doküman"}
+                  {citation.page
+                    ? `Sayfa ${citation.page}`
+                    : citation.t_start != null
+                      ? formatTime(citation.t_start)
+                      : "Doküman"}
                 </span>
               </span>
               {numbered && (

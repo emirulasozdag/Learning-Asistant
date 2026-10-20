@@ -6,9 +6,9 @@ import type { DocumentOut } from "../api/types";
 import { useAuth } from "../auth/useAuth";
 import { useCourse, useCourses } from "../features/courses/context";
 import type { CourseOutlet } from "../features/courses/courseOutlet";
-import { LEVEL_LABELS, MATERIAL_LABELS, courseMetaParts, languageLabel } from "../labels";
+import { LEVEL_LABELS, MATERIAL_LABELS, courseMetaParts, languageLabel, materialTotals } from "../labels";
 import { courseService, type Course } from "../services/courseService";
-import { formatRelative } from "../text";
+import { formatRelative, formatTime } from "../text";
 import Button from "../ui/Button";
 import { cx } from "../ui/cx";
 import EmptyState from "../ui/EmptyState";
@@ -288,6 +288,7 @@ function CourseInfo({
       byType.set(document.material_type, (byType.get(document.material_type) ?? 0) + 1);
     }
     const latest = documents.reduce((a, b) => (a.created_at > b.created_at ? a : b));
+    const totals = materialTotals(documents);
     sections.push({
       label: "Ders materyali",
       content: (
@@ -298,12 +299,20 @@ function CourseInfo({
               <span className="font-semibold text-ink tabular-nums">{count}</span>
             </li>
           ))}
-          <li className="mt-1 flex justify-between gap-4 border-t border-line pt-1">
-            <span>Toplam sayfa</span>
-            <span className="font-semibold text-ink tabular-nums">
-              {documents.reduce((sum, d) => sum + d.page_count, 0)}
-            </span>
-          </li>
+          {totals.hasPages && (
+            <li className="mt-1 flex justify-between gap-4 border-t border-line pt-1">
+              <span>Toplam sayfa</span>
+              <span className="font-semibold text-ink tabular-nums">{totals.pages}</span>
+            </li>
+          )}
+          {totals.hasVideo && (
+            <li
+              className={`flex justify-between gap-4 ${totals.hasPages ? "" : "mt-1 border-t border-line pt-1"}`}
+            >
+              <span>Video süresi</span>
+              <span className="font-semibold text-ink tabular-nums">{formatTime(totals.videoSeconds)}</span>
+            </li>
+          )}
         </ul>
       ),
     });

@@ -240,20 +240,37 @@ Kurallar:
 
 ## 4. Video varlığı ve zaman
 
-**Durum:** Tip olarak koda geçti (#14, PR a); davranış (b)(c)(d)'de. Şemalar, ORM alanları, migration ve `types.ts`
-vardır; VTT okuma, oynatma önceliği, transkripsiyon, `media_url` üretimi ve `invalid_video` doğrulaması **yoktur**.
+**Durum:** Tip (#14 PR a) ve davranış (#14 PR b+c) koda geçti: VTT yükleme ve oynatma konumu önceliği vardır.
+**Yoktur:** video dosyası yükleme ve transkripsiyon (d0/d), `media_url` girme arayüzü (#19/#22), oynatıcı.
 Videonun nerede barındırıldığı hâlâ bilinmiyor (DECISIONS.md açık soru 1); `media_url` bu yüzden barındırma
 yönteminden bağımsız, opak bir URL'dir.
 
 **Şu an.**
-- `MaterialType` içinde `video` ve `transcript` var, ama video yüklemek/oynatmak için hiçbir yol yok
-  (yükleme yalnızca `.pdf`, `.pptx`; `vtt_parser.py` iskelet).
-- `AskRequest.video: VideoRef | null` kabul ediliyor. `retrieve(video=VideoPosition | None)` bunu **yok sayıyor**;
-  frontend göndermiyor. `video.document_id`'nin aynı derse ait olup olmadığı kontrol edilmiyor.
-- `Chunk.t_start/t_end` sütunları var, dolduran yol yok. `Citation`, `SourceDetail` ve `RetrievalHit`
-  `t_start/t_end` taşıyor (PDF/PPTX'te `null`).
-- `Document.duration_s` ve `Document.media_url` var; hiçbir yol doldurmuyor, `DocumentOut` ikisini de `null` döner.
-- `SourceDetail.media_url` yalnızca dosya URL'si olarak dolduruluyor (PDF/PPTX).
+- `.vtt` yüklenebilir (`POST /courses/{id}/materials`); her zaman `material_type = "video"` kaydedilir. `material_type = "video"`
+  ile `.vtt` dışı dosya `422` ("Video dosyası henüz yüklenemiyor; altyazı (.vtt) yükleyin."). Ayrıştırıcı
+  `ingestion/parsers/vtt_parser.py` (yalnızca stdlib): zaman aralıkları, `<v Ad>` konuşmacı adı metne **girmez** (ADR-5),
+  YouTube kayan satır tekrarı atılır, bozuk cue atlanıp `cues_skipped`e sayılır; dosya bütünüyle bozuksa ya da cue'ların
+  %50'sinden fazlası atlandıysa `422`.
+- Video dokümanı: `page_count = 0`, `duration_s` = en geç cue bitişi; parçalar `page = null`, `t_start/t_end` dolu
+  (`chunk_timed_segments`: en çok 480 token / 60 sn, cue bölünmez). `IngestionReport`: `pages_read = 0`, `empty_pages = 0`,
+  `duration_s`, `cues_read`, `cues_skipped`; atlanan cue varsa `warnings`te Türkçe uyarı.
+- `media_url` (isteğe bağlı form alanı): yalnızca `.vtt`/video yüklemesinde; yalnızca `https`, dolu ana makine, en çok 1000 karakter,
+  değilse `422`. Değer opak saklanır ve `DocumentOut.media_url` ile video `SourceDetail.media_url` olarak aynen döner
+  (`#t=` eklenmez; zamanı sarmak oynatıcının işidir). Verilmezse `null`.
+- `AskRequest.video` verilirse: doküman var, aynı derse ait ve `material_type = "video"` olmalı, değilse
+  `422` (Türkçe `detail`; hata zarfında `code` alanı **henüz yok**, bkz. §5). `time_s > duration_s` ise `duration_s`e kırpılır (hata değil).
+- Öncelik: `retrieve(video=…)` o videonun `[time_s − video_window_s, time_s + video_window_s]` ile örtüşen parçalarını
+  (`video_neighbors`, orta noktaya uzaklığa göre) RRF'e **ayrı bir sıralama** olarak `video_weight` ağırlığıyla ekler. Hiçbir
+  parça elenmez; başka videoların aynı saniyesi öne çıkmaz. Alakasızlık kapısı (`relevant`, `best_similarity`,
+  `keyword_coverage`, takip sorusu) videodan etkilenmez, yalnızca soru metninden hesaplanır.
+- Frontend: `.vtt` yüklenir, alıntıda ve kaynak panelinde zaman ("Video, 12:34–13:20") görünür, `media_url` varsa "Videoda aç"
+  bağlantısı çıkar; `video` isteği **göndermez** (oynatıcı yok).
+
+**Bilinen sınırlamalar / kalibre edilmemiş değerler.**
+- `video_window_s = 120` ve `video_weight = 0.5` kalibre **edilmedi**; eval'de ("full + video time" ile "full") ayarlanacak.
+- Bağlamsız sorular ("bu adımı açıklar mısın") soru metninden hesaplanan alakasızlık kapısında takılıp "materyalde yok" cevabı
+  alabilir; öncelik kapıdan **sonra** devreye girer. #9 kalibrasyonunu bozmamak için bu PR'da çözülmedi.
+- Boş (`""`) `media_url` gönderilirse form ayrıştırıcısı onu "verilmedi" sayar.
 
 **Sözleşme.**
 
@@ -278,8 +295,9 @@ Kurallar:
 - Bir VTT dosyası `material_type = "video"` olarak kaydedilir. `transcript` türü şimdilik **kullanılmaz** (türün
   kaldırılması ya da başka bir anlam kazanması ayrı bir karardır).
 - `video` verilmezse arama tüm dersi eşit tarar; verilirse yalnızca sıralamaya *yumuşak* bir öncelik uygulanır, hiçbir parça elenmez (FR-06).
-- `video.document_id` aynı derse ait olmalıdır, değilse `422 {code: "invalid_video"}` (davranış, (c)'de).
-- `Document.media_url` harici bir URL ise **yalnızca `https`** kabul edilir (doğrulama (b)'de; `javascript:` gibi
+- `video.document_id` aynı derse ait bir video dokümanı olmalıdır, değilse `422`. Hedef: `{code: "invalid_video"}`; hata zarfı
+  (§5) gelene kadar yalnızca Türkçe `detail` döner.
+- `Document.media_url` harici bir URL ise **yalnızca `https`** kabul edilir (doğrulama bu PR'da; `javascript:` gibi
   şemalar reddedilir). Alan boşsa ve medya dosyası saklanıyorsa URL dosya uç noktasından üretilir.
 - `media_url` dönmezse arayüz oynatıcıyı göstermez, metin ve zamanı gösterir.
 - `IngestionReport` video alanları yalnızca video/altyazı yüklemesinde dolar; sayfa tabanlı dosyalarda `null`
@@ -294,7 +312,7 @@ Kurallar:
   `RetrievalHit.t_start/t_end`; `Document.duration_s/media_url` ve `ix_chunks_document_id_t_start` — **[ekleme]**.
 - `approved_by/approved_at` (ADR-3) bu PR'da **eklenmedi** (#11). `status/error/transcript_*` (arka plan transkripsiyonu)
   (d0) PR'ında eklenecek.
-- Davranış (VTT okuma, oynatma önceliği, transkripsiyon, `media_url` üretimi, `invalid_video`) bu PR'da **yoktur**.
+- Davranış (VTT okuma, oynatma önceliği, `media_url`, `invalid_video`) #14 PR b+c ile geldi; transkripsiyon hâlâ **yoktur**.
 
 ---
 

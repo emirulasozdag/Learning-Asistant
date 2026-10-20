@@ -9,11 +9,18 @@ interface Step {
 
 function steps(report: Report): Step[] {
   const removed = report.repeated_lines_removed + report.page_numbers_removed;
+  const video = report.cues_read != null;
   return [
     {
       title: "Okuma",
-      value: `${report.pages_read} sayfa`,
-      detail: report.empty_pages ? `${report.empty_pages} boş sayfa atlandı` : "metin çıkarıldı",
+      value: video ? `${report.cues_read} altyazı satırı` : `${report.pages_read} sayfa`,
+      detail: video
+        ? report.cues_skipped
+          ? `${report.cues_skipped} bozuk satır atlandı`
+          : "metin çıkarıldı"
+        : report.empty_pages
+          ? `${report.empty_pages} boş sayfa atlandı`
+          : "metin çıkarıldı",
       ms: report.timings_ms.parse,
     },
     {
@@ -25,7 +32,7 @@ function steps(report: Report): Step[] {
     {
       title: "Parçalama",
       value: `${report.chunks} parça`,
-      detail: "her parça tek sayfadan",
+      detail: video ? "ardışık satırlar, zaman aralıklı" : "her parça tek sayfadan",
       ms: report.timings_ms.chunk,
     },
     {
@@ -66,6 +73,13 @@ export default function IngestionReport({ report }: { report: Report }) {
           </li>
         ))}
       </ol>
+      {report.warnings.length > 0 && (
+        <ul className="mt-2 text-sm text-graphite">
+          {report.warnings.map((warning) => (
+            <li key={warning}>{warning}</li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }

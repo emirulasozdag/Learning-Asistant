@@ -16,6 +16,7 @@ router = APIRouter(tags=["materials"])
 _MEDIA_TYPES = {
     ".pdf": "application/pdf",
     ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    ".vtt": "text/vtt",
 }
 
 
@@ -30,10 +31,12 @@ def upload_material(
     material_type: Annotated[MaterialType, Form()],
     file: Annotated[UploadFile, File()],
     title: Annotated[str | None, Form()] = None,
+    media_url: Annotated[str | None, Form()] = None,
 ) -> DocumentOut:
     """FR-01..02: onaylı materyali yükle → parse → temizle → parçala → vektörleştir.
 
-    Cevaptaki `report`, hattın her adımında ne olduğunu gösterir.
+    `.vtt` altyazısı video olarak kaydedilir; `media_url` (https) videonun harici oynatma
+    adresidir. Cevaptaki `report`, hattın her adımında ne olduğunu gösterir.
     """
     course = get_course_or_404(db, course_id)
     try:
@@ -44,6 +47,7 @@ def upload_material(
             content=file.file.read(),
             material_type=material_type,
             title=title,
+            media_url=media_url,
         )
     except IngestionError as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc

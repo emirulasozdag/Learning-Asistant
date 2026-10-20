@@ -4,11 +4,14 @@ from collections.abc import Iterator
 
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import StreamingResponse
+from sqlalchemy.orm import Session
 
 from app.api.deps import DbSession, SessionFactory, get_course_or_404
+from app.db.models import Course, Document
 from app.llm.gateway import select_client
 from app.qa import service
-from app.schemas.ask import AskRequest, AskResponse
+from app.schemas.ask import AskRequest, AskResponse, VideoRef
+from app.schemas.materials import MaterialType
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/ask", tags=["qa"])
@@ -18,6 +21,7 @@ router = APIRouter(prefix="/ask", tags=["qa"])
 def ask(request: AskRequest, db: DbSession) -> AskResponse:
     """Seçili dersin materyalinde ara → kaynaklı cevap ya da 'materyalde yok'."""
     course = get_course_or_404(db, request.course_id)
+    request = _checked_video(db, course, request)
     try:
         return service.ask(db, course, request, select_client())
     except service.ConversationNotFound as exc:
@@ -31,7 +35,7 @@ def ask_stream(request: AskRequest, db: DbSession, sessions: SessionFactory) -> 
     Olaylar: `retrieval` (bulunan parçalar), `delta` (doğrulanmamış taslak metin parçası),
     `done` (doğrulanmış AskResponse; taslağın yerini her zaman alır), hata olursa `error`.
     """
-    get_course_or_404(db, request.course_id)
+    request = _checked_video(db, get_course_or_404(db, request.course_id), request)
 
     def events() -> Iterator[str]:
         with sessions() as stream_db:
@@ -57,6 +61,26 @@ def ask_stream(request: AskRequest, db: DbSession, sessions: SessionFactory) -> 
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+def _checked_video(db: Session, course: Course, request: AskRequest) -> AskRequest:
+    """Verilen video bu dersin bir video dokümanı olmalı (değilse 422); zaman süreye kırpılır."""
+    if request.video is None:
+        return request
+    document = db.get(Document, request.video.document_id)
+    if (
+        document is None
+        or document.course_id != course.id
+        or document.material_type != MaterialType.VIDEO
+    ):
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "Seçilen video bu derse ait bir video değil.",
+        )
+    time_s = request.video.time_s
+    if document.duration_s is not None:
+        time_s = min(time_s, document.duration_s)
+    return request.model_copy(update={"video": VideoRef(document_id=document.id, time_s=time_s)})
 
 
 def _sse(event: str, data: object) -> str:

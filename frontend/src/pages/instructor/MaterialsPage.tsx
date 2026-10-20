@@ -8,6 +8,8 @@ import Dropzone from "../../features/materials/Dropzone";
 import MaterialsTable, { type PendingUpload } from "../../features/materials/MaterialsTable";
 import { useCourseOutlet } from "../../features/courses/courseOutlet";
 import { courseService, guessMaterialType } from "../../services/courseService";
+import { documentExtent, materialTotals } from "../../labels";
+import { formatTime } from "../../text";
 import Button from "../../ui/Button";
 import Dialog from "../../ui/Dialog";
 import EmptyState from "../../ui/EmptyState";
@@ -62,7 +64,7 @@ export default function MaterialsPage() {
         toast.show({
           tone: "success",
           title: `${document.title} yüklendi`,
-          description: `${document.page_count} sayfa, ${document.chunk_count} parça; öğrenciler artık bu dokümandan soru sorabilir.`,
+          description: `${documentExtent(document)}, ${document.chunk_count} parça; öğrenciler artık bu dokümandan soru sorabilir.`,
         });
         if (document.report) {
           const report = document.report;
@@ -109,7 +111,7 @@ export default function MaterialsPage() {
     }
   }
 
-  const totalPages = documents?.reduce((sum, d) => sum + d.page_count, 0) ?? 0;
+  const totals = materialTotals(documents ?? []);
   const totalChunks = documents?.reduce((sum, d) => sum + d.chunk_count, 0) ?? 0;
   const busy = pending.some((p) => p.status === "processing");
 
@@ -123,7 +125,8 @@ export default function MaterialsPage() {
           documents.length > 0 && (
             <dl className="flex gap-8">
               <Stat label="doküman" value={documents.length} />
-              <Stat label="sayfa" value={totalPages} />
+              {totals.hasPages && <Stat label="sayfa" value={totals.pages} />}
+              {totals.hasVideo && <Stat label="video süresi" value={formatTime(totals.videoSeconds)} />}
               <Stat label="parça" value={totalChunks} />
             </dl>
           )
@@ -207,7 +210,7 @@ export default function MaterialsPage() {
   );
 }
 
-function Stat({ label, value }: { label: string; value: number }) {
+function Stat({ label, value }: { label: string; value: number | string }) {
   return (
     <div className="flex flex-col-reverse">
       <dt className="text-sm text-graphite">{label}</dt>

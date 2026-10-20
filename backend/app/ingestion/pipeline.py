@@ -11,26 +11,25 @@ from app.db.models import Chunk, Course, Document
 from app.db.text_search import ts_config
 from app.embeddings.base import Embedder
 from app.embeddings.provider import get_embedder
-from app.ingestion.chunking import chunk_segments
-from app.ingestion.cleaning import clean_segments_with_stats
+from app.ingestion.chunking import chunk_segments, chunk_timed_segments
+from app.ingestion.cleaning import clean_segments_with_stats, normalize_timed_segments
+from app.ingestion.documents import validate_media_url
 from app.ingestion.parsers.pdf_parser import parse_pdf
 from app.ingestion.parsers.pptx_parser import parse_pptx
-from app.ingestion.types import RawSegment
+from app.ingestion.parsers.vtt_parser import ParsedVtt, parse_vtt
+from app.ingestion.types import ChunkDraft, IngestionError, RawSegment
 from app.schemas.materials import IngestionReport, MaterialType
 
 PARSERS: dict[str, Callable[[Path], list[RawSegment]]] = {
     ".pdf": parse_pdf,
     ".pptx": parse_pptx,
 }
+VTT_EXTENSION = ".vtt"
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024
 
 
-class IngestionError(ValueError):
-    """Kullanıcıya gösterilecek, düzeltilebilir bir yükleme hatası."""
-
-
 def supported_extensions() -> list[str]:
-    return sorted(PARSERS)
+    return sorted([*PARSERS, VTT_EXTENSION])
 
 
 def ingest_document(
@@ -41,17 +40,27 @@ def ingest_document(
     material_type: MaterialType,
     title: str | None = None,
     embedder: Embedder | None = None,
+    media_url: str | None = None,
 ) -> tuple[Document, IngestionReport]:
     """Dosyayı kaydet → parse → temizle → parçala → vektörleştir → Document + Chunk yaz.
 
+    `.vtt` altyazısı her zaman `video` türünde kaydedilir; parçalar sayfa yerine zaman
+    aralığı taşır. `media_url`, videonun harici (opak, https) oynatma adresidir.
     Hata olursa veritabanı değişiklikleri geri alınır ve kaydedilen dosya silinir.
     """
     extension = Path(filename).suffix.lower()
-    if extension not in PARSERS:
+    if material_type == MaterialType.VIDEO and extension != VTT_EXTENSION:
+        raise IngestionError("Video dosyası henüz yüklenemiyor; altyazı (.vtt) yükleyin.")
+    if extension != VTT_EXTENSION and extension not in PARSERS:
         raise IngestionError(
             f"Desteklenmeyen dosya türü: {extension or '(uzantısız)'}. "
             f"Desteklenenler: {', '.join(supported_extensions())}"
         )
+    is_video = extension == VTT_EXTENSION
+    if media_url is not None:
+        if not is_video:
+            raise IngestionError("Medya adresi yalnızca video (.vtt) yüklemesinde verilebilir.")
+        validate_media_url(media_url)
     if not content:
         raise IngestionError("Dosya boş.")
     if len(content) > MAX_UPLOAD_BYTES:
@@ -61,9 +70,10 @@ def ingest_document(
     document = Document(
         course_id=course.id,
         title=title or Path(filename).stem,
-        material_type=material_type.value,
+        material_type=MaterialType.VIDEO.value if is_video else material_type.value,
         filename=Path(filename).name,
         file_path="",
+        media_url=media_url,
     )
     db.add(document)
     db.flush()
@@ -72,27 +82,42 @@ def ingest_document(
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(content)
     timings: dict[str, int] = {}
+    parsed: ParsedVtt | None = None
     try:
         with _timed(timings, "parse"):
             try:
-                segments = PARSERS[extension](path)
+                if is_video:
+                    parsed = parse_vtt(path)
+                    segments = parsed.segments
+                else:
+                    segments = PARSERS[extension](path)
+            except IngestionError:
+                raise
             except Exception as exc:
                 raise IngestionError("Dosya okunamadı; bozuk ya da şifreli olabilir.") from exc
 
+        drafts: list[ChunkDraft]
         with _timed(timings, "clean"):
-            cleaned, stats = clean_segments_with_stats(segments)
+            if is_video:
+                cleaned, stats = normalize_timed_segments(segments)
+            else:
+                cleaned, stats = clean_segments_with_stats(segments)
         with _timed(timings, "chunk"):
-            drafts = chunk_segments(cleaned)
+            drafts = chunk_timed_segments(cleaned) if is_video else chunk_segments(cleaned)
         if not drafts:
             raise IngestionError(
-                "Dosyadan metin çıkarılamadı. Taranmış (görüntü) bir PDF olabilir."
+                "Altyazıdan metin çıkarılamadı."
+                if is_video
+                else "Dosyadan metin çıkarılamadı. Taranmış (görüntü) bir PDF olabilir."
             )
 
         with _timed(timings, "embed"):
             vectors = embedder.embed_passages([draft.text for draft in drafts])
 
         document.file_path = str(path)
-        document.page_count = len(segments)
+        document.page_count = 0 if is_video else len(segments)
+        if parsed is not None:
+            document.duration_s = parsed.duration_s
         config = cast(literal(ts_config(course.language)), REGCONFIG)
         db.add_all(
             Chunk(
@@ -117,8 +142,8 @@ def ingest_document(
     db.refresh(document)
 
     report = IngestionReport(
-        pages_read=len(segments),
-        empty_pages=stats.empty_segments_dropped,
+        pages_read=0 if is_video else len(segments),
+        empty_pages=0 if is_video else stats.empty_segments_dropped,
         repeated_lines_removed=stats.repeated_lines_removed,
         page_numbers_removed=stats.page_numbers_removed,
         chunks=len(drafts),
@@ -126,8 +151,26 @@ def ingest_document(
         vector_dim=embedder.dim,
         embedding_model=settings.embedding_model if embedder.name == "e5" else embedder.name,
         timings_ms=timings,
+        **_video_report_fields(parsed),
     )
     return document, report
+
+
+def _video_report_fields(parsed: ParsedVtt | None) -> dict[str, object]:
+    if parsed is None:
+        return {}
+    warnings = []
+    if parsed.cues_skipped:
+        warnings.append(
+            f"{parsed.cues_skipped} altyazı satırı okunamadı ve atlandı; "
+            "o aralıklar aramada bulunmayacak."
+        )
+    return {
+        "duration_s": parsed.duration_s,
+        "cues_read": parsed.cues_read,
+        "cues_skipped": parsed.cues_skipped,
+        "warnings": warnings,
+    }
 
 
 class _timed:
