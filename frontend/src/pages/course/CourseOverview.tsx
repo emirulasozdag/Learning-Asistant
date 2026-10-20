@@ -2,11 +2,11 @@ import { MessageSquareText, Pencil, Upload } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
 
-import type { CourseActivity, DocumentOut, MaterialType } from "../../api/types";
+import type { CourseActivity, DocumentOut } from "../../api/types";
 import { useAuth } from "../../auth/useAuth";
 import CourseInfoDialog from "../../features/courses/CourseInfoDialog";
 import { useCourseOutlet } from "../../features/courses/courseOutlet";
-import { MATERIAL_LABELS } from "../../labels";
+import { MATERIAL_LABELS, TYPE_ORDER } from "../../labels";
 import { instructorService } from "../../services/instructorService";
 import { buttonClasses } from "../../ui/buttonStyles";
 import Button from "../../ui/Button";
@@ -82,8 +82,6 @@ export default function CourseOverview() {
     </div>
   );
 }
-
-const TYPE_ORDER: MaterialType[] = ["notes", "slides", "textbook", "past_exam", "transcript", "video"];
 
 function MaterialSummary({
   documents,

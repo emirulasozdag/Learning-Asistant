@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, status
 
 from app.api.deps import DbSession, get_course_or_404
 from app.courses import service
-from app.schemas.courses import CourseCreate, CourseSummary, CourseUpdate
+from app.schemas.courses import CourseCreate, CourseOutline, CourseSummary, CourseUpdate
 
 router = APIRouter(prefix="/courses", tags=["courses"])
 
@@ -28,3 +28,10 @@ def create_course(data: CourseCreate, db: DbSession) -> CourseSummary:
 def update_course(course_id: int, data: CourseUpdate, db: DbSession) -> CourseSummary:
     """Ders bilgisini düzenler (eğitmen, dönem, seviye, bölüm, açıklama, ad, dil)."""
     return service.update_course(db, get_course_or_404(db, course_id), data)
+
+
+@router.get("/{course_id}/outline", response_model=CourseOutline)
+def course_outline(course_id: int, db: DbSession) -> CourseOutline:
+    """Dersin izlencesi ve takvimi (OCW "Syllabus" / "Calendar")."""
+    course = get_course_or_404(db, course_id)
+    return CourseOutline.model_validate({"syllabus": course.syllabus, "calendar": course.calendar})

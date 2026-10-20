@@ -451,3 +451,31 @@ sahte içerik gösterilmez ([mock/README.md](../frontend/src/mock/README.md)). K
 Backend'i olmayan özellikler (pratik, öğrenci listesi, sık hatalar) ilgili API hazır olunca gerçek veriyle eklenir
 (#17 ve ilgili işler). Ders istatistikleri artık mock değildir; öğrenci sayısı gibi alanlar kullanıcı/üyelik
 verisi (#11) gelene kadar gösterilmez.
+
+---
+
+## 8. Ders içeriği bölümleri (OCW düzeni)
+
+Ders sayfası MIT OpenCourseWare gibi bölümlere ayrılır: İzlence, Takvim, Video dersler, Ders notları, Sınavlar,
+Pratik problemler, Ödevler. Bölümler `frontend/src/features/courses/sections.ts`'te tanımlıdır. Materyal bölümleri
+dokümanları türüne göre süzer, izlence ve takvim ayrı bir endpoint'ten gelir. Hepsi **[ekleme]**: mevcut alan ve
+endpoint'ler değişmez.
+
+| Değişiklik | Backend | Frontend |
+|---|---|---|
+| Yeni materyal türleri | `MaterialType.ASSIGNMENT = "assignment"`, `PRACTICE_PROBLEM = "practice_problem"` | `MaterialType` birleşimi, `MATERIAL_LABELS` ("Ödev", "Pratik problem") |
+| İzlence / takvim kolonu | `courses.syllabus`, `courses.calendar` (JSONB, boş olabilir); migration `c4f1d2a8e6b0` | — |
+| Yeni endpoint | `GET /courses/{id}/outline` → `CourseOutline` (ders yoksa 404) | `api.courseOutline`, `courseService.outline` |
+| Yeni adresler | — | `…/courses/:id/{syllabus,calendar,videos,lecture-notes,quizzes,practice-problems,assignments}` (iki rol) |
+
+```
+CourseOutline   { syllabus: SyllabusBlock[] | null, calendar: CourseCalendar | null }
+SyllabusBlock   { type: "heading" | "paragraph" | "list" | "table", text, items, rows }   # tabloda ilk satır başlık
+CourseCalendar  { intro: str | null, columns: str[], rows: CalendarCell[][] }
+CalendarCell    { lines: str[], span: int }
+```
+
+- Değişmez: izlence ve takvim **düz metindir**; dışarıdan gelen HTML saklanmaz ve sayfaya basılmaz.
+- Şimdilik yalnızca `python -m app.scripts.import_ocw <paket>` doldurur. Eğitmenin düzenlemesi sonraki iştir.
+- Bölüm ↔ tür: Video dersler = `video`, `transcript`; Ders notları = `notes`, `slides`, `textbook`;
+  Sınavlar = `past_exam`; Pratik problemler = `practice_problem`; Ödevler = `assignment`.

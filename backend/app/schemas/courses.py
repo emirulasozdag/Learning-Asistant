@@ -57,3 +57,36 @@ class CourseUpdate(CourseInfo):
 
     name: str | None = Field(default=None, min_length=2, max_length=200)
     language: Literal["tr", "en"] | None = None
+
+
+class SyllabusBlock(BaseModel):
+    """İzlencenin bir parçası (düz metin): başlık, paragraf, madde listesi ya da tablo.
+
+    Tabloda ilk satır başlıktır.
+    """
+
+    type: Literal["heading", "paragraph", "list", "table"]
+    text: str | None = None
+    items: list[str] | None = None
+    rows: list[list[str]] | None = None
+
+
+class CalendarCell(BaseModel):
+    lines: list[str]
+    # Birden çok sütunu kaplayan hücre (ör. "Final Exam" haftası).
+    span: int = 1
+
+
+class CourseCalendar(BaseModel):
+    """Haftalık takvim tablosu: sütun başlıkları ve her hafta için bir satır."""
+
+    intro: str | None = None
+    columns: list[str]
+    rows: list[list[CalendarCell]]
+
+
+class CourseOutline(BaseModel):
+    """OCW "Syllabus" ve "Calendar" bölümleri; ders için girilmemişse boş."""
+
+    syllabus: list[SyllabusBlock] | None = None
+    calendar: CourseCalendar | None = None

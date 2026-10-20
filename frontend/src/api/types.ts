@@ -214,6 +214,32 @@ export interface CourseSummary extends CourseInfo {
   role: Role | null;
 }
 
+/** İzlencenin bir parçası (düz metin). Tabloda ilk satır başlıktır. */
+export interface SyllabusBlock {
+  type: "heading" | "paragraph" | "list" | "table";
+  text: string | null;
+  items: string[] | null;
+  rows: string[][] | null;
+}
+
+export interface CalendarCell {
+  lines: string[];
+  span: number;
+}
+
+/** Haftalık takvim tablosu: sütun başlıkları ve her hafta için bir satır. */
+export interface CourseCalendar {
+  intro: string | null;
+  columns: string[];
+  rows: CalendarCell[][];
+}
+
+/** OCW "Syllabus" ve "Calendar" bölümleri; girilmemişse `null`. */
+export interface CourseOutline {
+  syllabus: SyllabusBlock[] | null;
+  calendar: CourseCalendar | null;
+}
+
 export interface UserOut {
   id: number;
   name: string;
@@ -272,7 +298,15 @@ export interface CourseCreate extends Partial<CourseInfo> {
 /** Kısmi güncelleme: yalnızca gönderilen alanlar değişir; boş metin alanı temizler. */
 export type CourseUpdate = Partial<CourseInfo> & { name?: string; language?: "tr" | "en" };
 
-export type MaterialType = "textbook" | "notes" | "slides" | "past_exam" | "transcript" | "video";
+export type MaterialType =
+  | "textbook"
+  | "notes"
+  | "slides"
+  | "past_exam"
+  | "assignment"
+  | "practice_problem"
+  | "transcript"
+  | "video";
 
 export interface DocumentOut {
   id: number;

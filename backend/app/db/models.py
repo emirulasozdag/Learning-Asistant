@@ -34,6 +34,10 @@ class Course(Base):
     level: Mapped[str | None] = mapped_column(String(16))
     department: Mapped[str | None] = mapped_column(String(200))
     description: Mapped[str | None] = mapped_column(Text)
+    # Ders izlencesi ve takvimi (OCW "Syllabus" / "Calendar"): HTML değil, yapılandırılmış veri.
+    # Biçim: app.schemas.courses.SyllabusBlock listesi ve CourseCalendar.
+    syllabus: Mapped[list | None] = mapped_column(JSONB)
+    calendar: Mapped[dict | None] = mapped_column(JSONB)
 
     documents: Mapped[list["Document"]] = relationship(back_populates="course")
 

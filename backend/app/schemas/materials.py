@@ -11,6 +11,9 @@ class MaterialType(StrEnum):
     NOTES = "notes"
     SLIDES = "slides"
     PAST_EXAM = "past_exam"
+    # OCW "Assignments" ve "Practice Problems": ödev / problem seti ve çözümlü pratik problemler.
+    ASSIGNMENT = "assignment"
+    PRACTICE_PROBLEM = "practice_problem"
     TRANSCRIPT = "transcript"
     VIDEO = "video"
 

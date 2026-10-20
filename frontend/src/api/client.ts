@@ -7,6 +7,7 @@ import type {
   ChunkPreview,
   CourseActivity,
   CourseCreate,
+  CourseOutline,
   CourseSummary,
   CourseUpdate,
   DocumentOut,
@@ -156,6 +157,9 @@ export const api = {
 
   updateCourse: (courseId: number, body: CourseUpdate) =>
     request<CourseSummary>(`/courses/${courseId}`, { method: "PATCH", body: JSON.stringify(body) }),
+
+  courseOutline: (courseId: number, signal?: AbortSignal) =>
+    request<CourseOutline>(`/courses/${courseId}/outline`, { signal }),
 
   askStream,
 
