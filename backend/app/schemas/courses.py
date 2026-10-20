@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
@@ -32,8 +33,8 @@ class CourseSummary(CourseInfo):
     code: str
     name: str
     language: Literal["tr", "en"]
-    # Kimlik doğrulama gelene kadar boş.
-    role: Role | None = None
+    # Kullanıcının bu dersteki rolü (ADR-2); yalnızca üye olunan dersler listelenir.
+    role: Role
 
 
 class CourseCreate(CourseInfo):
@@ -57,3 +58,10 @@ class CourseUpdate(CourseInfo):
 
     name: str | None = Field(default=None, min_length=2, max_length=200)
     language: Literal["tr", "en"] | None = None
+
+
+class JoinCode(BaseModel):
+    """Dersin katılım kodu (ADR-2). Yalnızca eğitmen görür ve yeniler."""
+
+    code: str
+    expires_at: datetime | None = None

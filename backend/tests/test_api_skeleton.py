@@ -1,5 +1,6 @@
-"""İskelet endpoint'lerinin var olduğunu ve henüz 501 döndüğünü doğrular.
+"""İskelet endpoint'lerinin var olduğunu ve yetki denetiminin 501'den önce geldiğini doğrular.
 
+Oturumsuz istek 401 alır (veritabanı gerekmez); yetkili üyenin 501 aldığı test_access.py'de.
 Bir özellik uygulandığında ilgili satır buradan kaldırılıp gerçek testine taşınır.
 """
 
@@ -36,7 +37,8 @@ SKELETON_ENDPOINTS = [
 
 
 @pytest.mark.parametrize(("method", "path", "kwargs"), SKELETON_ENDPOINTS)
-def test_skeleton_endpoint_returns_501(method: str, path: str, kwargs: dict) -> None:
+def test_skeleton_endpoint_requires_a_session(method: str, path: str, kwargs: dict) -> None:
     response = getattr(client, method)(path, **kwargs)
 
-    assert response.status_code == 501
+    assert response.status_code == 401
+    assert response.json()["code"] == "not_authenticated"

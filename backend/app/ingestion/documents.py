@@ -37,15 +37,15 @@ def validate_media_url(url: str) -> None:
         )
 
 
-def list_documents(db: Session, course_id: int) -> list[DocumentOut]:
+def list_documents(db: Session, course_id: int, approved_only: bool = False) -> list[DocumentOut]:
+    """Dersin dokümanları. `approved_only`: eğitmen dışındakiler onaysızları görmez (ADR-3)."""
     chunk_count = (
         select(func.count(Chunk.id)).where(Chunk.document_id == Document.id).scalar_subquery()
     )
-    rows = db.execute(
-        select(Document, chunk_count)
-        .where(Document.course_id == course_id)
-        .order_by(Document.created_at.desc(), Document.id.desc())
-    )
+    query = select(Document, chunk_count).where(Document.course_id == course_id)
+    if approved_only:
+        query = query.where(Document.approved_at.is_not(None))
+    rows = db.execute(query.order_by(Document.created_at.desc(), Document.id.desc()))
     return [to_document_out(document, count) for document, count in rows]
 
 

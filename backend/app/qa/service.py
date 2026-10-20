@@ -41,15 +41,25 @@ class DoneEvent:
 QAEvent = RetrievalEvent | DeltaEvent | DoneEvent
 
 
-def get_conversation(db: Session, course: Course, conversation_id: int | None) -> Conversation:
-    """Var olan sohbeti getirir ya da yenisini başlatır. Başka dersin sohbeti kullanılamaz."""
+def get_conversation(
+    db: Session, course: Course, conversation_id: int | None, user_id: int | None = None
+) -> Conversation:
+    """Var olan sohbeti getirir ya da yenisini başlatır.
+
+    Başka dersin ya da başka kullanıcının sohbeti kullanılamaz (CONTRACTS.md §3). `user_id`
+    yalnızca değerlendirme hattında (geri alınan işlem) boştur; API her zaman verir.
+    """
     if conversation_id is None:
-        conversation = Conversation(course_id=course.id)
+        conversation = Conversation(course_id=course.id, user_id=user_id)
         db.add(conversation)
         db.flush()
         return conversation
     conversation = db.get(Conversation, conversation_id)
-    if conversation is None or conversation.course_id != course.id:
+    if (
+        conversation is None
+        or conversation.course_id != course.id
+        or conversation.user_id != user_id
+    ):
         raise ConversationNotFound(conversation_id)
     return conversation
 
@@ -60,13 +70,15 @@ def ask_stream(
     request: AskRequest,
     llm: LLMClient | None,
     embedder: Embedder | None = None,
+    user_id: int | None = None,
 ) -> Iterator[QAEvent]:
     """Önce bulunan parçalar, sonra taslak cevap metni parça parça, en sonda doğrulanmış cevap.
 
     DeltaEvent'ler doğrulanmamış taslaktır; DoneEvent'teki cevap taslağın yerini alır
     (iddialar çıkarılmış, cevap reddedilmiş ya da LLM'siz alıntıya düşülmüş olabilir).
+    LLM'e yalnızca soru, parçalar ve sohbet geçmişi gider; kullanıcı kimliği gitmez (ADR-5).
     """
-    conversation = get_conversation(db, course, request.conversation_id)
+    conversation = get_conversation(db, course, request.conversation_id, user_id)
     history = _history(db, conversation)
 
     # Takip sorusu ("peki karmaşıklığı ne?") tek başına eksik kalabilir; önceki soru
@@ -127,8 +139,9 @@ def ask(
     request: AskRequest,
     llm: LLMClient | None,
     embedder: Embedder | None = None,
+    user_id: int | None = None,
 ) -> AskResponse:
-    for event in ask_stream(db, course, request, llm, embedder):
+    for event in ask_stream(db, course, request, llm, embedder, user_id):
         if isinstance(event, DoneEvent):
             return event.response
     raise RuntimeError("Soru-cevap akışı sonuçsuz bitti")

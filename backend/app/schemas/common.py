@@ -20,6 +20,10 @@ ErrorCode = Literal[
     "invalid_video",
     "not_authenticated",
     "insufficient_role",
+    # #11: aydınlatma metninin güncel sürümü kabul edilmeden soru sorulamaz (ADR-4).
+    "consent_required",
+    # #11: bu e-postayla bir hesap zaten var.
+    "email_exists",
     "not_implemented",
     "validation_error",
 ]

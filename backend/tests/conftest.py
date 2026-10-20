@@ -7,7 +7,9 @@ ile pytest çalıştırın. Bu veritabanının tabloları her testte boşaltıl�
 """
 
 import os
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
+from datetime import UTC, datetime
+from functools import cache
 from pathlib import Path
 
 import pymupdf
@@ -20,10 +22,13 @@ from sqlalchemy import create_engine, make_url, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.api.deps import get_session_factory
+from app.auth.passwords import hash_password
+from app.auth.sessions import create_session
 from app.core.config import settings
-from app.db.models import Course
+from app.db.models import Course, Enrollment, User
 from app.db.session import get_db
 from app.main import app
+from app.schemas.common import Role
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
@@ -110,8 +115,8 @@ def db(db_engine) -> Iterator[Session]:
     with db_engine.begin() as connection:
         connection.execute(
             text(
-                "TRUNCATE messages, conversations, chunks, documents, courses "
-                "RESTART IDENTITY CASCADE"
+                "TRUNCATE messages, conversations, chunks, documents, enrollments, sessions, "
+                "users, courses RESTART IDENTITY CASCADE"
             )
         )
     with session_factory(db_engine)() as session:
@@ -122,25 +127,88 @@ def session_factory(engine) -> sessionmaker[Session]:
     return sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
 
+TEST_PASSWORD = "test-sifre-123"
+
+
+@cache
+def _test_password_hash() -> str:
+    # argon2 bilerek yavaştır: testlerde bir kez hesaplanır.
+    return hash_password(TEST_PASSWORD)
+
+
+def make_user(
+    db: Session,
+    email: str,
+    *,
+    can_create_courses: bool = False,
+    consented: bool = True,
+    research_logging: bool = False,
+) -> User:
+    """Test kullanıcısı (şifresi TEST_PASSWORD). `consented`: güncel aydınlatma metni onaylı."""
+    user = User(
+        name=email.split("@")[0],
+        email=email,
+        password_hash=_test_password_hash(),
+        can_create_courses=can_create_courses,
+        research_logging=research_logging,
+        policy_version=settings.privacy_policy_version if consented else None,
+        consented_at=datetime.now(UTC) if consented else None,
+    )
+    db.add(user)
+    db.commit()
+    return user
+
+
+def enroll(db: Session, user: User, course: Course, role: Role) -> Enrollment:
+    enrollment = Enrollment(user_id=user.id, course_id=course.id, role=role)
+    db.add(enrollment)
+    db.commit()
+    return enrollment
+
+
 @pytest.fixture
-def client(
-    db: Session, db_engine, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> Iterator[TestClient]:
-    """Test veritabanına bağlı, LLM'siz ve geçici upload klasörlü API istemcisi."""
+def api(db: Session, db_engine, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    """API'yi test veritabanına bağlar; LLM'siz ve geçici upload klasörlü."""
     monkeypatch.setattr(settings, "upload_dir", tmp_path / "uploads")
     monkeypatch.setattr(settings, "cache_dir", tmp_path / "cache")
     monkeypatch.setattr(settings, "llm_api_key", "")
     app.dependency_overrides[get_db] = lambda: db
     app.dependency_overrides[get_session_factory] = lambda: session_factory(db_engine)
-    yield TestClient(app)
+    yield
     app.dependency_overrides.clear()
 
 
 @pytest.fixture
-def course(db: Session) -> Course:
+def client_for(api, db: Session) -> Callable[[User | None], TestClient]:
+    """Verilen kullanıcının oturumuyla (None: oturumsuz) ayrı bir API istemcisi."""
+
+    def make(user: User | None) -> TestClient:
+        client = TestClient(app)
+        if user is not None:
+            client.cookies.set(settings.session_cookie_name, create_session(db, user))
+        return client
+
+    return make
+
+
+@pytest.fixture
+def user(db: Session) -> User:
+    """Ders açabilen, aydınlatma metnini onaylamış kullanıcı; `course`'un eğitmeni."""
+    return make_user(db, "egitmen@example.com", can_create_courses=True)
+
+
+@pytest.fixture
+def client(client_for, user: User) -> TestClient:
+    """`user` olarak oturum açmış API istemcisi."""
+    return client_for(user)
+
+
+@pytest.fixture
+def course(db: Session, user: User) -> Course:
     course = Course(code="BLM2512", name="Veri Yapilari ve Algoritmalar", language="tr")
     db.add(course)
     db.commit()
+    enroll(db, user, course, "instructor")
     return course
 
 

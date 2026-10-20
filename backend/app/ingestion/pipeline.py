@@ -41,11 +41,16 @@ def ingest_document(
     title: str | None = None,
     embedder: Embedder | None = None,
     media_url: str | None = None,
+    approved_by: int | None = None,
 ) -> tuple[Document, IngestionReport]:
     """Dosyayı kaydet → parse → temizle → parçala → vektörleştir → Document + Chunk yaz.
 
+    Yükleme onay sayılır (ADR-3): yalnızca eğitmen yükler ve beyanı işaretler; `approved_by`
+    yükleyen eğitmendir.
+
     `.vtt` altyazısı her zaman `video` türünde kaydedilir; parçalar sayfa yerine zaman
     aralığı taşır. `media_url`, videonun harici (opak, https) oynatma adresidir.
+
     Hata olursa veritabanı değişiklikleri geri alınır ve kaydedilen dosya silinir.
     """
     extension = Path(filename).suffix.lower()
@@ -74,6 +79,8 @@ def ingest_document(
         filename=Path(filename).name,
         file_path="",
         media_url=media_url,
+        approved_by=approved_by,
+        approved_at=func.now(),
     )
     db.add(document)
     db.flush()
