@@ -89,3 +89,26 @@ def _repeated_lines(texts: list[str]) -> set[str]:
     )
     threshold = len(non_empty) * REPEATED_LINE_RATIO
     return {line for line, count in counts.items() if count >= threshold}
+
+
+def normalize_timed_segments(
+    segments: list[RawSegment],
+) -> tuple[list[RawSegment], CleaningStats]:
+    """Zamanlı segmentlerde (altyazı) yalnızca normalize eder, boş olanları atar.
+
+    Konuşmada tekrarlanan satır ya da yalnız rakamdan oluşan satır içeriktir ("3"):
+    üst/alt bilgi ve sayfa numarası silme burada uygulanmaz.
+    """
+    stats = CleaningStats()
+    cleaned: list[RawSegment] = []
+    for segment in segments:
+        text = _normalize(segment.text).strip()
+        if text:
+            cleaned.append(
+                RawSegment(
+                    text=text, page=segment.page, t_start=segment.t_start, t_end=segment.t_end
+                )
+            )
+        else:
+            stats.empty_segments_dropped += 1
+    return cleaned, stats

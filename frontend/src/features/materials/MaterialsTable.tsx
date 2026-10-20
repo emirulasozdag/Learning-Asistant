@@ -1,7 +1,7 @@
 import { ExternalLink, RotateCcw, Trash2, X } from "lucide-react";
 
 import type { DocumentOut, MaterialType } from "../../api/types";
-import { materialLabel } from "../../labels";
+import { documentExtent, materialLabel } from "../../labels";
 import { formatRelative } from "../../text";
 import { StatusBadge } from "../../ui/Badge";
 import FileBadge from "../../ui/FileBadge";
@@ -113,7 +113,7 @@ export default function MaterialsTable({
               {formatRelative(document.created_at)}
             </TD>
             <TD className="hidden whitespace-nowrap text-graphite tabular-nums sm:table-cell">
-              {document.page_count} sayfa, {document.chunk_count} parça
+              {documentExtent(document)}, {document.chunk_count} parça
             </TD>
             <TD className="hidden sm:table-cell">
               <StatusBadge status="indexed" />

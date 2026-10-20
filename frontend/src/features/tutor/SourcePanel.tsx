@@ -6,7 +6,7 @@ import type { Highlight, SourceDetail } from "../../api/types";
 import Sheet from "../../components/Sheet";
 import { materialLabel } from "../../labels";
 import { tutorService } from "../../services/tutorService";
-import { reflow } from "../../text";
+import { formatTimeRange, reflow } from "../../text";
 import Button from "../../ui/Button";
 import { buttonClasses } from "../../ui/buttonStyles";
 import EmptyState from "../../ui/EmptyState";
@@ -57,6 +57,7 @@ export default function SourcePanel({
 
   const current = source?.source_id === sourceId ? source : null;
   const isPdf = Boolean(current?.page_image_url);
+  const isVideo = current?.material_type === "video";
   const Root = modal ? "div" : "aside";
 
   return (
@@ -74,6 +75,9 @@ export default function SourcePanel({
               <p className="truncate text-sm text-graphite">
                 {materialLabel(current.material_type)}
                 {current.page ? `, sayfa ${current.page}` : ""}
+                {current.page == null && current.t_start != null
+                  ? `, ${formatTimeRange(current.t_start, current.t_end)}`
+                  : ""}
               </p>
             </>
           ) : failure ? null : (
@@ -91,7 +95,7 @@ export default function SourcePanel({
             className={buttonClasses("ghost", "sm")}
           >
             <ExternalLink size={14} aria-hidden />
-            {isPdf ? "PDF'te aç" : "İndir"}
+            {isPdf ? "PDF'te aç" : isVideo ? "Videoda aç" : "İndir"}
           </a>
         )}
         <IconButton icon={X} label="Kaynağı kapat" size="sm" onClick={onClose} />

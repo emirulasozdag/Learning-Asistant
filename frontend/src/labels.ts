@@ -1,4 +1,5 @@
-import type { Citation, MaterialType } from "./api/types";
+import type { Citation, DocumentOut, MaterialType } from "./api/types";
+import { formatTime } from "./text";
 
 export const MATERIAL_LABELS: Record<MaterialType, string> = {
   notes: "Ders notu",
@@ -9,11 +10,19 @@ export const MATERIAL_LABELS: Record<MaterialType, string> = {
   video: "Video",
 };
 
-/** Yükleme ekranında seçilebilen türler (transkript ve video sonraki adımda). */
-export const UPLOADABLE_TYPES: MaterialType[] = ["notes", "slides", "textbook", "past_exam"];
+/** Yükleme ekranında seçilebilen türler (video: altyazı dosyası; videonun kendisi henüz yüklenemez). */
+export const UPLOADABLE_TYPES: MaterialType[] = ["notes", "slides", "textbook", "past_exam", "video"];
 
 export function materialLabel(type: string): string {
   return MATERIAL_LABELS[type as MaterialType] ?? type;
+}
+
+/** Dokümanın boyutu: sayfa tabanlı dosyada sayfa sayısı, videoda süre. */
+export function documentExtent(document: Pick<DocumentOut, "material_type" | "page_count" | "duration_s">): string {
+  if (document.material_type === "video") {
+    return document.duration_s == null ? "video" : formatTime(document.duration_s);
+  }
+  return `${document.page_count} sayfa`;
 }
 
 const LANGUAGE_LABELS: Record<string, string> = { tr: "Türkçe", en: "İngilizce" };
@@ -25,7 +34,8 @@ export function languageLabel(code: string): string {
 
 export function citationLabel(citation: Citation): string {
   const title = citation.document_title ?? "Kaynak";
-  return citation.page ? `${title}, s. ${citation.page}` : title;
+  if (citation.page) return `${title}, s. ${citation.page}`;
+  return citation.t_start != null ? `${title}, ${formatTime(citation.t_start)}` : title;
 }
 
 const MINOR_WORDS = new Set(["ve", "ile", "and", "of", "the", "için"]);
@@ -53,4 +63,49 @@ export function courseMetaParts(course: {
   return [course.code, course.term, course.level && LEVEL_LABELS[course.level]].filter(
     (part): part is string => Boolean(part),
   );
+}
+
+export interface MaterialTotals {
+  /** Yalnızca sayfa tabanlı dokümanların (video değil) sayfa toplamı. */
+  pages: number;
+  /** Video dokümanlarının toplam süresi (saniye). */
+  videoSeconds: number;
+  /** Sayfa tabanlı / video doküman var mı: yoksa ilgili sayaç hiç gösterilmez. */
+  hasPages: boolean;
+  hasVideo: boolean;
+}
+
+type TotalsInput = Pick<DocumentOut, "material_type" | "page_count" | "duration_s">;
+
+/** Sayfa ve süre toplamları ayrı hesaplanır: video "0 sayfa" diye sayılmaz. */
+export function materialTotals(documents: TotalsInput[]): MaterialTotals {
+  const videos = documents.filter((d) => d.material_type === "video");
+  const paged = documents.filter((d) => d.material_type !== "video");
+  return {
+    pages: paged.reduce((sum, d) => sum + d.page_count, 0),
+    videoSeconds: videos.reduce((sum, d) => sum + (d.duration_s ?? 0), 0),
+    hasPages: paged.length > 0,
+    hasVideo: videos.length > 0,
+  };
+}
+
+/** "12 sayfa", "video süresi 3:30" ya da ikisi birden; hiçbiri yoksa boş metin. */
+export function describeTotals(totals: MaterialTotals): string {
+  const parts: string[] = [];
+  if (totals.hasPages) parts.push(`${totals.pages} sayfa`);
+  if (totals.hasVideo) parts.push(`video süresi ${formatTime(totals.videoSeconds)}`);
+  return parts.join(", ");
+}
+
+/** Tablo hücresi için kısa biçim: "12", "3:30" ya da "12 · 3:30". */
+export function compactTotals(totals: MaterialTotals): string {
+  const parts: string[] = [];
+  if (totals.hasPages) parts.push(String(totals.pages));
+  if (totals.hasVideo) parts.push(formatTime(totals.videoSeconds));
+  return parts.length > 0 ? parts.join(" · ") : "—";
+}
+
+/** Sayfa/süre sütununun başlığı. */
+export function totalsHeading(totals: MaterialTotals): string {
+  return totals.hasVideo ? (totals.hasPages ? "Sayfa / süre" : "Süre") : "Sayfa";
 }

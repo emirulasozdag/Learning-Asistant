@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.db.models import Chunk
-from app.ingestion.documents import file_url
+from app.ingestion.documents import document_media_url, file_url
 from app.ingestion.rendering import find_highlights, is_pdf
 from app.schemas.materials import MaterialType
 from app.schemas.sources import SourceDetail
@@ -26,7 +26,11 @@ def get_source(db: Session, source_id: str) -> SourceDetail | None:
         page=chunk.page,
         t_start=chunk.t_start,
         t_end=chunk.t_end,
-        media_url=file_url(document.id, chunk.page if pdf else None),
+        media_url=(
+            document_media_url(document)
+            if document.material_type == MaterialType.VIDEO
+            else file_url(document.id, chunk.page if pdf else None)
+        ),
         page_image_url=(
             f"{settings.public_api_prefix}/documents/{document.id}/pages/{chunk.page}.png"
             if pdf

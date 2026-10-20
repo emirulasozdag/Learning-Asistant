@@ -3,7 +3,7 @@ import { useRef, useState, type DragEvent } from "react";
 
 import { cx } from "../../ui/cx";
 
-const ACCEPTED_EXTENSIONS = [".pdf", ".pptx"];
+const ACCEPTED_EXTENSIONS = [".pdf", ".pptx", ".vtt"];
 
 interface DropzoneProps {
   onFiles: (files: File[]) => void;
@@ -25,7 +25,7 @@ export default function Dropzone({ onFiles, onReject, disabled, compact }: Dropz
     const rejected = files.filter((file) => !valid.includes(file));
     if (rejected.length > 0) {
       onReject(
-        `${rejected.map((file) => file.name).join(", ")} yüklenemez: yalnızca PDF ve PPTX destekleniyor.`,
+        `${rejected.map((file) => file.name).join(", ")} yüklenemez: yalnızca PDF, PPTX ve altyazı (VTT) destekleniyor.`,
       );
     }
     if (valid.length > 0) onFiles(valid);
@@ -90,7 +90,7 @@ export default function Dropzone({ onFiles, onReject, disabled, compact }: Dropz
           {dragging ? "Bırak, yüklemeye başlayalım" : "Dosyaları buraya sürükle ya da bilgisayarından seç"}
         </span>
         <span className="mt-1 block text-sm text-graphite">
-          Ders notu, slayt, ders kitabı bölümü, geçmiş sınav. PDF veya PPTX, dosya başına en fazla 50 MB.
+          Ders notu, slayt, ders kitabı bölümü, geçmiş sınav, video altyazısı. PDF, PPTX veya VTT, dosya başına en fazla 50 MB.
         </span>
       </span>
     </div>
