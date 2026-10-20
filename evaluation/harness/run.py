@@ -17,14 +17,14 @@ import sys
 import time
 import uuid
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import urlparse
 
 from harness.conditions import Condition
 from harness.fingerprint import file_sha256, text_sha256
-from harness.metrics import accuracy, hallucination, retrieval, scope
+from harness.metrics import accuracy, citation, hallucination, retrieval, scope
 from harness.schemas import (
     CorpusSnapshot,
     GoldItem,
@@ -62,6 +62,8 @@ class Answer:
     cited_source_ids: list[str]
     retrieved_source_ids: list[str]
     best_similarity: float | None
+    # Getirilen parçaların metni, `retrieved_source_ids` ile aynı sırada.
+    retrieved_texts: list[str | None] = field(default_factory=list)
 
 
 AskFn = Callable[[str], Answer]
@@ -113,6 +115,9 @@ def evaluate(
             )
             continue
         elapsed_ms = (clock() - started) * 1000
+        retrieved, retrieved_text = _locate_with_text(
+            answer.retrieved_source_ids, answer.retrieved_texts, locate
+        )
         results.append(
             ItemResult(
                 id=item.id,
@@ -124,7 +129,8 @@ def evaluate(
                 model=answer.model,
                 answer=answer.text,
                 cited=_locate_all(answer.cited_source_ids, locate),
-                retrieved=_locate_all(answer.retrieved_source_ids, locate),
+                retrieved=retrieved,
+                retrieved_text=retrieved_text,
                 best_similarity=answer.best_similarity,
                 latency_ms=round(elapsed_ms, 1),
             )
@@ -134,6 +140,22 @@ def evaluate(
 
 def _locate_all(source_ids: Sequence[str], locate: LocateFn) -> list[SourceLocator]:
     return [loc for loc in (locate(source_id) for source_id in source_ids) if loc is not None]
+
+
+def _locate_with_text(
+    source_ids: Sequence[str], texts: Sequence[str | None], locate: LocateFn
+) -> tuple[list[SourceLocator], list[str]]:
+    """Konumu bulunan parçalar ve metinleri.
+
+    Bir parçanın bile metni eksikse metin listesi boş kalır: judge eksik kanıta göre etiketlemez,
+    boşluk yazar.
+    """
+    located = [(locate(source_id), index) for index, source_id in enumerate(source_ids)]
+    pairs = [(loc, index) for loc, index in located if loc is not None]
+    found = [texts[index] if index < len(texts) else None for _, index in pairs]
+    if not all(found):
+        return [loc for loc, _ in pairs], []
+    return [loc for loc, _ in pairs], [text for text in found if text]
 
 
 def compute_metrics(
@@ -188,6 +210,27 @@ def compute_metrics(
         numerator=sum(cited),
         empty_gap="cevaplanmış soru yok",
     )
+    cited_with_evidence = [r for r in answered if by_id[r.id].evidence]
+    metrics["citation_evidence_coverage"] = _metric(
+        lambda: citation.evidence_coverage(
+            [r.cited for r in cited_with_evidence],
+            [by_id[r.id].evidence for r in cited_with_evidence],
+            match=SourceLocator.matches,
+        ),
+        denominator=len(cited_with_evidence),
+        empty_gap="gold kanıtı olan cevaplanmış soru yok",
+    )
+    hits, total_citations = citation.precision_counts(
+        [r.cited for r in cited_with_evidence],
+        [by_id[r.id].evidence for r in cited_with_evidence],
+        match=SourceLocator.matches,
+    )
+    metrics["citation_precision"] = _metric(
+        lambda: hits / total_citations,
+        denominator=total_citations,
+        numerator=hits,
+        empty_gap="gold kanıtı olan cevaplarda alıntı yok",
+    )
     failures = [r.outcome == "provider_failure" for r in ok]
     metrics["provider_failure_rate"] = _metric(
         lambda: sum(failures) / len(failures),
@@ -207,7 +250,8 @@ def compute_metrics(
         empty_gap="süre ölçülmedi",
     )
 
-    judge_gap = "judge kalibre edilmedi; değer üretilmedi (#13)"
+    # Judge/insan etiketi gerektirir: `python -m harness.trust` koşu kaydıyla hesaplar.
+    judge_gap = "insan/judge etiketi gerekli; harness.trust ile hesaplanır"
     metrics["answer_fully_correct_rate"] = MetricValue(
         value=None, denominator=len(answerable), target=f">= {accuracy.TARGET}", gap=judge_gap
     )
@@ -217,6 +261,7 @@ def compute_metrics(
         target=f"<= {hallucination.TARGET_MAX}",
         gap=judge_gap,
     )
+    metrics["unsupported_claim_rate"] = MetricValue(value=None, denominator=0, gap=judge_gap)
     gaps.append(
         "Maliyet (token/ücret) kaydedilmiyor: soru-cevap hattı kullanım bilgisi döndürmüyor"
     )
@@ -286,9 +331,13 @@ def _backend_ask(engine, course_id: int, llm) -> AskFn:
     """Her soru ayrı işlemde: hat commit etse bile en sonda geri alınır."""
     from sqlalchemy.orm import Session
 
-    from app.db.models import Course
+    from app.db.models import Chunk, Course
     from app.qa import service
     from app.schemas.ask import AskRequest
+
+    def _chunk_text(db: Session, source_id: str) -> str | None:
+        chunk = db.get(Chunk, int(source_id)) if source_id.isdigit() else None
+        return chunk.text if chunk is not None else None
 
     def ask(question: str) -> Answer:
         with engine.connect() as connection:
@@ -299,6 +348,8 @@ def _backend_ask(engine, course_id: int, llm) -> AskFn:
                     response = service.ask(
                         db, course, AskRequest(course_id=course_id, question=question), llm
                     )
+                    # Judge ve değerlendirici iddiaları modelin gördüğü pasajlara göre etiketler.
+                    texts = [_chunk_text(db, hit.source_id) for hit in response.retrieval]
             finally:
                 transaction.rollback()
         return Answer(
@@ -310,6 +361,7 @@ def _backend_ask(engine, course_id: int, llm) -> AskFn:
             cited_source_ids=[c.source_id for c in response.citations],
             retrieved_source_ids=[hit.source_id for hit in response.retrieval],
             best_similarity=response.best_similarity,
+            retrieved_texts=texts,
         )
 
     return ask

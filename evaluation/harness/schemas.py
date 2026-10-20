@@ -241,6 +241,9 @@ class ItemResult(_Strict):
     cited: list[SourceLocator] = []
     # Getirilen parçalar, sıra korunarak (1. eleman en iyi).
     retrieved: list[SourceLocator] = []
+    # Getirilen parçaların metni, `retrieved` ile aynı sırada (judge ve insan değerlendirici
+    # iddiaları buna göre etiketler). Koşu kayıtları git'e girmez; eski kayıtlarda boştur.
+    retrieved_text: list[str] = []
     best_similarity: float | None = None
     latency_ms: float | None = None
     error: str | None = None
@@ -273,3 +276,7 @@ def load_gold_set(path: Path) -> GoldSet:
 
 def load_manifest(path: Path) -> CorpusManifest:
     return CorpusManifest.model_validate_json(path.read_text(encoding="utf-8"))
+
+
+def load_run(path: Path) -> RunRecord:
+    return RunRecord.model_validate_json(path.read_text(encoding="utf-8"))

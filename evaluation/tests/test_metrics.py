@@ -1,5 +1,11 @@
 import pytest
 
+from harness.metrics.accuracy import fully_correct_rate
+from harness.metrics.citation import evidence_coverage, precision_counts
+from harness.metrics.hallucination import (
+    answers_with_unsupported_claim_rate,
+    unsupported_claim_rate,
+)
 from harness.metrics.retrieval import recall_at_k
 from harness.metrics.scope import decline_rate, over_refusal_rate
 
@@ -47,3 +53,35 @@ def test_decline_and_over_refusal_rates():
 def test_rates_empty_denominator(fn):
     with pytest.raises(ValueError, match="payda"):
         fn([])
+
+
+# --- Doğruluk, hallucination, alıntı kapsamı ---------------------------------------------------
+
+
+def test_fully_correct_rate():
+    assert fully_correct_rate([2, 2, 1, 0]) == 0.5
+    with pytest.raises(ValueError, match="payda"):
+        fully_correct_rate([])
+    with pytest.raises(ValueError, match="0, 1 ya da 2"):
+        fully_correct_rate([3])
+
+
+def test_hallucination_rates():
+    labels = [["supported", "unsupported"], ["supported"], []]
+    # 3 cevaptan 1'inde desteklenmeyen iddia; 3 iddiadan 1'i desteklenmiyor.
+    assert answers_with_unsupported_claim_rate(labels) == pytest.approx(1 / 3)
+    assert unsupported_claim_rate(labels) == pytest.approx(1 / 3)
+    with pytest.raises(ValueError, match="payda"):
+        unsupported_claim_rate([[]])
+    with pytest.raises(ValueError, match="etiket"):
+        answers_with_unsupported_claim_rate([["maybe"]])
+
+
+def test_citation_coverage_and_precision():
+    cited = [["a", "x"], ["z"], ["b"]]
+    gold = [["a", "c"], ["b"], []]
+    # soru 1: 2 kanıttan 1'i alıntılandı; soru 2: hiçbiri; 3. soru kanıtsız → hesaba katılmaz.
+    assert evidence_coverage(cited, gold) == pytest.approx(0.25)
+    assert precision_counts(cited, gold) == (1, 3)
+    with pytest.raises(ValueError, match="Gold kanıtı"):
+        evidence_coverage([["a"]], [[]])
