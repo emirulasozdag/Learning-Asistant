@@ -105,6 +105,7 @@ def ingest_document(
                 t_end=draft.t_end,
                 search_vector=func.to_tsvector(config, draft.text),
                 embedding=vector,
+                embedding_model=embedder.identity,
             )
             for ordinal, (draft, vector) in enumerate(zip(drafts, vectors, strict=True))
         )

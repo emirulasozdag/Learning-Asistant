@@ -222,6 +222,11 @@ class RunConfig(_Strict):
     embedding_provider: str
     embedding_model: str
     retrieval: dict[str, float | int]
+    # Vektör uzayı kimliği (`Embedder.identity`) ve indeksin parmak izi (parça metinleri,
+    # konumları, embedder kimlikleri): aynı materyal farklı parçalanır ya da başka modelle
+    # vektörleştirilirse değişir. Eski kayıtlarda boştur.
+    embedding_identity: str | None = None
+    index_fingerprint: str | None = None
 
 
 class ItemResult(_Strict):

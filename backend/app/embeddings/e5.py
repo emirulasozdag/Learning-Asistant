@@ -27,6 +27,11 @@ class E5Embedder:
         self.model_name = model_name
         self.batch_size = batch_size
 
+    @property
+    def identity(self) -> str:
+        # Önek ya da normalizasyon değişirse sürüm artırılır: eski vektörler yeniden üretilmeli.
+        return f"e5/{self.model_name}/v1"
+
     def embed_passages(self, texts: list[str]) -> list[list[float]]:
         return self._encode([f"passage: {text}" for text in texts])
 

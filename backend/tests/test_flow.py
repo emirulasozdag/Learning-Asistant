@@ -12,6 +12,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 
 from app.api import ask as ask_api
+from app.core.config import settings
 from app.db.models import Chunk, Course, Message
 from app.llm.base import LLMError
 from tests.test_answer import FakeLLM
@@ -390,6 +391,9 @@ def test_follow_up_question_gets_history(
     upload(client, course.id, sample_pdf)
     llm = FakeLLM(["Sirali dizide arama [S1]."])
     monkeypatch.setattr(ask_api, "select_client", lambda: llm)
+    # Sahte embedder'da anlamsal benzerlik yok: eksik takip sorusunu bağlamla kabul ettir.
+    monkeypatch.setattr(settings, "retrieval_follow_up_min_similarity", 0.0)
+    monkeypatch.setattr(settings, "retrieval_min_keyword_coverage", 0.3)
 
     first = client.post("/ask", json={"course_id": course.id, "question": "Ikili arama nedir?"})
     client.post(
