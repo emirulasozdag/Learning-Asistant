@@ -1,17 +1,15 @@
 import { ExternalLink, FileText, X } from "lucide-react";
-import { useEffect, useState } from "react";
 
-import { ApiError } from "../../api/client";
-import type { Highlight, SourceDetail } from "../../api/types";
 import Sheet from "../../components/Sheet";
 import { materialLabel } from "../../labels";
-import { tutorService } from "../../services/tutorService";
 import { formatTimeRange } from "../../text";
 import Button from "../../ui/Button";
 import { buttonClasses } from "../../ui/buttonStyles";
 import EmptyState from "../../ui/EmptyState";
 import IconButton from "../../ui/IconButton";
 import Skeleton from "../../ui/Skeleton";
+import PageImage from "./PageImage";
+import { useSourceDetail } from "./useSourceDetail";
 
 /**
  * Seçilen alıntının ders materyalindeki yeri: gerçek PDF sayfası + işaretli satırlar.
@@ -27,35 +25,7 @@ export default function SourcePanel({
   onClose: () => void;
   modal?: boolean;
 }) {
-  const [source, setSource] = useState<SourceDetail | null>(null);
-  /** "missing": kaynak yok (404), tekrar denemek işe yaramaz. "failed": ulaşılamadı. */
-  const [failure, setFailure] = useState<"missing" | "failed" | null>(null);
-  const [attempt, setAttempt] = useState(0);
-
-  useEffect(() => {
-    let cancelled = false;
-    const controller = new AbortController();
-    tutorService
-      .source(sourceId, controller.signal)
-      .then((detail) => {
-        if (!cancelled) setSource(detail);
-      })
-      .catch((reason: unknown) => {
-        if (cancelled) return;
-        setFailure(reason instanceof ApiError && reason.status === 404 ? "missing" : "failed");
-      });
-    return () => {
-      cancelled = true;
-      controller.abort();
-    };
-  }, [sourceId, attempt]);
-
-  function retry() {
-    setFailure(null);
-    setAttempt((count) => count + 1);
-  }
-
-  const current = source?.source_id === sourceId ? source : null;
+  const { source: current, failure, retry } = useSourceDetail(sourceId);
   const isPdf = Boolean(current?.page_image_url);
   const isVideo = current?.material_type === "video";
   const Root = modal ? "div" : "aside";
@@ -153,35 +123,5 @@ export default function SourcePanel({
         )}
       </div>
     </Root>
-  );
-}
-
-function PageImage({ src, alt, highlights }: { src: string; alt: string; highlights: Highlight[] }) {
-  const [loaded, setLoaded] = useState(false);
-  return (
-    <figure className="relative overflow-hidden rounded-sm bg-surface shadow-page">
-      <img
-        src={src}
-        alt={alt}
-        onLoad={() => setLoaded(true)}
-        className={`block w-full transition-opacity duration-300 ${loaded ? "opacity-100" : "opacity-0"}`}
-      />
-      {!loaded && <Skeleton className="absolute inset-0 rounded-none" />}
-      {loaded &&
-        highlights.map((box, index) => (
-          <span
-            key={index}
-            aria-hidden
-            className="marker-box"
-            style={{
-              left: `${box.x * 100}%`,
-              top: `${box.y * 100}%`,
-              width: `${box.width * 100}%`,
-              height: `${box.height * 100}%`,
-              animationDelay: `${index * 45}ms`,
-            }}
-          />
-        ))}
-    </figure>
   );
 }

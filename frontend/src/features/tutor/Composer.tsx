@@ -87,7 +87,7 @@ export default function Composer({
             type="submit"
             disabled={!canSend}
             aria-label="Gönder"
-            className="flex size-9 shrink-0 items-center justify-center rounded-control bg-accent text-white transition-colors hover:bg-accent-hover disabled:bg-muted-bg disabled:text-faint"
+            className="flex size-9 shrink-0 items-center justify-center rounded-control bg-accent text-on-accent transition-colors hover:bg-accent-hover disabled:bg-muted-bg disabled:text-faint"
           >
             <ArrowUp size={16} aria-hidden />
           </button>

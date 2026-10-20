@@ -23,6 +23,9 @@ export interface Turn {
   failure?: TutorFailure;
   /** Öğrenci "Durdur"a bastı; cevap tamamlanmadı. */
   stopped?: boolean;
+  /** Sorunun gönderildiği ve doğrulanmış cevabın geldiği an (ms); cevap süresi için. */
+  startedAt?: number;
+  finishedAt?: number;
 }
 
 export interface SelectSourceProps {

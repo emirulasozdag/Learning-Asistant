@@ -2,12 +2,13 @@
 import { api } from "../api/client";
 import type { AskStreamEvent } from "../api/types";
 
-export type QuickAction = "simpler" | "example";
+export type QuickAction = "simpler" | "example" | "quiz";
 
 /** Cevabın altındaki hızlı eylemler aynı sohbette takip sorusu olarak gönderilir. */
 const QUICK_ACTION_PROMPTS: Record<QuickAction, string> = {
   simpler: "Bunu daha basit, adım adım anlatır mısın?",
   example: "Bunu ders materyalindeki bir örnekle gösterir misin?",
+  quiz: "Bu konuyu anlayıp anlamadığımı görmek için bana ders materyaline dayanan kısa bir soru sorar mısın?",
 };
 
 export const tutorService = {
