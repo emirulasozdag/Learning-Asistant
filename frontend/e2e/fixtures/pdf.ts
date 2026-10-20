@@ -20,7 +20,8 @@ export const COURSE_A: TestCourse = {
       heading: "İkili arama",
       paragraphs: [
         "İkili arama sıralı bir dizide aranan değeri bulmak için kullanılır.",
-        "Her adımda dizinin ortasındaki eleman aranan değerle karşılaştırılır. Aranan değer ortadaki elemandan küçükse sağ yarı atılır, büyükse sol yarı atılır.",
+        // "çalışır" testlerin sorusunda geçer: sahte embedder'la alakasızlık kapısı kelime kapsamasına bakar.
+        "İkili arama şöyle çalışır: her adımda dizinin ortasındaki eleman aranan değerle karşılaştırılır. Aranan değer ortadaki elemandan küçükse sağ yarı atılır, büyükse sol yarı atılır.",
         "Böylece her adımda arama alanı yarıya iner ve ikili aramanın zaman karmaşıklığı logaritmiktir.",
       ],
     },

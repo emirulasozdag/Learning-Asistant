@@ -26,6 +26,8 @@ export default function MaterialsPage() {
   const [loadFailed, setLoadFailed] = useState(false);
   const [pending, setPending] = useState<PendingUpload[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
+  // ADR-3: yükleme, eğitmenin onaylı materyal beyanıyla yapılır (backend `declaration=true` ister).
+  const [declared, setDeclared] = useState(false);
   const [reports, setReports] = useState<Record<number, IngestionReport>>({});
   const [openDocument, setOpenDocument] = useState<DocumentOut | null>(null);
   const [toDelete, setToDelete] = useState<DocumentOut | null>(null);
@@ -133,9 +135,23 @@ export default function MaterialsPage() {
         }
       />
 
+      <label className="flex cursor-pointer items-start gap-3 rounded-panel border border-line bg-surface px-4 py-3">
+        <input
+          type="checkbox"
+          checked={declared}
+          onChange={(event) => setDeclared(event.target.checked)}
+          className="mt-1 size-4 accent-accent"
+        />
+        <span className="text-base text-ink">
+          Yükleyeceğim dosyaların bu ders için kullanılmasına izin verilmiş materyal olduğunu ve cevap üretmek
+          için yapay zekâ servisine gönderilebileceğini beyan ederim.
+        </span>
+      </label>
+
       <Dropzone
         onFiles={(files) => void addFiles(files)}
         onReject={setNotice}
+        disabled={!declared}
         compact={Boolean(documents && documents.length > 0)}
       />
 

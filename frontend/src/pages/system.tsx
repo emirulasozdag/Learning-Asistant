@@ -7,7 +7,8 @@ import EmptyState from "../ui/EmptyState";
 
 /** "/" — rolün ana sayfasına ya da girişe yönlendirir. */
 export function RootRedirect() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+  if (loading) return null;
   return <Navigate to={user ? homePath(user.role) : "/login"} replace />;
 }
 

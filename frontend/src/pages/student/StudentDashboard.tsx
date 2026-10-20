@@ -4,6 +4,7 @@ import { Link } from "react-router";
 
 import { useAuth } from "../../auth/useAuth";
 import AskBox from "../../features/courses/AskBox";
+import JoinCourseForm from "../../features/courses/JoinCourseForm";
 import { useCourses } from "../../features/courses/context";
 import { useMaterialSummaries, type MaterialSummary } from "../../features/courses/useMaterialSummaries";
 import { courseMetaParts, describeTotals } from "../../labels";
@@ -51,6 +52,11 @@ export default function StudentDashboard() {
 
       <div className="page">
         <PageTitle title="Derslerim" />
+        {!loading && !error && courses.length > 0 && (
+          <div className="mb-6">
+            <JoinCourseForm />
+          </div>
+        )}
         {loading ? (
           <SkeletonRows rows={3} />
         ) : error ? (
@@ -69,7 +75,8 @@ export default function StudentDashboard() {
           <EmptyState
             icon={BookOpen}
             title="Henüz kayıtlı dersin yok"
-            description="Eğitmenin dersi oluşturduğunda burada görünecek."
+            description="Eğitmeninden dersin katılım kodunu iste ve aşağıya gir."
+            action={<JoinCourseForm />}
           />
         ) : (
           <ul className="divide-y divide-line border-y border-line">

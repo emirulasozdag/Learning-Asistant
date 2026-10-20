@@ -5,6 +5,7 @@ import { Link } from "react-router";
 import type { CourseActivity, DocumentOut } from "../../api/types";
 import { useAuth } from "../../auth/useAuth";
 import CourseInfoDialog from "../../features/courses/CourseInfoDialog";
+import JoinCodePanel from "../../features/courses/JoinCodePanel";
 import { useCourseOutlet } from "../../features/courses/courseOutlet";
 import { MATERIAL_LABELS, TYPE_ORDER, materialTotals, totalsHeading } from "../../labels";
 import { formatTime } from "../../text";
@@ -74,6 +75,8 @@ export default function CourseOverview() {
         />
         <MaterialSummary documents={documents} failed={documentsFailed} instructor={instructor} base={base} />
       </section>
+
+      {course.role === "instructor" && <JoinCodePanel courseId={course.id} />}
 
       {instructor && <ActivitySummary courseId={course.id} base={base} />}
 

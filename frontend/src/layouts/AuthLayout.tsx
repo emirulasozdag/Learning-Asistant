@@ -1,13 +1,16 @@
-import { Navigate, Outlet } from "react-router";
+import { Navigate, Outlet, useLocation } from "react-router";
 
-import { homePath, useAuth } from "../auth/useAuth";
+import { afterLoginPath, useAuth } from "../auth/useAuth";
 import InfoPanel from "../ui/InfoPanel";
 import Logo from "../ui/Logo";
 
 /** Giriş / kayıt: kurumsal üst bar, mavi şerit, solda form, sağda platform hakkında. */
 export default function AuthLayout() {
-  const { user } = useAuth();
-  if (user) return <Navigate to={homePath(user.role)} replace />;
+  const { user, loading } = useAuth();
+  const location = useLocation();
+  if (loading) return null;
+  // Giriş/kayıt başarılı olunca kullanıcı burada yönlendirilir (istenen sayfa korunur).
+  if (user) return <Navigate to={afterLoginPath(user.role, location.state)} replace />;
 
   return (
     <div className="flex min-h-dvh flex-col bg-canvas">

@@ -10,12 +10,19 @@ import type {
   CourseOutline,
   CourseSummary,
   CourseUpdate,
+  Consent,
+  DemoInfo,
+  ConsentUpdate,
   DocumentOut,
+  JoinCode,
   LearningRecord,
+  LoginRequest,
   MaterialType,
+  Me,
   MistakeSummary,
   PracticeItem,
   PracticeRequest,
+  RegisterRequest,
   ReviewDecision,
   Rubric,
   RubricIn,
@@ -35,13 +42,23 @@ const BASE = "/api";
 export class ApiError extends Error {
   readonly kind: "network" | "http" | "stream";
   readonly status?: number;
+  /** Backend'in hata kodu (`not_authenticated`, `consent_required`…); yoksa boş. */
+  readonly code?: string;
 
-  constructor(message: string, kind: "network" | "http" | "stream", status?: number) {
+  constructor(message: string, kind: "network" | "http" | "stream", status?: number, code?: string) {
     super(message);
     this.name = "ApiError";
     this.kind = kind;
     this.status = status;
+    this.code = code;
   }
+}
+
+let onUnauthorized: (() => void) | null = null;
+
+/** Oturum düşünce (401) çağrılır; AuthProvider kullanıcıyı çıkış yapmış sayar. */
+export function setUnauthorizedHandler(handler: (() => void) | null): void {
+  onUnauthorized = handler;
 }
 
 /** `fetch` ile aynı; ağ hatasını `ApiError("network")` yapar. İptal (abort) olduğu gibi geçer. */
@@ -55,7 +72,10 @@ async function send(input: string, init?: RequestInit): Promise<Response> {
 }
 
 async function httpError(response: Response): Promise<ApiError> {
-  return new ApiError(await errorMessage(response), "http", response.status);
+  const { detail, code } = await errorBody(response);
+  // Hatalı şifre de 401 döner; o durumda oturum zaten yoktur, çıkış kancası çağrılmaz.
+  if (response.status === 401 && !response.url.endsWith("/auth/login")) onUnauthorized?.();
+  return new ApiError(detail, "http", response.status, code);
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -66,18 +86,22 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (!response.ok) {
     throw await httpError(response);
   }
+  if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
 }
 
-/** Backend'in `detail` mesajını (Türkçe) gösterir; yoksa HTTP durumunu. */
-async function errorMessage(response: Response): Promise<string> {
+/** Backend'in `detail` mesajı (Türkçe; yoksa HTTP durumu) ve varsa hata kodu. */
+async function errorBody(response: Response): Promise<{ detail: string; code?: string }> {
   try {
-    const body = (await response.json()) as { detail?: unknown };
-    if (typeof body.detail === "string") return body.detail;
+    const body = (await response.json()) as { detail?: unknown; code?: unknown };
+    const code = typeof body.code === "string" ? body.code : undefined;
+    if (typeof body.detail === "string") return { detail: body.detail, code };
+    // FastAPI doğrulama hatası: alan hataları listesi
+    if (Array.isArray(body.detail)) return { detail: "Girilen bilgiler geçersiz.", code };
   } catch {
     // JSON olmayan hata gövdesi
   }
-  return `İstek başarısız (${response.status})`;
+  return { detail: `İstek başarısız (${response.status})` };
 }
 
 /**
@@ -150,7 +174,35 @@ function parseSseBlock(block: string): AskStreamEvent | null {
 }
 
 export const api = {
+  me: (signal?: AbortSignal) => request<Me>("/me", { signal }),
+
+  login: (body: LoginRequest) =>
+    request<Me>("/auth/login", { method: "POST", body: JSON.stringify(body) }),
+
+  register: (body: RegisterRequest) =>
+    request<Me>("/auth/register", { method: "POST", body: JSON.stringify(body) }),
+
+  logout: () => request<void>("/auth/logout", { method: "POST" }),
+
+  /** Sunum modu kapalıysa 404 döner. */
+  demoInfo: (signal?: AbortSignal) => request<DemoInfo>("/auth/demo", { signal }),
+
+  demoLogin: (role: "instructor" | "student") =>
+    request<Me>("/auth/demo-login", { method: "POST", body: JSON.stringify({ role }) }),
+
+  updateConsent: (body: ConsentUpdate) =>
+    request<Consent>("/me/consent", { method: "PUT", body: JSON.stringify(body) }),
+
   courses: () => request<CourseSummary[]>("/courses"),
+
+  joinCourse: (code: string) =>
+    request<CourseSummary>("/courses/join", { method: "POST", body: JSON.stringify({ code }) }),
+
+  joinCode: (courseId: number, signal?: AbortSignal) =>
+    request<JoinCode>(`/courses/${courseId}/join-code`, { signal }),
+
+  rotateJoinCode: (courseId: number) =>
+    request<JoinCode>(`/courses/${courseId}/join-code`, { method: "POST" }),
 
   createCourse: (body: CourseCreate) =>
     request<CourseSummary>("/courses", { method: "POST", body: JSON.stringify(body) }),
@@ -213,6 +265,8 @@ export const api = {
     const form = new FormData();
     form.append("material_type", materialType);
     form.append("file", file);
+    // ADR-3: eğitmen dosyanın bu ders için onaylı materyal olduğunu beyan eder (formda işaretlenir).
+    form.append("declaration", "true");
     if (title) form.append("title", title);
     return request<DocumentOut>(`/courses/${courseId}/materials`, { method: "POST", body: form });
   },

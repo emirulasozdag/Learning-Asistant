@@ -16,6 +16,8 @@ from pathlib import Path
 
 from sqlalchemy import select
 
+from app.auth.demo import enroll_dev_instructor
+from app.core.config import settings
 from app.db.models import Course, Document
 from app.db.session import SessionLocal
 from app.embeddings.provider import get_embedder
@@ -51,6 +53,8 @@ def main() -> None:
         course.syllabus = ocw.read_syllabus(root)
         course.calendar = ocw.read_calendar(root)
         db.commit()
+        if enroll_dev_instructor(db, course):
+            print(f"Demo eğitmeni ({settings.dev_instructor_email}) dersin eğitmeni yapıldı.")
 
         existing = set(db.scalars(select(Document.title).where(Document.course_id == course.id)))
         added = skipped = failed = pages = chunks = 0
@@ -89,10 +93,11 @@ def main() -> None:
             f"İzlence: {len(course.syllabus or [])} blok, "
             f"takvim: {len((course.calendar or {}).get('rows', []))} hafta."
         )
-        print(
-            "Dersi görmek için bir eğitmene bağlayın: python -m app.scripts.create_instructor "
-            f'--email ... --name "..." --course {course.code}'
-        )
+        if not settings.seed_dev_accounts:
+            print(
+                "Dersi görmek için bir eğitmene bağlayın: python -m app.scripts.create_instructor "
+                f'--email ... --name "..." --course {course.code}'
+            )
 
 
 if __name__ == "__main__":

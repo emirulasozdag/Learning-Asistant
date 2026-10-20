@@ -17,6 +17,20 @@ export const courseService = {
     return api.createCourse(input);
   },
 
+  /** Katılım koduyla derse öğrenci olarak katılır (ADR-2). */
+  join(code: string): Promise<Course> {
+    return api.joinCourse(code);
+  },
+
+  /** Katılım kodu (yalnızca eğitmen); yoksa sunucu üretir. */
+  joinCode(courseId: number, signal?: AbortSignal) {
+    return api.joinCode(courseId, signal);
+  },
+
+  rotateJoinCode(courseId: number) {
+    return api.rotateJoinCode(courseId);
+  },
+
   update(courseId: number, input: CourseUpdate): Promise<Course> {
     return api.updateCourse(courseId, input);
   },

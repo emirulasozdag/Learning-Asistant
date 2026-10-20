@@ -245,6 +245,8 @@ export interface UserOut {
   name: string;
   email: string;
   title: string | null;
+  /** Ders açabilir mi (eğitmen hesabı); hiç dersi olmayan eğitmen de eğitmen ana sayfasını görür. */
+  can_create_courses: boolean;
 }
 
 /** Kullanıcının bir dersteki rolü. */
@@ -275,6 +277,32 @@ export interface Me {
 /** Katılım kodu ile derse katılma. */
 export interface JoinCourseRequest {
   code: string;
+}
+
+/** Sunum modu (DEMO_LOGIN): giriş ekranındaki demo hesapları ve derslerin katılım kodları. */
+export interface DemoAccount {
+  role: "instructor" | "student";
+  name: string;
+  email: string;
+  title: string | null;
+}
+
+export interface DemoCourse {
+  course_id: number;
+  code: string;
+  name: string;
+  join_code: string;
+}
+
+export interface DemoInfo {
+  accounts: DemoAccount[];
+  courses: DemoCourse[];
+}
+
+/** Dersin katılım kodu; yalnızca eğitmen görür ve yeniler. */
+export interface JoinCode {
+  code: string;
+  expires_at: string | null;
 }
 
 export interface LoginRequest {

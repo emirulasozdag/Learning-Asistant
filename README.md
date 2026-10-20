@@ -89,12 +89,28 @@ Sonraki açılışlarda model `models` volume'undan yüklenir, internet gerekmez
   `DELETE /me` hesabı siler.
 
 ### Demo
-Arayüzdeki giriş #12'ye kadar sahtedir (oturum yalnızca tarayıcıda; backend bu oturumu tanımaz):
-**Dr. Ayşe Demir** (eğitmen) ve **Elif Kaya** (öğrenci). Aşağıdaki akış #12 ile gerçek hesaplarla çalışır.
+Giriş gerçektir (e-posta + şifre, sunucu oturumu). `docker compose up` ile açılan yerel sistemde **demo
+hesapları kendiliğinden gelir**; giriş ekranının altındaki **Demo hesapları**'na tıklayınca şifresiz girilir:
 
-1. Eğitmen olarak gir. Sol menüdeki **+** ile bir ders oluştur (ya da hazır BLM2512'yi kullan).
-2. Dersin **Materyaller** sekmesine PDF sürükle. Yükleme sonrası dokümana tıklayınca, yükleme raporu (okunan sayfa, temizlenen satırlar, parça ve vektör sayısı) ve sistemin çıkardığı parçalar sayfa numaralarıyla görünür.
-3. Öğrenci olarak gir, dersin **AI Tutor**'unu aç ve bir soru sor (ör. *Binary search'te neden sağ yarıyı atabiliyoruz?*). Cevap akarak gelir; sarı numaraya ya da kaynak kartına tıklayınca sağda PDF'in o sayfası açılır ve alıntılanan satırlar işaretlenir.
+- **Dr. Ayşe Demir** (eğitmen): demo dersin (BLM2512) ve içeri alınan OCW derslerinin eğitmeni
+- **Elif Kaya** (öğrenci): BLM2512'ye kayıtlı; diğer derslere katılım koduyla katılır
+
+Derslerin **katılım kodları** da giriş ekranında listelenir; öğrencinin "Derse katıl" kutusunun altında tek tıkla
+yazılır. İlk girişte aydınlatma metni onaylanır.
+
+> Bu sunum modu yalnızca yerel geliştirme içindir (`docker-compose.yml` varsayılanı; uygulamanın kendi
+> varsayılanı kapalı). Gerçek kurulumda `SEED_DEV_ACCOUNTS=false` ve `DEMO_LOGIN=false` olmalı.
+> Gerçek eğitmen hesabı: `docker compose exec api python -m app.scripts.create_instructor --email ... --name "..." --course BLM2512`.
+
+**MIT 6.006 dersini eklemek (isteğe bağlı, sunum için):**
+1. [6.006 Introduction to Algorithms](https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/download/) sayfasından paketi indirip açın.
+   Klasörü `data/ocw/6-006-spring-2020` olarak koyun (içinde `data.json` olmalı). `data/` git'e girmez.
+2. `docker compose exec api python -m app.scripts.import_ocw /code/data/ocw/6-006-spring-2020`
+   (89 PDF; ilk seferde ~15 dk). Ders demo eğitmenine otomatik bağlanır; kodu giriş ekranında görünür.
+
+1. Eğitmen olarak gir. Ders genel bakışında **katılım kodunu** gör; yeni ders için **+ Ders oluştur**.
+2. Dersin **Materyal yönetimi** sekmesinde beyanı işaretle ve PDF sürükle. Yükleme sonrası dokümana tıklayınca, yükleme raporu (okunan sayfa, temizlenen satırlar, parça ve vektör sayısı) ve sistemin çıkardığı parçalar sayfa numaralarıyla görünür.
+3. Öğrenci olarak gir (ya da **Hesap oluştur**), Derslerim'de katılım koduyla derse katıl, dersin **AI Tutor**'unu aç ve bir soru sor (ör. *Binary search'te neden sağ yarıyı atabiliyoruz?*). Cevap akarak gelir; sarı numaraya ya da kaynak kartına tıklayınca sağda PDF'in o sayfası açılır ve alıntılanan satırlar işaretlenir.
 4. Takip sorusu sor (ör. *Peki karmaşıklığı ne?*). Asistan önceki soruyu hatırlar.
 5. Ders dışı bir soru sor (ör. *Fransa'nın başkenti neresi?*). Asistan "materyalde yok" der; "Nasıl bulundu" panelinde benzerliğin eşiğin altında kaldığı görülür.
 

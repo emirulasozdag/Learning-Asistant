@@ -86,6 +86,7 @@ def test_register_sets_httponly_cookie_and_gives_empty_me(client_for) -> None:
     assert "httponly" in response.headers["set-cookie"].lower()
     assert settings.session_cookie_name in response.headers["set-cookie"]
     body = response.json()
+    assert body["user"]["can_create_courses"] is False
     assert body["memberships"] == []
     assert body["consent"]["consented_at"] is None
     assert body["consent"]["policy_version"] == ""
@@ -140,7 +141,10 @@ def test_login_with_upper_case_email_works(client_for, user) -> None:
     )
 
     assert response.status_code == 200
-    assert client.get("/me").json()["user"]["email"] == "egitmen@example.com"
+    me = client.get("/me").json()["user"]
+    assert me["email"] == "egitmen@example.com"
+    # Eğitmen hesabı: arayüz hiç dersi yokken de eğitmen ana sayfasını açar.
+    assert me["can_create_courses"] is True
 
 
 def test_logout_invalidates_the_token(client_for, user) -> None:
