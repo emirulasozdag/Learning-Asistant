@@ -41,7 +41,7 @@ def upload_vtt(client: TestClient, course_id: int, path: Path, **data: str):
     with path.open("rb") as file:
         return client.post(
             f"/courses/{course_id}/materials",
-            data={"material_type": "video", **data},
+            data={"material_type": "video", "declaration": "true", **data},
             files={"file": (path.name, file)},
         )
 
@@ -104,7 +104,7 @@ def test_vtt_is_always_video_even_if_another_type_is_chosen(
     with path.open("rb") as file:
         response = client.post(
             f"/courses/{course.id}/materials",
-            data={"material_type": "notes"},
+            data={"material_type": "notes", "declaration": "true"},
             files={"file": (path.name, file)},
         )
 
@@ -186,7 +186,11 @@ def test_media_url_is_only_meaningful_for_video_uploads(
     with sample_pdf.open("rb") as file:
         response = client.post(
             f"/courses/{course.id}/materials",
-            data={"material_type": "notes", "media_url": "https://video.example.com/ders1"},
+            data={
+                "material_type": "notes",
+                "declaration": "true",
+                "media_url": "https://video.example.com/ders1",
+            },
             files={"file": (sample_pdf.name, file)},
         )
 

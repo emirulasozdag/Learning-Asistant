@@ -28,6 +28,7 @@ def dense_search(
         .where(
             Chunk.course_id == course.id,
             Document.course_id == course.id,
+            Document.approved_at.is_not(None),
             Chunk.embedding.is_not(None),
             Chunk.embedding_model == embedding_model,
         )

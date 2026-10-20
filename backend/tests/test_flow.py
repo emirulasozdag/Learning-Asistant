@@ -1,6 +1,7 @@
 """Uçtan uca akış: ders → materyal yükle → soru sor → kaynağı aç (gerçek veritabanı).
 
 Sahte embedder ve (gerektiğinde) sahte LLM ile çalışır; TEST_DATABASE_URL yoksa atlanır.
+`client` dersin eğitmeni olarak oturum açmıştır (conftest); yetki testleri test_access.py'de.
 """
 
 import json
@@ -15,6 +16,7 @@ from app.api import ask as ask_api
 from app.core.config import settings
 from app.db.models import Chunk, Course, Message
 from app.llm.base import LLMError
+from tests.conftest import enroll, make_user
 from tests.test_answer import FakeLLM
 
 # Ders bilgisi alanları verilmediğinde boş döner.
@@ -31,7 +33,7 @@ def upload(client: TestClient, course_id: int, path: Path, material_type: str = 
     with path.open("rb") as file:
         return client.post(
             f"/courses/{course_id}/materials",
-            data={"material_type": material_type},
+            data={"material_type": material_type, "declaration": "true"},
             files={"file": (path.name, file)},
         )
 
@@ -46,7 +48,7 @@ def test_courses_are_listed(client: TestClient, course: Course) -> None:
             "code": "BLM2512",
             "name": "Veri Yapilari ve Algoritmalar",
             "language": "tr",
-            "role": None,
+            "role": "instructor",
             **EMPTY_INFO,
         }
     ]
@@ -157,11 +159,12 @@ def test_ask_out_of_scope_question_is_declined(
 
 
 def test_search_is_isolated_per_course(
-    client: TestClient, db, course: Course, sample_pdf: Path
+    client: TestClient, db, user, course: Course, sample_pdf: Path
 ) -> None:
     other = Course(code="FIZ101", name="Fizik", language="tr")
     db.add(other)
     db.commit()
+    enroll(db, user, other, "student")
     upload(client, course.id, sample_pdf)
 
     answer = client.post("/ask", json={"course_id": other.id, "question": "ikili arama"}).json()
@@ -197,7 +200,7 @@ def test_create_course_normalizes_code_and_rejects_duplicates(client: TestClient
         "code": "BLM2512",
         "name": "Veri Yapilari",
         "language": "tr",
-        "role": None,
+        "role": "instructor",
         **EMPTY_INFO,
     }
     assert duplicate.status_code == 409
@@ -270,7 +273,7 @@ def test_pptx_source_has_no_page_image(
 
 
 def test_conversation_is_remembered_and_isolated(
-    client: TestClient, db, course: Course, sample_pdf: Path
+    client: TestClient, db, user, course: Course, sample_pdf: Path
 ) -> None:
     upload(client, course.id, sample_pdf)
     first = client.post("/ask", json={"course_id": course.id, "question": "Ikili arama nedir?"})
@@ -287,6 +290,7 @@ def test_conversation_is_remembered_and_isolated(
     other = Course(code="FIZ101", name="Fizik", language="tr")
     db.add(other)
     db.commit()
+    enroll(db, user, other, "student")
     foreign = client.post(
         "/ask",
         json={"course_id": other.id, "question": "?", "conversation_id": conversation_id},
@@ -298,6 +302,7 @@ def test_conversation_is_remembered_and_isolated(
     ).all()
     assert roles == ["user", "assistant", "user", "assistant"]
     assert foreign.status_code == 404
+    assert foreign.json()["code"] == "conversation_not_found"
 
 
 def test_stream_endpoint_sends_retrieval_deltas_and_validated_answer(
@@ -424,25 +429,37 @@ def test_stream_reports_unexpected_errors_as_event(
 
 
 def test_instructor_activity_is_computed_from_real_questions(
-    client: TestClient, course: Course, sample_pdf: Path
+    client: TestClient, client_for, db, course: Course, sample_pdf: Path
 ) -> None:
     upload(client, course.id, sample_pdf)
-    answered = client.post(
-        "/ask", json={"course_id": course.id, "question": "Neden sag yari elenir?"}
-    ).json()
-    client.post("/ask", json={"course_id": course.id, "question": "Fransa'nın başkenti neresi?"})
+    students = []
+    for number in range(3):
+        student = make_user(db, f"ogrenci{number}@example.com", research_logging=True)
+        enroll(db, student, course, "student")
+        students.append(client_for(student))
+    answered = (
+        students[0]
+        .post("/ask", json={"course_id": course.id, "question": "Neden sag yari elenir?"})
+        .json()
+    )
+    students[1].post(
+        "/ask", json={"course_id": course.id, "question": "Fransa'nın başkenti neresi?"}
+    )
+    students[2].post("/ask", json={"course_id": course.id, "question": "Sag yari neden elenir?"})
+    for student in (students[0], students[2]):  # cevapsızlar da üç ayrı öğrenciden gelsin
+        student.post("/ask", json={"course_id": course.id, "question": "Ankara kac yilinda?"})
 
     activity = client.get(f"/instructor/courses/{course.id}/activity").json()
 
-    assert activity["questions"] == 2 and activity["conversations"] == 2
-    assert activity["answered"] == 1 and activity["not_covered"] == 1
-    assert len(activity["daily"]) == 14 and activity["daily"][-1]["questions"] == 2
+    assert activity["questions"] == 5 and activity["conversations"] == 5
+    assert activity["answered"] == 2 and activity["not_covered"] == 3
+    assert len(activity["daily"]) == 14 and activity["daily"][-1]["questions"] == 5
     top = activity["top_sources"][0]
     assert top["source_id"] == answered["citations"][0]["source_id"]
-    assert (top["document_title"], top["page"], top["citations"]) == ("notlar", 2, 1)
+    assert (top["document_title"], top["page"], top["citations"]) == ("notlar", 2, 2)
     unanswered = [q["question"] for q in activity["unanswered_questions"]]
-    assert unanswered == ["Fransa'nın başkenti neresi?"]
-    assert activity["recent_questions"][0]["question"] == "Fransa'nın başkenti neresi?"
+    assert unanswered == ["Ankara kac yilinda?"] * 2 + ["Fransa'nın başkenti neresi?"]
+    assert activity["recent_questions"][0]["question"] == "Ankara kac yilinda?"
 
 
 def test_instructor_activity_for_unknown_course_is_404(client: TestClient) -> None:

@@ -16,6 +16,8 @@ class SourceDetail(BaseModel):
     """Kaynak görüntüleyicide açılacak alıntı: metin + sayfa veya video anı."""
 
     source_id: str
+    # Erişim kontrolü için (CONTRACTS.md §1, §3): kaynak yalnızca bu dersin üyelerine açılır.
+    course_id: int
     document_id: int
     document_title: str
     material_type: MaterialType

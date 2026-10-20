@@ -75,8 +75,7 @@ Değişmezler:
   zamanında `ValidationError` oluşur ve `RetrievedPassage` `material_type` taşımadığı için arama katmanı da
   değişmelidir. **Metin donduruldu; koda geçişi evidence işi / #16.**
 - `RetrievalHit`'e `document_id`, `material_type`, `t_start`, `t_end` eklenir — **[ekleme]**. Metin donduruldu; koda geçişi aynı iş.
-- `SourceDetail.course_id` — **[ekleme]**. Metin donduruldu; koda geçişi **#11** (erişim kontrolü ile birlikte;
-  [lookup.py](../backend/app/sources/lookup.py) doldurmalıdır).
+- `SourceDetail.course_id` — **[ekleme]**. **#11'de koda geçti** ([lookup.py](../backend/app/sources/lookup.py)).
 - TS `SourceDetail.material_type: string` → `MaterialType` — kırıcı değil (tüketici `materialLabel(type: string)`
   `MaterialType`'ı kabul eder). **Bu PR'da tip olarak donduruldu.**
 - `SourceUsage` (PR #68) ileride `Citation + {citations: int}` olmalıdır; üretici ([instructor/activity.py](../backend/app/instructor/activity.py))
@@ -166,6 +165,30 @@ Hata davranışı: kontrolden geçen bir item üretilemezse `422 {code: "no_vali
 - **Metin donduruldu; koda geçişi #11:** `CourseSummary.role` zorunluluğu, `SourceDetail.course_id`, `GET /courses`
   davranışı, ORM/migration (`users`, `enrollments`, onay, `conversations.user_id`, `documents.approved_*`),
   hata kodlarının üretilmesi ve tüm endpoint'lerde yetki kontrolü.
+
+**#11'de koda geçti (backend).** Aşağıdaki "Şu an" tablosunun backend sütunu #11 öncesini anlatır; frontend
+sütunu #12'ye kadar geçerlidir.
+- Endpoint'ler: `POST /auth/register|login|logout`, `GET /me`, `PUT /me/consent`, `POST /courses/join`; `GET /courses`
+  yalnızca üye olunan dersler, `CourseSummary.role` zorunlu. Oturum: httpOnly `la_session` çerezi (SameSite=Lax),
+  sunucuda yalnızca belirteç özeti; durum değiştiren istekte `Origin` başlığı izinli kökenlerden biri olmalı (CSRF).
+- Yetki: §3 kuralları bütün ders kapsamlı endpoint'lerde uygulanır; 501 iskeletleri de önce yetki denetler.
+  Yükleme, doküman silme, ders düzenleme, katılım kodu, rubrik girişi: `instructor`. Etkinlik, sık hatalar,
+  rubrik listesi: `instructor | ta`. Okuma ve soru: dersin her üyesi.
+- `Consent`: `consented_at == null` ⇔ aydınlatma metni kabul edilmedi (`policy_version` boş metin). `PUT /me/consent`
+  yalnızca sunucunun güncel sürümünü (`PRIVACY_POLICY_VERSION`) kabul eder, değilse `422 validation_error`.
+  Güncel sürüm kabul edilmeden `/ask`, `/ask/stream`, `/practice` → `403 consent_required`.
+- Hata zarfı `{detail, code}` kimlik/yetki hatalarında ve bu PR'ın dokunduğu 404/409'larda üretilir; diğerleri
+  (#5) hâlâ `{detail}`.
+- **[ekleme] #11** (frontend #12 tüketir):
+  - `GET /courses/{id}/join-code` → `JoinCode {code: str, expires_at: datetime | null}`; `POST` aynı yol → kodu yeniler
+    (eski kod geçersiz, var olan üyelikler kalır). Yalnızca `instructor`.
+  - `DELETE /me/data` → 204 (kullanıcının bütün sohbet ve mesajları); `DELETE /me` → 204 (hesap ve bağlı veri).
+  - `ErrorCode`'a `consent_required`, `email_exists`.
+  - `POST /courses/{id}/materials` formuna zorunlu `declaration=true` (ADR-3 beyanı) — **[KIRICI]** arayüz yükleme formu.
+  - `POST /courses` yalnızca ders açma yetkisi olan hesap (eğitmen hesabı; seed ya da `create_instructor` betiği);
+    değilse `403 insufficient_role`. `Me` bu yetkiyi taşımaz: hiç dersi olmayan eğitmenin ana sayfası #12'de
+    açık soru (DECISIONS.md açık soru 7).
+- Şifre: 8–256 karakter; e-posta küçük harfe çevrilir ve basit biçim denetiminden geçer.
 
 **Şu an.**
 
