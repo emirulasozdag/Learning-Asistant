@@ -36,6 +36,8 @@ def to_document_out(document: Document, chunk_count: int) -> DocumentOut:
         chunk_count=chunk_count,
         created_at=document.created_at,
         file_url=file_url(document.id),
+        duration_s=document.duration_s,
+        media_url=document.media_url,
     )
 
 

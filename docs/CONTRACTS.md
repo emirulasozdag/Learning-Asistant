@@ -240,43 +240,61 @@ Kurallar:
 
 ## 4. Video varlığı ve zaman
 
-**Durum:** Metin donduruldu; koda geçişi video barındırma kararından sonra (DECISIONS.md açık soru 1, #8 materyal
-envanteri). Bu PR'da tip eklenmedi. Videonun nerede barındırıldığı bilinmiyor; `media_url` bu yüzden barındırma
-yönteminden bağımsız, opak bir URL olarak tanımlıdır.
+**Durum:** Tip olarak koda geçti (#14, PR a); davranış (b)(c)(d)'de. Şemalar, ORM alanları, migration ve `types.ts`
+vardır; VTT okuma, oynatma önceliği, transkripsiyon, `media_url` üretimi ve `invalid_video` doğrulaması **yoktur**.
+Videonun nerede barındırıldığı hâlâ bilinmiyor (DECISIONS.md açık soru 1); `media_url` bu yüzden barındırma
+yönteminden bağımsız, opak bir URL'dir.
 
 **Şu an.**
 - `MaterialType` içinde `video` ve `transcript` var, ama video yüklemek/oynatmak için hiçbir yol yok
   (yükleme yalnızca `.pdf`, `.pptx`; `vtt_parser.py` iskelet).
-- `AskRequest.video_time_s: float | null` kabul ediliyor ama `retrieve()` onu kullanmıyor; frontend göndermiyor.
-  Hangi videoya ait olduğu belirsiz.
-- `Chunk.t_start/t_end` sütunları var, dolduran yol yok. `Citation` ve `SourceDetail` `t_start/t_end` taşıyor.
+- `AskRequest.video: VideoRef | null` kabul ediliyor. `retrieve(video=VideoPosition | None)` bunu **yok sayıyor**;
+  frontend göndermiyor. `video.document_id`'nin aynı derse ait olup olmadığı kontrol edilmiyor.
+- `Chunk.t_start/t_end` sütunları var, dolduran yol yok. `Citation`, `SourceDetail` ve `RetrievalHit`
+  `t_start/t_end` taşıyor (PDF/PPTX'te `null`).
+- `Document.duration_s` ve `Document.media_url` var; hiçbir yol doldurmuyor, `DocumentOut` ikisini de `null` döner.
 - `SourceDetail.media_url` yalnızca dosya URL'si olarak dolduruluyor (PDF/PPTX).
 
-**Önerilen sözleşme.**
+**Sözleşme.**
 
 ```
 VideoRef   { document_id: int, time_s: float }       # time_s >= 0, videonun başından saniye
 AskRequest { course_id: int, question: str, conversation_id?: int | null,
-             video?: VideoRef | null }               # video_time_s kaldırılır
+             video?: VideoRef | null }
 
 DocumentOut (material_type = "video")  + { duration_s: float | null, media_url: str | null }
+IngestionReport                        + { duration_s?: float | null, cues_read?: int | null,
+                                           cues_skipped?: int | null, warnings: string[] }
+RetrievalHit                           + { t_start: float | null, t_end: float | null }
 Citation / SourceDetail (video parçası):  page = null; t_start, t_end dolu (saniye)
 SourceDetail.media_url:  oynatılabilir URL (opak); arayüz t_start'a sarar
+Document (ORM)                         + { duration_s: float | null, media_url: str(1000) | null }
+Chunk (ORM)                            + Index(document_id, t_start)
 ```
 
 Kurallar:
 - Transkript (VTT/Whisper) parçaları ilgili **video** `Document`'ına bağlanır; `t_start/t_end` bu videonun zamanıdır.
+  Videolar `document_id` ile ayırt edilir, zaman damgasıyla değil.
+- Bir VTT dosyası `material_type = "video"` olarak kaydedilir. `transcript` türü şimdilik **kullanılmaz** (türün
+  kaldırılması ya da başka bir anlam kazanması ayrı bir karardır).
 - `video` verilmezse arama tüm dersi eşit tarar; verilirse yalnızca sıralamaya *yumuşak* bir öncelik uygulanır, hiçbir parça elenmez (FR-06).
-- `video.document_id` aynı derse ait olmalıdır, değilse `422 {code: "invalid_video"}`.
+- `video.document_id` aynı derse ait olmalıdır, değilse `422 {code: "invalid_video"}` (davranış, (c)'de).
+- `Document.media_url` harici bir URL ise **yalnızca `https`** kabul edilir (doğrulama (b)'de; `javascript:` gibi
+  şemalar reddedilir). Alan boşsa ve medya dosyası saklanıyorsa URL dosya uç noktasından üretilir.
 - `media_url` dönmezse arayüz oynatıcıyı göstermez, metin ve zamanı gösterir.
+- `IngestionReport` video alanları yalnızca video/altyazı yüklemesinde dolar; sayfa tabanlı dosyalarda `null`
+  (`warnings` boş liste). Mevcut alanlar değişmedi.
 
 **Koddan farklar.**
-- `AskRequest.video_time_s` → `video: VideoRef` — **[KIRICI]** (alan adı). Pratikte etkisi yok: frontend göndermiyor,
-  backend yok sayıyor. Alan kaldırılırsa [qa/service.py](../backend/app/qa/service.py) `request.video_time_s` okuduğu için
-  servis kodu da değişmelidir; bu yüzden **bu PR'da yapılmadı**. Geçiş dönemi gerekmez; alanı kaldıran iş `AskRequest`'in
-  tüm kullanım yerlerini ve testleri aynı PR'da günceller.
-- `DocumentOut.duration_s`, `media_url` — **[ekleme]**; üretici (`to_document_out`) değişeceği için bu PR'da yapılmadı.
-- Davranış (video yükleme/oynatma/öncelik) bu PR'da **yoktur**; ilgili işlerde gerçekleşir.
+- `AskRequest.video_time_s` → `video: VideoRef` — **[KIRICI]** (alan adı ve tip). Eski alan kaldırıldı; Pydantic
+  fazla alanı yok saydığı için `video_time_s` gönderen bir istek hata almaz, alan sessizce atlanır. Tüketiciler
+  ([qa/service.py](../backend/app/qa/service.py), `retrieve()`, `types.ts`) aynı PR'da güncellendi; frontend alanı
+  zaten göndermiyordu. `retrieve(video_time_s=…)` → `retrieve(video: VideoPosition | None)` da **[KIRICI]** (iç API).
+- `DocumentOut.duration_s`, `media_url`; `IngestionReport.duration_s/cues_read/cues_skipped/warnings`;
+  `RetrievalHit.t_start/t_end`; `Document.duration_s/media_url` ve `ix_chunks_document_id_t_start` — **[ekleme]**.
+- `approved_by/approved_at` (ADR-3) bu PR'da **eklenmedi** (#11). `status/error/transcript_*` (arka plan transkripsiyonu)
+  (d0) PR'ında eklenecek.
+- Davranış (VTT okuma, oynatma önceliği, transkripsiyon, `media_url` üretimi, `invalid_video`) bu PR'da **yoktur**.
 
 ---
 

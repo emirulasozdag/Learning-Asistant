@@ -34,11 +34,18 @@ export interface Citation {
   t_end?: number | null;
 }
 
+/** Öğrencinin izlediği ders videosu (doküman kimliği) ve durdurduğu an. */
+export interface VideoRef {
+  document_id: number;
+  /** Videonun başından itibaren saniye (>= 0). */
+  time_s: number;
+}
+
 export interface AskRequest {
   course_id: number;
   question: string;
-  video_time_s?: number | null;
   conversation_id?: number | null;
+  video?: VideoRef | null;
 }
 
 /** "Nasıl bulundu": aramanın getirdiği bir parça ve skorları. */
@@ -46,6 +53,9 @@ export interface RetrievalHit {
   source_id: string;
   document_title: string;
   page: number | null;
+  /** Video parçasında saniye cinsinden aralık (sayfa yerine). */
+  t_start: number | null;
+  t_end: number | null;
   /** Anlamsal benzerlik (0–1). */
   dense_score: number | null;
   /** Kelime aramasındaki sıra (1 = en iyi). */
@@ -274,6 +284,9 @@ export interface DocumentOut {
   chunk_count: number;
   created_at: string;
   file_url: string;
+  /** Yalnızca video dokümanında (material_type = "video"). */
+  duration_s: number | null;
+  media_url: string | null;
   /** Yalnızca yükleme cevabında: hattın adım adım özeti. */
   report: IngestionReport | null;
 }
@@ -288,6 +301,11 @@ export interface IngestionReport {
   vector_dim: number;
   embedding_model: string;
   timings_ms: Record<"parse" | "clean" | "chunk" | "embed", number>;
+  /** Video / altyazı yüklemesinde dolu; sayfa tabanlı dosyalarda null. */
+  duration_s: number | null;
+  cues_read: number | null;
+  cues_skipped: number | null;
+  warnings: string[];
 }
 
 export interface ChunkPreview {

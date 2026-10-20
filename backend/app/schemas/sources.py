@@ -23,6 +23,7 @@ class SourceDetail(BaseModel):
     page: int | None = None
     t_start: float | None = None
     t_end: float | None = None
+    # Oynatılabilir ya da açılabilir opak URL; video parçasında arayüz t_start'a sarar.
     media_url: str | None = None
     # Yalnızca PDF: sayfanın görüntüsü ve alıntılanan satırların yeri.
     page_image_url: str | None = None
