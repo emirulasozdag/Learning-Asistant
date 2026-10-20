@@ -258,3 +258,36 @@ def test_write_outputs_never_overwrites(tmp_path):
 
     with pytest.raises(FileExistsError):
         write_outputs(record, tmp_path)
+
+
+def test_evaluate_keeps_passage_text_aligned_with_located_hits():
+    texts = {"1": "bir", "2": "iki", "3": "üç"}
+    results = evaluate(
+        [gold("a")],
+        lambda q: answer(retrieved_source_ids=["1", "x", "3"], retrieved_texts=["bir", None, "üç"]),
+        lambda sid: locator(int(sid)) if sid in texts else None,
+    )
+    assert [loc.page for loc in results[0].retrieved] == [1, 3]
+    assert results[0].retrieved_text == ["bir", "üç"]
+
+
+def test_metrics_citation_coverage_and_precision():
+    items = [gold("a", evidence=[locator(1), locator(2)]), gold("b", evidence=[locator(3)])]
+    results = [
+        result("a", cited=[locator(1), locator(9)]),
+        result("b", cited=[locator(3)]),
+    ]
+    metrics, _ = compute_metrics(items, results)
+    coverage = metrics["citation_evidence_coverage"]
+    assert (coverage.value, coverage.denominator) == (0.75, 2)
+    precision = metrics["citation_precision"]
+    assert (precision.numerator, precision.denominator) == (2, 3)
+
+
+def test_evaluate_drops_all_text_if_one_passage_text_is_missing():
+    results = evaluate(
+        [gold("a")],
+        lambda q: answer(retrieved_source_ids=["1", "2"], retrieved_texts=["bir", None]),
+        lambda sid: locator(int(sid)),
+    )
+    assert len(results[0].retrieved) == 2 and results[0].retrieved_text == []

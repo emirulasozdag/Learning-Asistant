@@ -83,6 +83,9 @@ def test_baseline_run_locates_evidence_and_leaves_no_trace(
     answerable, out_of_scope = results
     assert answerable.error is None
     assert SourceLocator(document_sha256=sha, page=2) in answerable.retrieved
+    # Judge'ın göreceği pasaj metni, konumla aynı sırada kaydedildi.
+    assert len(answerable.retrieved_text) == len(answerable.retrieved)
+    assert all(answerable.retrieved_text)
     assert out_of_scope.declined is True
     assert metrics["retrieval_recall_at_5"].value == 1.0
     assert metrics["out_of_scope_decline_rate"].value == 1.0
