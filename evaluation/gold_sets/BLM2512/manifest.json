@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "course_code": "BLM2512",
+  "approved_by": null,
+  "documents": [],
+  "missing_inputs": [
+    {
+      "what": "Eğitmenin onayladığı materyal envanteri (ders notu, slayt, geçmiş sınav; dosya başına kullanım izni)",
+      "owner": "Ekip → dersin eğitmeni",
+      "blocking": ["#8", "#9", "#13"]
+    },
+    {
+      "what": "Aktif / yayınlanmamış sınav içeriğinin listesi (indekse girmeyecek dosyalar)",
+      "owner": "Dersin eğitmeni",
+      "blocking": ["#8"]
+    },
+    {
+      "what": "En az 30 eğitmen incelemeli cevaplanabilir soru + referans cevap + kanıt sayfası",
+      "owner": "Dersin eğitmeni / TA",
+      "blocking": ["#8", "#13"]
+    },
+    {
+      "what": "En az 30 kapsam dışı soru (eğitmen onaylı)",
+      "owner": "Ekip, eğitmen onayıyla",
+      "blocking": ["#8", "#13"]
+    }
+  ]
+}

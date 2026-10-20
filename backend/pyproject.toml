@@ -44,6 +44,10 @@ target-version = "py312"
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
 
+[tool.ruff.lint.isort]
+# evaluation/ harness'i de bu yapılandırmayla denetlenir (CI: ruff check . ../evaluation).
+known-first-party = ["app", "harness", "tests"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 filterwarnings = [

@@ -28,6 +28,8 @@ jobs:
     env:
       # Entegrasyon testleri (tests/test_flow.py) bu veritabanında koşar.
       TEST_DATABASE_URL: postgresql+psycopg://learning:learning@localhost:5432/learning_assistant_test
+      # Veritabanı testleri CI'da sessizce atlanamaz (conftest bu durumda testi düşürür).
+      REQUIRE_DB_TESTS: "1"
       # CI'da model indirilmez; testler sahte embedder kullanır.
       EMBEDDING_PROVIDER: fake
     steps:
@@ -41,6 +43,8 @@ jobs:
       - run: ruff check . ../evaluation
       - run: ruff format --check . ../evaluation
       - run: pytest -q
+      # Değerlendirme harness'inin birim testleri (veritabanısız).
+      - run: pytest -q ../evaluation/tests
 
   frontend:
     runs-on: ubuntu-latest
