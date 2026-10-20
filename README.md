@@ -129,6 +129,21 @@ LLM_MODEL=anthropic/claude-opus-5.5
 - `LLM_MODEL` ile model değiştirilebilir. Örneğin `anthropic/claude-haiku-5.5` çok daha ucuzdur.
 - Anahtar boşsa sistem **LLM'siz** çalışır: cevap yerine en ilgili ders parçasını kaynağıyla gösterir.
 
+### Transkripsiyonu açmak (isteğe bağlı)
+
+Altyazısı (.vtt) olmayan ders videosu/sesi (.mp4 .webm .mkv .mov .mp3 .m4a .wav, en çok 2 GB) yerelde yazıya çevrilebilir
+(faster-whisper, CPU; ses dışarı gönderilmez, DECISIONS.md ADR-6). Varsayılan **kapalıdır**; kapalıyken medya yüklemesi
+reddedilir ve altyazı istenir. Açmak için `.env`:
+
+```
+TRANSCRIPTION_MODEL=large-v3-turbo
+```
+
+Sonra `docker compose up --build`. Model ilk açılışta indirilir (~1,6 GB), sonra internetsiz çalışır. CPU'da 1 saatlik bir
+ders dakikalar sürer; yükleme hemen döner, doküman "İşleniyor" görünür ve bitince "İndekslendi" olur (liste kendiliğinden
+yenilenir). Süren iş sunucu yeniden başlarsa (ör. `--reload`) "Başarısız" olur; dosyayı yeniden yükleyin. Hızlı deneme için
+`TRANSCRIPTION_MODEL=tiny` (düşük doğruluk).
+
 ### Cevap akışı ve alıntı doğrulama
 `POST /api/ask/stream` sırasıyla şu olayları gönderir:
 1. `retrieval`: bulunan parçalar

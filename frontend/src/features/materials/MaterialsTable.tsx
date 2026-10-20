@@ -1,7 +1,7 @@
 import { ExternalLink, RotateCcw, Trash2, X } from "lucide-react";
 
 import type { DocumentOut, MaterialType } from "../../api/types";
-import { documentExtent, materialLabel } from "../../labels";
+import { documentExtent, documentIndexStatus, materialLabel } from "../../labels";
 import { formatRelative } from "../../text";
 import { StatusBadge } from "../../ui/Badge";
 import FileBadge from "../../ui/FileBadge";
@@ -104,7 +104,13 @@ export default function MaterialsTable({
                   >
                     {document.title}
                   </button>
-                  <p className="truncate text-sm text-graphite">{document.filename}</p>
+                  {document.status === "failed" && document.error ? (
+                    <p className="truncate text-sm text-danger" title={document.error}>
+                      {document.error}
+                    </p>
+                  ) : (
+                    <p className="truncate text-sm text-graphite">{document.filename}</p>
+                  )}
                 </div>
               </div>
             </TD>
@@ -116,20 +122,22 @@ export default function MaterialsTable({
               {documentExtent(document)}, {document.chunk_count} parça
             </TD>
             <TD className="hidden sm:table-cell">
-              <StatusBadge status="indexed" />
+              <StatusBadge status={documentIndexStatus(document)} />
             </TD>
             <TD>
               <div className="flex justify-end gap-0.5" onClick={(event) => event.stopPropagation()}>
-                <a
-                  href={document.file_url}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label={`${document.title} dosyasını aç`}
-                  title="Dosyayı aç"
-                  className="inline-flex size-7 items-center justify-center rounded-control text-graphite hover:bg-subtle hover:text-ink"
-                >
-                  <ExternalLink size={14} aria-hidden />
-                </a>
+                {document.status === "ready" && (
+                  <a
+                    href={document.file_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={`${document.title} dosyasını aç`}
+                    title="Dosyayı aç"
+                    className="inline-flex size-7 items-center justify-center rounded-control text-graphite hover:bg-subtle hover:text-ink"
+                  >
+                    <ExternalLink size={14} aria-hidden />
+                  </a>
+                )}
                 <IconButton
                   icon={Trash2}
                   label={`${document.title} dokümanını sil`}

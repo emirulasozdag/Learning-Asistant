@@ -32,6 +32,12 @@ class Settings(BaseSettings):
     embedding_provider: str = "e5"
     embedding_model: str = "intfloat/multilingual-e5-base"
 
+    # Altyazısı olmayan ders videosu/sesi için yerel transkripsiyon (faster-whisper, ADR-6).
+    # Model adı (ör. large-v3-turbo); boşsa kapalı: medya yüklemesi reddedilir, .vtt yüklenir.
+    transcription_model: str = ""
+    # Medya (video/ses) yükleme sınırı; VTT/PDF/PPTX için 50 MB sınırı ayrıdır.
+    max_media_bytes: int = 2 * 1024 * 1024 * 1024
+
     # Alakasızlık kapısı (`retrieval/hybrid.py`): soru, en iyi anlamsal benzerlik ya da en iyi
     # parçanın anahtar kelime kapsaması (IDF ağırlıklı, 0–1) eşiğin üstündeyse dersle ilgili
     # sayılır; değilse "materyalde yok" denir ve LLM çağrılmaz. Eşikler kalibrasyon split'inde

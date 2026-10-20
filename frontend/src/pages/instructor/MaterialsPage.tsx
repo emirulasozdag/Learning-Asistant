@@ -47,6 +47,28 @@ export default function MaterialsPage() {
     return () => controller.abort();
   }, [courseId, attempt]);
 
+  // Transkripsiyon sürerken (status "processing") sayfa açık kaldığı sürece 5 sn'de bir yenile;
+  // hepsi bitince durur. Geçici ağ hatası listeyi bozmaz, bir sonraki turda yeniden denenir.
+  const hasProcessing = documents?.some((d) => d.status === "processing") ?? false;
+  useEffect(() => {
+    if (!hasProcessing) return;
+    const controller = new AbortController();
+    const timer = window.setInterval(() => {
+      courseService
+        .materials(courseId, controller.signal)
+        .then((list) => {
+          if (controller.signal.aborted) return;
+          setDocuments(list);
+          if (!list.some((d) => d.status === "processing")) reloadDocuments();
+        })
+        .catch(() => undefined);
+    }, 5000);
+    return () => {
+      window.clearInterval(timer);
+      controller.abort();
+    };
+  }, [hasProcessing, courseId, reloadDocuments]);
+
   function reload() {
     setLoadFailed(false);
     setDocuments(null);
@@ -63,11 +85,20 @@ export default function MaterialsPage() {
         setPending((list) => list.filter((p) => p.key !== item.key));
         setDocuments((list) => [document, ...(list ?? [])]);
         reloadDocuments();
-        toast.show({
-          tone: "success",
-          title: `${document.title} yüklendi`,
-          description: `${documentExtent(document)}, ${document.chunk_count} parça; öğrenciler artık bu dokümandan soru sorabilir.`,
-        });
+        toast.show(
+          document.status === "processing"
+            ? {
+                tone: "success",
+                title: `${document.title} yüklendi`,
+                description:
+                  "Konuşma yazıya çevriliyor; uzun derslerde dakikalar sürebilir. Bitince öğrenciler bu dersten soru sorabilir.",
+              }
+            : {
+                tone: "success",
+                title: `${document.title} yüklendi`,
+                description: `${documentExtent(document)}, ${document.chunk_count} parça; öğrenciler artık bu dokümandan soru sorabilir.`,
+              },
+        );
         if (document.report) {
           const report = document.report;
           setReports((map) => ({ ...map, [document.id]: report }));

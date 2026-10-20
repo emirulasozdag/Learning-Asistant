@@ -16,6 +16,7 @@ hukuk birimi onayı alınmalıdır (bkz. ANALYSIS §13.1, "KVKK" riski).
 | 3 | Onaylı materyalin dahil edilmesi | Kabul edildi | 2026-10-20 | Nisanur İlhan (öneren), Emir Ulaş Özdağ (@emirulasozdag), Mehmet Akif Kurt (@saintpeterslibiri) |
 | 4 | Onay ve saklama (KVKK) | Kabul edildi | 2026-10-20 | Nisanur İlhan (öneren), Emir Ulaş Özdağ (@emirulasozdag), Mehmet Akif Kurt (@saintpeterslibiri) |
 | 5 | Hosted modelle veri paylaşımı | Kabul edildi | 2026-10-20 | Nisanur İlhan (öneren), Emir Ulaş Özdağ (@emirulasozdag), Mehmet Akif Kurt (@saintpeterslibiri) |
+| 6 | Transkripsiyon: yerel faster-whisper | Önerildi | — | — |
 
 ---
 
@@ -171,6 +172,26 @@ FR-14 için generator'dan farklı bir model ailesi (judge) gerekiyor. `local.py`
 ve saklama ayarları için kısa bir kayıt.
 
 **Durum:** Kabul edildi · **Karar tarihi:** 2026-10-20 · **Katılanlar:** Nisanur İlhan (öneren), Emir Ulaş Özdağ (@emirulasozdag), Mehmet Akif Kurt (@saintpeterslibiri)
+
+---
+
+## ADR-6 — Transkripsiyon: yerel faster-whisper
+
+**Bağlam.** Altyazısı olmayan ders videosu/sesi de aranabilir olmalı (FR-03). Ses, kişisel veri taşıyabilir (eğitmenin sesi,
+bazen öğrenci sesi); ADR-5 hosted modele giden verinin sınırlı tutulmasını ister.
+
+**Karar (öneri).** Transkripsiyon **yerel** çalışır: faster-whisper, CPU, `int8`; hosted ses API'si kullanılmaz. Dil dersin
+dilidir (otomatik algılama yok); `vad_filter` açık, `condition_on_previous_text` kapalı (sessizlikte uydurma metni azaltır).
+Özellik **varsayılan kapalıdır** (`TRANSCRIPTION_MODEL` boş): kapalıyken eğitmenden `.vtt` istenir. Açıksa iş arka planda
+sürer, dokümanda `status` ve `error` tutulur; transkript WebVTT olarak saklanır, medya dosyası silinir.
+
+**Sonuçları.** İmaj büyür (faster-whisper + CTranslate2 + PyAV), ilk açılışta model iner (`large-v3-turbo` ~1,6 GB), CPU'da
+uzun dersler dakikalar sürer. Ses sunucudan çıkmaz.
+
+**Açık soru.** Model seçimi (`large-v3-turbo` / `small` / `tiny`) Türkçe ders sesinde **WER ölçümüyle doğrulanmadı**; pilot
+öncesi gerçek ders kayıtlarında ölçülmeli.
+
+**Durum:** Önerildi · **Karar tarihi:** — · **Katılanlar:** —
 
 ---
 

@@ -1,5 +1,6 @@
 import type { Citation, DocumentOut, MaterialType } from "./api/types";
 import { formatTime } from "./text";
+import type { IndexStatus } from "./ui/Badge";
 
 export const MATERIAL_LABELS: Record<MaterialType, string> = {
   notes: "Ders notu",
@@ -40,6 +41,11 @@ export function materialLabel(type: string): string {
 }
 
 /** Dokümanın boyutu: sayfa tabanlı dosyada sayfa sayısı, videoda süre. */
+/** Dokümanın işlem durumunu rozet durumuna çevirir. */
+export function documentIndexStatus(document: DocumentOut): IndexStatus {
+  return document.status === "ready" ? "indexed" : document.status;
+}
+
 export function documentExtent(document: Pick<DocumentOut, "material_type" | "page_count" | "duration_s">): string {
   if (document.material_type === "video") {
     return document.duration_s == null ? "video" : formatTime(document.duration_s);

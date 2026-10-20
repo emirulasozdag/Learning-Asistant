@@ -22,6 +22,7 @@ def video_neighbors(
             Chunk.document_id == video.document_id,
             Chunk.course_id == course.id,
             Document.course_id == course.id,
+            Document.status == "ready",
             Chunk.t_start.is_not(None),
             Chunk.t_end.is_not(None),
             Chunk.t_start <= video.time_s + window_s,

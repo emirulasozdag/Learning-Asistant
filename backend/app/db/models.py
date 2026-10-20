@@ -125,6 +125,14 @@ class Document(Base):
     # Hesaplardan önce yüklenenler için approved_by boştur.
     approved_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # İşlem durumu: processing (transkripsiyon sürüyor) | ready | failed. Yalnızca ready
+    # dokümanlar öğrencilere görünür ve aramaya girer. `error`: failed için Türkçe kısa neden.
+    status: Mapped[str] = mapped_column(String(16), server_default="ready")
+    error: Mapped[str | None] = mapped_column(Text)
+    # Video transkriptinin kaynağı: "vtt" (yüklenen altyazı) | "asr" (yerel transkripsiyon) ve
+    # asr için model kimliği (ör. faster-whisper/large-v3-turbo/int8). Diğer dokümanlarda boş.
+    transcript_source: Mapped[str | None] = mapped_column(String(8))
+    transcript_model: Mapped[str | None] = mapped_column(String(200))
 
     course: Mapped[Course] = relationship(back_populates="documents")
     chunks: Mapped[list["Chunk"]] = relationship(

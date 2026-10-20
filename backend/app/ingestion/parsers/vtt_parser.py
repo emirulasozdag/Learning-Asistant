@@ -114,3 +114,25 @@ def _clean_line(line: str) -> str:
     line = _TAG.sub("", line)
     line = _ENTITY.sub(lambda m: _ENTITIES[m.group(1)], line)
     return " ".join(line.split())
+
+
+def write_vtt(path: Path, segments: list[RawSegment]) -> None:
+    """Zamanlı segmentleri WebVTT dosyası olarak yazar (`parse_vtt` ile geri okunabilir)."""
+    blocks = [
+        f"{_format_timestamp(segment.t_start or 0.0)} --> "
+        f"{_format_timestamp(segment.t_end or 0.0)}\n{_cue_text(segment.text)}"
+        for segment in segments
+    ]
+    path.write_text("WEBVTT\n\n" + "\n\n".join(blocks) + "\n", encoding="utf-8")
+
+
+def _format_timestamp(seconds: float) -> str:
+    total_ms = round(seconds * 1000)
+    hours, rest = divmod(total_ms, 3_600_000)
+    minutes, rest = divmod(rest, 60_000)
+    return f"{hours:02}:{minutes:02}:{rest // 1000:02}.{rest % 1000:03}"
+
+
+def _cue_text(text: str) -> str:
+    # Boş satır cue'yu bitirir, "-->" zaman satırı sayılır: ikisi de cue metninde olamaz.
+    return " ".join(text.split()).replace("-->", "->")

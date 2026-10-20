@@ -55,7 +55,9 @@ def ingest_document(
     """
     extension = Path(filename).suffix.lower()
     if material_type == MaterialType.VIDEO and extension != VTT_EXTENSION:
-        raise IngestionError("Video dosyası henüz yüklenemiyor; altyazı (.vtt) yükleyin.")
+        raise IngestionError(
+            "Video türünde yalnızca altyazı (.vtt) ya da ders videosu/sesi yüklenir."
+        )
     if extension != VTT_EXTENSION and extension not in PARSERS:
         raise IngestionError(
             f"Desteklenmeyen dosya türü: {extension or '(uzantısız)'}. "
@@ -81,6 +83,7 @@ def ingest_document(
         media_url=media_url,
         approved_by=approved_by,
         approved_at=func.now(),
+        transcript_source="vtt" if is_video else None,
     )
     db.add(document)
     db.flush()
@@ -125,22 +128,7 @@ def ingest_document(
         document.page_count = 0 if is_video else len(segments)
         if parsed is not None:
             document.duration_s = parsed.duration_s
-        config = cast(literal(ts_config(course.language)), REGCONFIG)
-        db.add_all(
-            Chunk(
-                document_id=document.id,
-                course_id=course.id,
-                ordinal=ordinal,
-                text=draft.text,
-                page=draft.page,
-                t_start=draft.t_start,
-                t_end=draft.t_end,
-                search_vector=func.to_tsvector(config, draft.text),
-                embedding=vector,
-                embedding_model=embedder.identity,
-            )
-            for ordinal, (draft, vector) in enumerate(zip(drafts, vectors, strict=True))
-        )
+        add_chunks(db, course, document, drafts, vectors, embedder)
         db.commit()
     except Exception:
         db.rollback()
@@ -161,6 +149,32 @@ def ingest_document(
         **_video_report_fields(parsed),
     )
     return document, report
+
+
+def add_chunks(
+    db: Session,
+    course: Course,
+    document: Document,
+    drafts: list[ChunkDraft],
+    vectors: list[list[float]],
+    embedder: Embedder,
+) -> None:
+    config = cast(literal(ts_config(course.language)), REGCONFIG)
+    db.add_all(
+        Chunk(
+            document_id=document.id,
+            course_id=course.id,
+            ordinal=ordinal,
+            text=draft.text,
+            page=draft.page,
+            t_start=draft.t_start,
+            t_end=draft.t_end,
+            search_vector=func.to_tsvector(config, draft.text),
+            embedding=vector,
+            embedding_model=embedder.identity,
+        )
+        for ordinal, (draft, vector) in enumerate(zip(drafts, vectors, strict=True))
+    )
 
 
 def _video_report_fields(parsed: ParsedVtt | None) -> dict[str, object]:

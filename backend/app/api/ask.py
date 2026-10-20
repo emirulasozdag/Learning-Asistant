@@ -99,6 +99,7 @@ def _checked_video(db: Session, course: Course, request: AskRequest) -> AskReque
         or document.course_id != course.id
         or document.material_type != MaterialType.VIDEO
         or document.approved_at is None
+        or document.status != "ready"
     ):
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT,

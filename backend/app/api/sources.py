@@ -18,6 +18,8 @@ def get_source(source_id: str, user: AuthUser, db: DbSession) -> SourceDetail:
     if chunk is None:
         raise not_found_error("source_not_found")
     role = require_course_role(user, chunk.course_id, not_found="source_not_found")
-    if chunk.document.approved_at is None and role != "instructor":
+    if (
+        chunk.document.approved_at is None or chunk.document.status != "ready"
+    ) and role != "instructor":
         raise not_found_error("source_not_found")
     return source_detail(chunk)

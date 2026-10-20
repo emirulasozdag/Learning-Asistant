@@ -1,5 +1,6 @@
 from datetime import datetime
 from enum import StrEnum
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -53,6 +54,13 @@ class DocumentOut(BaseModel):
     # Yalnızca video dokümanında (material_type = "video").
     duration_s: float | None = None
     media_url: str | None = None
+    # processing: transkripsiyon sürüyor (parça yok); failed: `error` nedeni söyler. Öğrenciler
+    # yalnızca ready dokümanları görür.
+    status: Literal["processing", "ready", "failed"] = "ready"
+    error: str | None = None
+    # Video: "vtt" (yüklenen altyazı) | "asr" (yerel transkripsiyon) ve asr için model kimliği.
+    transcript_source: Literal["vtt", "asr"] | None = None
+    transcript_model: str | None = None
     # Yalnızca yükleme cevabında dolu.
     report: IngestionReport | None = None
 

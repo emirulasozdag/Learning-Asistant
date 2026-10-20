@@ -275,14 +275,16 @@ Kurallar:
 
 ## 4. Video varlığı ve zaman
 
-**Durum:** Tip (#14 PR a) ve davranış (#14 PR b+c) koda geçti: VTT yükleme ve oynatma konumu önceliği vardır.
-**Yoktur:** video dosyası yükleme ve transkripsiyon (d0/d), `media_url` girme arayüzü (#19/#22), oynatıcı.
+**Durum:** Tip (#14 PR a), davranış (#14 PR b+c) ve yerel transkripsiyon (#14 PR d) koda geçti: VTT yükleme, altyazısız
+video/ses için arka plan transkripsiyonu ve oynatma konumu önceliği vardır.
+**Yoktur:** `media_url` girme arayüzü (#19/#22), oynatıcı.
 Videonun nerede barındırıldığı hâlâ bilinmiyor (DECISIONS.md açık soru 1); `media_url` bu yüzden barındırma
 yönteminden bağımsız, opak bir URL'dir.
 
 **Şu an.**
 - `.vtt` yüklenebilir (`POST /courses/{id}/materials`); her zaman `material_type = "video"` kaydedilir. `material_type = "video"`
-  ile `.vtt` dışı dosya `422` ("Video dosyası henüz yüklenemiyor; altyazı (.vtt) yükleyin."). Ayrıştırıcı
+  ile `.vtt` ya da medya dışı dosya (ör. PDF) `422` ("Video türünde yalnızca altyazı (.vtt) ya da ders videosu/sesi
+  yüklenir."). Medya dosyası için aşağıdaki "Transkripsiyon". Ayrıştırıcı
   `ingestion/parsers/vtt_parser.py` (yalnızca stdlib): zaman aralıkları, `<v Ad>` konuşmacı adı metne **girmez** (ADR-5),
   YouTube kayan satır tekrarı atılır, bozuk cue atlanıp `cues_skipped`e sayılır; dosya bütünüyle bozuksa ya da cue'ların
   %50'sinden fazlası atlandıysa `422`.
@@ -301,6 +303,31 @@ yönteminden bağımsız, opak bir URL'dir.
 - Frontend: `.vtt` yüklenir, alıntıda ve kaynak panelinde zaman ("Video, 12:34–13:20") görünür, `media_url` varsa "Videoda aç"
   bağlantısı çıkar; `video` isteği **göndermez** (oynatıcı yok).
 
+**Transkripsiyon (altyazısı olmayan video/ses; ADR-6).**
+- **Kapalı/açık.** `Settings.transcription_model` (`TRANSCRIPTION_MODEL`) boşsa **kapalı** (varsayılan): medya yüklemesi
+  `422` ("Bu sunucuda transkripsiyon kapalı; videonun altyazısını (.vtt) yükleyin."), kayıt ve dosya kalmaz. Doluysa
+  (ör. `large-v3-turbo`) medya kabul edilir. VTT/PDF/PPTX yolu bundan etkilenmez.
+- **Kabul edilen medya:** `.mp4 .webm .mkv .mov .mp3 .m4a .wav` (sabit küme); sınır `Settings.max_media_bytes` = 2 GB
+  (VTT/PDF/PPTX için 50 MB aynen). Medya belleğe okunmaz, diske parça parça kopyalanır; aşılırsa `422`, dosya kalmaz.
+  Diğer uzantı `422`. Dil = `course.language` (otomatik algılama yok).
+- **Durum makinesi.** Yükleme `201` döner: `status="processing"`, `chunk_count = 0`, `report = null`. Arka plan işi (kendi
+  DB oturumu) bitince `ready` (zamanlı parçalar yazılır) ya da `failed` (`error`: "Medya dosyası çözülemedi." /
+  "Medyada konuşma bulunamadı." / "Transkripsiyon modeli yüklenemedi." / "Beklenmeyen bir hata oluştu."; parça yazılmaz).
+  `processing`den `ready`/`failed`e geçiş tek yönlüdür; başarısız dokümanın yeniden denenmesi yoktur (silinip yeniden
+  yüklenir). Uygulama açılışında `processing`de kalmış dokümanlar `failed` ("İşlem yarıda kaldı; dosyayı yeniden
+  yükleyin.") yapılır; `--reload` kod değişince süren işi öldürür.
+- **Saklama.** Başarıda transkript WebVTT olarak yazılır ve dokümanın `file_path`i olur (`filename = "<başlık>.vtt"`); medya
+  dosyası silinir. Başarısızlıkta da medya silinir (`file_path = ""`). `duration_s` = medyanın süresi,
+  `transcript_source = "asr"`, `transcript_model` = ör. `faster-whisper/large-v3-turbo/int8`. VTT yüklemesi
+  `transcript_source = "vtt"`, `transcript_model = null` yazar.
+- **Erişim (#11).** Yükleme kuralları aynı (yalnızca eğitmen + `declaration`; `approved_by` doldurulur). Öğrenciler
+  yalnızca `status = "ready"` dokümanları listede görür; `processing`/`failed` doküman için `/documents/{id}/…` ve
+  `/sources/…` onlara 404; eğitmen hepsini (durum ve hata dahil) görür. Arama (dense, lexical, video önceliği) ve
+  `AskRequest.video` yalnızca `ready` dokümanları kullanır.
+- **Ses tanıma kalitesi.** `no_speech_prob > 0.6` ya da `avg_logprob < -1.0` olan segmentlerin sayısı transkriptörün
+  uyarısına girer ve **sunucu günlüğüne** yazılır; `Document`'a / `IngestionReport`'a **kaydedilmez** (arka plan işinin
+  raporu yok, saklamak yeni bir alan gerektirir; açık soru).
+
 **Bilinen sınırlamalar / kalibre edilmemiş değerler.**
 - `video_window_s = 120` ve `video_weight = 0.5` kalibre **edilmedi**; eval'de ("full + video time" ile "full") ayarlanacak.
 - Bağlamsız sorular ("bu adımı açıklar mısın") soru metninden hesaplanan alakasızlık kapısında takılıp "materyalde yok" cevabı
@@ -315,6 +342,12 @@ AskRequest { course_id: int, question: str, conversation_id?: int | null,
              video?: VideoRef | null }
 
 DocumentOut (material_type = "video")  + { duration_s: float | null, media_url: str | null }
+DocumentOut (tüm türler)               + { status: "processing" | "ready" | "failed",  # varsayılan "ready"
+                                           error: str | null,
+                                           transcript_source: "vtt" | "asr" | null,
+                                           transcript_model: str | null }
+Document (ORM)                         + { status: str(16) = "ready", error: text | null,
+                                           transcript_source: str(8) | null, transcript_model: str(200) | null }
 IngestionReport                        + { duration_s?: float | null, cues_read?: int | null,
                                            cues_skipped?: int | null, warnings: string[] }
 RetrievalHit                           + { t_start: float | null, t_end: float | null }
@@ -345,9 +378,9 @@ Kurallar:
   zaten göndermiyordu. `retrieve(video_time_s=…)` → `retrieve(video: VideoPosition | None)` da **[KIRICI]** (iç API).
 - `DocumentOut.duration_s`, `media_url`; `IngestionReport.duration_s/cues_read/cues_skipped/warnings`;
   `RetrievalHit.t_start/t_end`; `Document.duration_s/media_url` ve `ix_chunks_document_id_t_start` — **[ekleme]**.
-- `approved_by/approved_at` (ADR-3) bu PR'da **eklenmedi** (#11). `status/error/transcript_*` (arka plan transkripsiyonu)
-  (d0) PR'ında eklenecek.
-- Davranış (VTT okuma, oynatma önceliği, `media_url`, `invalid_video`) #14 PR b+c ile geldi; transkripsiyon hâlâ **yoktur**.
+- `approved_by/approved_at` (ADR-3) #11 ile geldi. `status/error/transcript_source/transcript_model` ve yerel transkripsiyon
+  #14 PR d ile geldi — **[ekleme]**; mevcut dokümanlar `ready` olur, mevcut video dokümanları `transcript_source = "vtt"`.
+- Davranış (VTT okuma, oynatma önceliği, `media_url`, `invalid_video`) #14 PR b+c ile geldi.
 
 ---
 
