@@ -99,7 +99,7 @@ Bu senaryo uçtan uca kabul testinin (Playwright) temelidir: *sor → alıntıy�
 
 ## 5. Fonksiyonel gereksinimler
 
-Her gereksinim, iskeletteki ilgili modüle ve sunumdaki kaynağına eşlenmiştir. Bu gereksinimlerin hiçbiri **henüz uygulanmadı**.
+Her gereksinim, iskeletteki ilgili modüle ve sunumdaki kaynağına eşlenmiştir. Gerçek uygulama durumu ve kabul kanıtı: **§14.1** (FR-01..FR-22 tablosu).
 
 | ID | Gereksinim | Modül | Iter. | Kaynak |
 |---|---|---|---|---|
@@ -188,7 +188,10 @@ flowchart LR
 
 ## 8. Kavramsal veri modeli (öneri)
 
-Sunumda tablo şeması yok. Aşağıdaki tablo, gereksinimlerin ihtiyaç duyduğu **asgari varlıkları** gösterir. Kod veya migration yazılmadı.
+Sunumda tablo şeması yok. Aşağıdaki tablo, gereksinimlerin ihtiyaç duyduğu **asgari varlıkları** gösterir.
+Kodda şu an yalnızca `Course`, `Document`, `Chunk`, `Conversation` ve `Message` (`backend/app/db/models.py`, 2 Alembic migration) vardır;
+`User`/`Enrollment`, `PracticeItem`, `Rubric`, `Attempt`, `Claim`/`ClaimCheck`, `InstructorReview` ve `EvalRun` henüz yoktur.
+Kimlik, üyelik ve onay alanlarının önerisi: [DECISIONS.md](DECISIONS.md), [CONTRACTS.md §3](CONTRACTS.md).
 
 | Varlık | Temel alanlar | Not |
 |---|---|---|
@@ -333,56 +336,62 @@ Her iterasyon 2 haftalık sprintlerden oluşur ve **aynı değerlendirme koşusu
 
 ---
 
-## 14. İskeletin durumu
+## 14. Uygulamanın durumu
+
+> Son uzlaştırma: 2026-10-19 (issue #6), gerçek kodla karşılaştırılarak. Bu bölüm, önceki "iskelet" durumunun yerini alır.
 
 | Parça | Durum |
 |---|---|
 | Klasör yapısı (slayt 18) | ✅ |
 | `docker compose up`: PostgreSQL 16 + pgvector, FastAPI, Vite | ✅ |
 | `GET /health` + test | ✅ |
-| Boş React sayfası (Tailwind) | ✅ |
-| CI: ruff + pytest, eslint + build | ✅ |
+| Frontend: tasarım sistemi, giriş/kayıt (sahte), AI Tutor, Materyaller | ✅ AI Tutor ve Materyaller gerçek API; giriş/kayıt **sahte** (localStorage, FR-17). Pratik ve eğitmen sekmeleri "yakında" |
+| CI: ruff + pytest (PostgreSQL ile), eslint + build | ✅ Playwright testleri CI'da **çalışmıyor** (bkz. CONTRACTS.md §6.6) |
 | Issue şablonları (Bug, hallucination alanlarıyla birlikte; Görev) + PR şablonu | ✅ |
-| Özellik başına iskelet (aşağıdaki tablo) | ✅ İmzalar + `NotImplementedError`; endpoint'ler `501` döner |
-| Endpoint'lerin var olduğunu ve 501 döndüğünü doğrulayan testler | ✅ `backend/tests/test_api_skeleton.py` |
-| DB bağlantısı + oturum (`db/session.py`) + Alembic kurulumu | ✅ `alembic upgrade head` çalışıyor |
-| DB tabloları: Course, Document, Chunk + ilk migration | ✅ İlk demo (diğer varlıklar ilgili özelliklerle) |
-| Playwright UI testleri | ⏳ WP11 (test edilecek akış oluşunca) |
+| DB: `courses`, `documents`, `chunks`, `conversations`, `messages` + 2 Alembic migration | ✅ Diğer varlıklar (§8) yok |
+| Çalışan özellik mantığı | ✅ Yükleme hattı (PDF/PPTX), hibrit arama, cite-or-decline cevap + alıntı doğrulama, kaynak görüntüleyici, ders yönetimi |
+| Henüz iskelet (`501` / `NotImplementedError`) | Pratik, değerlendirme, öğrenme kaydı, eğitmen görünümü, rubrik; kimlik/yetki; video/transkript; claim kontrolü; rerank; task router; local LLM; eval harness |
+| Playwright UI testleri | ✅ `frontend/e2e/` (#7): AI Tutor ve hata durumları. *Sor → alıntı → pratik → gönder* akışı pratik gelince eklenecek |
 | RAGAs / Locust | ⏳ WP13 / WP14 |
-| **Herhangi bir özellik mantığı** | ❌ Bilinçli olarak yok |
 
-### 14.1 Fonksiyonel gereksinim → iskelet dosyası
+### 14.1 Fonksiyonel gereksinim → gerçek durum → kabul kanıtı
 
-Durum (Sprint 1 sonu): ✅ çalışıyor · 🟡 basit ilk sürüm · ⬜ iskelet (501 / NotImplemented)
+Durum: ✅ tamam · 🟡 kısmen · ⬜ yok (iskelet / yazılmadı). "Önceki" sütunu, bu güncellemeden önceki dokümandaki durumdur;
+farklıysa gerekçesi dosya sütunundadır.
 
-| FR | Backend | Endpoint | Frontend | Durum |
-|---|---|---|---|---|
-| FR-01 Yükleme / parse | `ingestion/parsers/{pdf,pptx,vtt}_parser.py`, `ingestion/pipeline.py` | `POST /courses/{id}/materials` | `features/instructor/MaterialUpload` | ✅ PDF, PPTX · ⬜ VTT |
-| FR-02 Temizleme + chunking + embedding | `ingestion/{cleaning,chunking,pipeline}.py`, `embeddings/` | ↑ | `features/instructor/IngestionReportView` | ✅ |
-| FR-03 Transkript (whisper) | `ingestion/transcribe.py` | ↑ | — | ⬜ |
-| FR-04 Ders izolasyonu | `retrieval/dense.py`, `retrieval/lexical.py` (`course_id` filtresi) | — | — | ✅ |
-| FR-05 Hibrit arama + RRF + rerank | `retrieval/{dense,lexical,fusion,rerank,hybrid}.py` | — | — | ✅ e5 + pgvector + FTS + RRF; rerank ⬜ |
-| FR-06 Video-zaman önceliği | `retrieval/video_time.py` | `POST /ask` (`video_time_s`) | `features/video/VideoPlayer` | ⬜ |
-| FR-07 Task router | `routing/router.py` | — | — | ⬜ |
-| FR-08 Model gateway | `llm/{base,openrouter,hosted,local,gateway}.py` | — | — | 🟡 OpenRouter / Claude; kural tabanlı seçim ⬜ |
-| FR-09 Cite-or-decline | `generation/answer.py`, `verification/citations.py`, `qa/service.py` | `POST /ask`, `POST /ask/stream` | `features/qa/ChatPanel` | ✅ akışlı (SSE) |
-| FR-10 Takip soruları | `qa/service.py` (Conversation, Message tabloları) | `POST /ask` (`conversation_id`) | `features/qa/ChatPanel` | ✅ |
-| FR-11 Pratik üretimi | `generation/question.py` | `POST /practice` | `features/practice/PracticePanel` | ⬜ |
-| FR-12 Pratik kontrolleri | `verification/practice_checks.py` | ↑ | — | ⬜ |
-| FR-13 Cevap değerlendirme | `generation/grade.py` | `POST /practice/{id}/answer` | `features/feedback/FeedbackPanel` | ⬜ |
-| FR-13 Rubrik + referans cevap girişi | `instructor/rubrics.py` | `GET/POST /instructor/courses/{id}/rubrics` | `features/instructor/RubricEditor` | ⬜ |
-| FR-14 Claim kontrolü + hallucination log | `verification/{claims,judge,hallucination}.py` | — | — | ⬜ |
-| FR-15 Öğrenme kaydı | `learning/record.py` | `GET /courses/{id}/learning-record` | `features/learning/LearningRecordPanel` | ⬜ |
-| FR-16 Eğitmen görünümü | `instructor/{mistakes,review}.py` | `GET /instructor/courses/{id}/mistakes`, `POST /instructor/reviews` | `features/instructor/{FrequentMistakes,ReviewQueue}` | 🟡 doküman listesi, parça önizleme, yükleme raporu |
-| FR-17 Erişim kontrolü | `auth/dependencies.py` (henüz endpoint'lere bağlı değil) | — | — | ⬜ |
-| FR-18 Öğrenci arayüzü | — | — | `pages/StudentPage`, `api/client.ts` | 🟡 chat, kaynak, "Nasıl bulundu"; video ⬜ |
-| FR-18 Kaynak görüntüleyici | `sources/lookup.py`, `ingestion/rendering.py` (PDF sayfa görüntüsü + işaret) | `GET /sources/{source_id}` | `features/sources/SourceViewer` | ✅ |
-| Ders seçimi (ders-bağımsız tasarım) | `courses/service.py` | `GET/POST /courses` | `features/courses/{CourseSelector,NewCourseButton}` | ✅ |
-| Veritabanı | `db/{base,session,models}.py`, `migrations/` (Alembic) | — | — | ✅ |
-| FR-19 Değerlendirme harness'i | `evaluation/harness/{run,conditions,judge_agreement}.py`, `evaluation/harness/metrics/*.py` (7 boyut + hedefler) | — | — | ⬜ |
-| FR-20–22 (Iteration 2–4) | Bilinçli olarak iskelet yok | — | — |
+| FR | Durum (önceki) | Gerçek dosyalar | Önerilen kabul kanıtı |
+|---|---|---|---|
+| 01 Yükleme / parse | 🟡 (✅ PDF/PPTX · ⬜ VTT) | `ingestion/parsers/{pdf,pptx}_parser.py`, `ingestion/pipeline.py`, `api/materials.py`; FE: `features/materials/*`, `pages/instructor/MaterialsPage.tsx`. VTT: `vtt_parser.py` iskelet. `past_exam` yalnızca bir etiket | Mevcut: `test_flow` (upload pdf/pptx/reddetme), `test_ingestion`. Eklenecek: VTT fixture ile parse testi |
+| 02 Temizleme + chunking + metadata | 🟡 (önceki ✅) | `ingestion/{cleaning,chunking,pipeline}.py`, `embeddings/`. **Sayfa** metadata'sı tam; `Chunk.t_start/t_end` sütunları var ama hiçbir yol doldurmuyor | Mevcut: `test_ingestion` (chunk/temizleme), `test_upload_returns_pipeline_report…`. Eklenecek: VTT chunk'larında `t_start/t_end` testi |
+| 03 Transkript (whisper) | ⬜ | `ingestion/transcribe.py` iskelet | Kısa ses fixture'ı ile zaman damgalı segment testi; örneklemde WER ölçümü |
+| 04 Ders izolasyonu | 🟡 (önceki ✅) | Arama ve sohbet izole: `retrieval/{dense,lexical}.py` (`course_id` filtresi), `qa/service.py`. **Güvenlik açığı — #11'de kapatılmalı:** `GET /sources/{id}`, `/documents/{id}/{chunks,file,pages}` ve `DELETE /documents/{id}` (`api/sources.py`, `api/materials.py`) dersle ve kullanıcıyla sınırlı değil | Mevcut: `test_search_is_isolated_per_course`, `test_conversation_is_remembered_and_isolated`. Eklenecek (#11): üye olmayan kullanıcı başka dersin `source_id`/doküman uç noktasında 404 alır |
+| 05 Hibrit arama + RRF + rerank | 🟡 (✅ rerank hariç) | `retrieval/{dense,lexical,fusion,hybrid}.py`; `rerank.py` iskelet | Mevcut: `test_retrieval` (RRF, ağırlıklar). Ölçüm: gold set üzerinde Recall@5 ≥ 0,85 (harness yok) |
+| 06 Video-zaman önceliği | ⬜ | `retrieval/video_time.py` iskelet. `AskRequest.video_time_s` kabul ediliyor, `retrieve()` kullanmıyor, frontend göndermiyor. Video oynatıcı yok | Prior için birim testi; eval'de "full + video time" ile "full" karşılaştırması. Sözleşme: CONTRACTS.md §4 |
+| 07 Task router | ⬜ | `routing/router.py` iskelet; görev başına ayrı endpoint var | Ekip kararı (DECISIONS.md açık soru 4): ayrı endpoint'ler yeterli sayılırsa bu satır ✅; değilse router birim testi |
+| 08 Model gateway | 🟡 | `llm/{base,openrouter,hosted,gateway}.py` (env tabanlı seçim); `llm/local.py`, `select_judge_client` iskelet | Sahte iki adapter ile aynı şemanın döndüğünü gösteren test; kural tabanlı seçim testi |
+| 09 Cite-or-decline | ✅ | `generation/answer.py`, `verification/citations.py`, `qa/service.py`, `api/ask.py` (`/ask`, `/ask/stream`); `AskResponse.outcome` (#5). FE: `pages/student/TutorPage.tsx`, `features/tutor/*` | Mevcut: `test_answer.py` (~24), `test_flow` akış testleri; `frontend/e2e/*`. Ölçüm: 30 kapsam dışı soruda ≥ %90 ret, aşırı ret ≤ %10. Açık: sonuç/hata sözleşmesi eksikleri (CONTRACTS.md §5) |
+| 10 Takip soruları | 🟡 (önceki ✅) | `qa/service.py` (son 3 tur). Sohbet bir kullanıcıya bağlı değil — #11 | Mevcut: `test_follow_up_question_gets_history`. Eklenecek (#11): başka kullanıcının `conversation_id`'si 404 |
+| 11 Pratik üretimi | ⬜ | `generation/question.py` iskelet; `api/practice.py` 501; FE: `pages/student/PracticePage.tsx` yer tutucu | `POST /practice`: `source.source_id` bir chunk'a çözülür. Sözleşme: CONTRACTS.md §2 |
+| 12 Pratik kontrolleri | ⬜ | `verification/practice_checks.py` iskelet | Kontrolden geçmeyen item'ın dönmediğini gösteren test; eğitmen/TA 40 item'da ≥ %85 kabul |
+| 13 Cevap değerlendirme | ⬜ | `generation/grade.py` iskelet; `api/practice.py` 501 | `POST /practice/{id}/answer` testi; 60 cevapta QWK ≥ 0,70 |
+| 13 Rubrik + referans cevap girişi | ⬜ | `instructor/rubrics.py` iskelet; `api/rubrics.py` 501 | Rubrik oluşturma/listeleme API testi; eğitmen onayı (`approved`) |
+| 14 Claim kontrolü + hallucination log | ⬜ | `verification/{claims,judge,hallucination}.py` iskelet. (Cümle düzeyinde etiket doğrulaması FR-09'dadır; judge değildir) | Gold set üzerinde unsupported oranı ≤ %10; judge–insan κ ≥ 0,6 |
+| 15 Öğrenme kaydı | ⬜ | `learning/record.py` iskelet; `api/learning.py` 501. `messages.meta` yalnızca ret/alıntı bilgisi tutuyor; kullanıcı bağı yok | `research_logging` kapalıyken kayıt yazılmadığını gösteren test (ADR-4) |
+| 16 Eğitmen görünümü | ⬜ (önceki 🟡) | `instructor/{mistakes,review}.py` iskelet; `api/instructor.py` 501; FE: `pages/instructor/CourseSections.tsx` "yakında". *Not:* önceki "doküman listesi, parça önizleme, yükleme raporu" FR-01/02'nin eğitmen arayüzüdür (`MaterialsPage`), FR-16 değil | Onay/düzeltme API testi; Playwright: eğitmen bir cevabı düzeltir |
+| 17 Erişim kontrolü | ⬜ | `auth/dependencies.py` iskelet; hiçbir endpoint kimlik doğrulamıyor. FE: `services/authService.ts` **sahte** (localStorage), `auth/RequireRole.tsx` yalnızca istemci tarafında | Rol matrisi testi (endpoint × rol × üyelik → 200/401/403/404); #11 ve #12. Kararlar: DECISIONS.md ADR-1, 2 |
+| 18 Öğrenci arayüzü | 🟡 | AI Tutor: `pages/student/TutorPage.tsx`, `features/tutor/{AnswerBlock,SourceCards,SourcePanel,SourceViewer,RetrievalDetails,outcome}.ts*`. Kaynak görüntüleyici: `sources/lookup.py`, `ingestion/rendering.py`, `GET /sources/{id}`. Video ve pratik/geri bildirim panelleri yok | Mevcut: `frontend/e2e/{tutor,failures}.spec.ts` (CI'da çalışmıyor). Eksik: *sor → alıntıyı aç → pratik iste → cevap gönder* uçtan uca senaryosu |
+| Ders yönetimi | ✅ | `courses/service.py`, `api/courses.py`; FE: `features/courses/*`. Yetki yok (FR-17) | Mevcut: `test_courses_are_listed`, `test_create_course_normalizes_code_and_rejects_duplicates` |
+| 19 Değerlendirme harness'i | ⬜ | `evaluation/harness/{run,conditions,judge_agreement}.py`, `metrics/*` iskelet (`NotImplementedError`); `gold_sets/` boş | Tek komutla 4 koşulun koşulması ve run log |
+| 20–22 (Iteration 2–4) | ⬜ bilinçli | — | Iteration 1'de kabul kanıtı yok; kapsam dışı |
+
+**Dokümanda kalan çelişkiler (düzeltildi):** §14.1'deki eski frontend yolları (`features/qa/ChatPanel`,
+`pages/StudentPage`, `features/sources/SourceViewer`, `features/video/VideoPlayer`, …) artık yok; yukarıdaki dosyalar gerçektir.
+
+**Açık güvenlik maddesi:** FR-04 satırındaki kaynak/doküman endpoint'leri ve kimliksiz yükleme/silme/ders oluşturma —
+**#11'de kapatılmalı** (DECISIONS.md açık soru 5).
 
 API sözleşmeleri `backend/app/schemas/` altında; frontend'deki karşılıkları `frontend/src/api/types.ts`.
+Önerilen değişiklikler ve ortak dosya protokolü: [CONTRACTS.md](CONTRACTS.md). Ekip kararları: [DECISIONS.md](DECISIONS.md).
 
 ---
 
