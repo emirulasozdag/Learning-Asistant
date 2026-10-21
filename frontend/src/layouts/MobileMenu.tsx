@@ -19,7 +19,7 @@ export default function MobileMenu({ onNavigate }: { onNavigate: () => void }) {
   if (!user) return null;
   return (
     <aside aria-label="Menü" className="flex h-full flex-col overflow-y-auto bg-surface">
-      <div className="flex h-[4.5rem] shrink-0 items-center bg-nav px-5">
+      <div className="flex h-[4.5rem] shrink-0 items-center border-b border-line bg-surface px-5">
         <Logo onDark />
       </div>
       <nav className="flex flex-col gap-6 px-3 py-5">

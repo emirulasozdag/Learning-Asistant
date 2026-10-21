@@ -148,7 +148,7 @@ function CourseFrame({ course, role }: { course: Course; role: "student" | "inst
       </div>
 
       <div className="flex min-h-0 flex-1">
-        <aside className="hidden w-64 shrink-0 flex-col gap-8 overflow-y-auto border-r border-line bg-surface px-3 py-6 lg:flex">
+        <aside className="hidden w-64 shrink-0 flex-col gap-8 overflow-y-auto border-r border-line bg-subtle/60 px-3 py-6 lg:flex">
           <SectionNav links={tools} label="Ders araçları" />
           <div className="border-t border-line pt-6">
             <p className="px-3 text-sm font-bold tracking-wide text-ink uppercase">Ders içeriği</p>
@@ -197,13 +197,13 @@ function CourseBanner({
 }) {
   const meta = courseMetaParts(course);
   return (
-    <div className={cx("shrink-0 bg-banner text-white", compact ? "py-3" : "py-8 lg:py-10")}>
+    <div className={cx("shrink-0 border-b border-line bg-surface/70 text-ink", compact ? "py-3" : "py-8 lg:py-10")}>
       <div className="flex items-end justify-between gap-6 px-5 sm:px-8">
         <div className="min-w-0">
-          <p className={cx("flex flex-wrap items-center font-semibold", compact ? "text-sm" : "text-base")}>
+          <p className={cx("flex flex-wrap items-center font-mono text-graphite", compact ? "text-xs" : "text-sm")}>
             {meta.map((part, index) => (
               <Fragment key={part}>
-                {index > 0 && <span aria-hidden className="mx-2.5 h-3.5 w-px bg-white/60" />}
+                {index > 0 && <span aria-hidden className="mx-2.5 h-3.5 w-px bg-line-strong" />}
                 {part}
               </Fragment>
             ))}
@@ -211,7 +211,7 @@ function CourseBanner({
           {compact ? (
             <p className="mt-0.5 truncate text-lg">{course.name}</p>
           ) : (
-            <h1 className="mt-3 text-[2.25rem] leading-tight font-normal tracking-tight text-balance sm:text-[2.75rem]">
+            <h1 className="mt-3 text-[2.25rem] leading-[1.08] font-semibold tracking-tight text-balance text-ink sm:text-[2.75rem]">
               {course.name}
             </h1>
           )}
@@ -220,7 +220,7 @@ function CourseBanner({
           <button
             type="button"
             onClick={onShowInfo}
-            className="hidden shrink-0 items-center gap-2 rounded-control border border-white/40 px-3 py-1.5 text-sm font-semibold hover:bg-white/10 sm:flex"
+            className="hidden shrink-0 items-center gap-2 rounded-control border border-line bg-surface px-3 py-1.5 text-sm font-semibold text-ink-2 shadow-card hover:border-line-strong hover:text-ink sm:flex"
           >
             <Info size={16} aria-hidden />
             Ders bilgisi
