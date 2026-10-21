@@ -12,7 +12,7 @@ export default function AppShell() {
 
   return (
     <CoursesProvider>
-      <div className="flex h-dvh flex-col overflow-hidden">
+      <div className="studio-grid flex h-dvh flex-col overflow-hidden">
         <AppHeader onOpenMenu={() => setMobileOpen(true)} />
 
         <div className="flex min-h-0 flex-1">

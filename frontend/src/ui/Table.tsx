@@ -14,7 +14,7 @@ export function Table({ children, label }: { children: ReactNode; label: string 
 }
 
 export function THead({ children }: { children: ReactNode }) {
-  return <thead className="bg-banner text-white">{children}</thead>;
+  return <thead className="border-b border-line-strong bg-subtle text-ink">{children}</thead>;
 }
 
 export function TH({ className, ...props }: ThHTMLAttributes<HTMLTableCellElement>) {
