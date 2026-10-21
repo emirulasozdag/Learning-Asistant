@@ -27,6 +27,8 @@ import type {
   Rubric,
   RubricIn,
   SourceDetail,
+  TutorStreamEvent,
+  TutorTurnRequest,
 } from "./types";
 
 // Vite proxy /api önekini backend'e yönlendirir (vite.config.ts).
@@ -108,12 +110,35 @@ async function errorBody(response: Response): Promise<{ detail: string; code?: s
  * /ask/stream: Server-Sent Events akışını okur, her olayı `onEvent` ile bildirir.
  * `signal` ile iptal edilebilir.
  */
-async function askStream(
+function askStream(
   body: AskRequest,
   onEvent: (event: AskStreamEvent) => void,
   signal?: AbortSignal,
 ): Promise<void> {
-  const response = await send(`${BASE}/ask/stream`, {
+  return readSse("/ask/stream", body, parseAskEvent, onEvent, signal);
+}
+
+/** /tutor/turn/stream: AI Tutor turu (CONTRACTS.md §9). */
+function tutorStream(
+  body: TutorTurnRequest,
+  onEvent: (event: TutorStreamEvent) => void,
+  signal?: AbortSignal,
+): Promise<void> {
+  return readSse("/tutor/turn/stream", body, parseTutorEvent, onEvent, signal);
+}
+
+// SSE verisi olay adına göre backend sözleşmesindeki şekli alır (types.ts).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type SsePayload = any;
+
+async function readSse<E>(
+  path: string,
+  body: unknown,
+  parse: (name: string, payload: SsePayload) => E | null,
+  onEvent: (event: E) => void,
+  signal?: AbortSignal,
+): Promise<void> {
+  const response = await send(`${BASE}${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -133,7 +158,8 @@ async function askStream(
       while (boundary !== -1) {
         const block = buffer.slice(0, boundary);
         buffer = buffer.slice(boundary + 2);
-        const event = parseSseBlock(block);
+        const parsed = parseSseBlock(block);
+        const event = parsed && parse(parsed.name, parsed.payload);
         if (event) onEvent(event);
         boundary = buffer.indexOf("\n\n");
       }
@@ -145,7 +171,7 @@ async function askStream(
   }
 }
 
-function parseSseBlock(block: string): AskStreamEvent | null {
+function parseSseBlock(block: string): { name: string; payload: SsePayload } | null {
   let name = "";
   let data = "";
   for (const line of block.split("\n")) {
@@ -153,17 +179,38 @@ function parseSseBlock(block: string): AskStreamEvent | null {
     else if (line.startsWith("data: ")) data += line.slice(6);
   }
   if (!name || !data) return null;
-  let payload;
   try {
-    payload = JSON.parse(data);
+    return { name, payload: JSON.parse(data) };
   } catch {
     throw new ApiError("Cevap akışı okunamadı", "stream");
   }
+}
+
+function parseAskEvent(name: string, payload: SsePayload): AskStreamEvent | null {
   switch (name) {
     case "retrieval":
       return { type: "retrieval", hits: payload };
     case "delta":
       return { type: "delta", text: payload.text };
+    case "done":
+      return { type: "done", response: payload };
+    case "error":
+      return { type: "error", detail: payload.detail };
+    default:
+      return null;
+  }
+}
+
+function parseTutorEvent(name: string, payload: SsePayload): TutorStreamEvent | null {
+  switch (name) {
+    case "status":
+      return { type: "status", tool: payload.tool, label: payload.label };
+    case "retrieval":
+      return { type: "retrieval", blockIndex: payload.block_index, hits: payload.hits };
+    case "delta":
+      return { type: "delta", blockIndex: payload.block_index, text: payload.text };
+    case "block":
+      return { type: "block", index: payload.index, block: payload.block };
     case "done":
       return { type: "done", response: payload };
     case "error":
@@ -214,6 +261,8 @@ export const api = {
     request<CourseOutline>(`/courses/${courseId}/outline`, { signal }),
 
   askStream,
+
+  tutorStream,
 
   source: (sourceId: string, signal?: AbortSignal) =>
     request<SourceDetail>(`/sources/${encodeURIComponent(sourceId)}`, { signal }),

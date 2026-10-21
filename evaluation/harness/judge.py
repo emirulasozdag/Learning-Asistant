@@ -290,9 +290,15 @@ def client_from_env() -> JudgeClient:
     judge = JudgeSettings()
     if not judge.model:
         raise JudgeError("EVAL_JUDGE_MODEL tanımlı değil; judge çalıştırılmadı")
-    api_key = judge.api_key or settings.llm_api_key
+    # Uygulamanın anahtarı yalnızca o da OpenRouter'sa geçerli (Gemini anahtarı OpenRouter'a
+    # gönderilmemeli).
+    shared_key = settings.llm_api_key if settings.llm_provider == "openrouter" else ""
+    api_key = judge.api_key or shared_key
     if not api_key:
-        raise JudgeError("Judge için LLM anahtarı yok (EVAL_JUDGE_API_KEY ya da LLM_API_KEY)")
+        raise JudgeError(
+            "Judge için OpenRouter anahtarı yok (EVAL_JUDGE_API_KEY; LLM_PROVIDER=openrouter ise "
+            "LLM_API_KEY)"
+        )
     return OpenRouterLLMClient(
         api_key=api_key,
         model=judge.model,

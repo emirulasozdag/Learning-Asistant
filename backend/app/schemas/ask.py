@@ -72,6 +72,8 @@ class AskResponse(BaseModel):
     outcome: AskOutcome = "answered"
     # Kaynağa dayanmadığı için cevaptan çıkarılan iddia (cümle) sayısı.
     unsupported_removed: int = 0
+    # [ekleme] Kısmi cevapta kaynakların kapsamadığı kısım (modelin "EKSİK:" satırı); alıntısızdır.
+    coverage_gap: str | None = None
     citations: list[Citation] = []
     declined: bool = False
     decline_reason: str | None = None

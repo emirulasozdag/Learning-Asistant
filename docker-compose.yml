@@ -21,10 +21,18 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-learning}:${POSTGRES_PASSWORD:-learning}@db:5432/${POSTGRES_DB:-learning_assistant}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
-      LLM_PROVIDER: ${LLM_PROVIDER:-openrouter}
+      LLM_PROVIDER: ${LLM_PROVIDER:-gemini}
       LLM_API_KEY: ${LLM_API_KEY:-}
-      LLM_MODEL: ${LLM_MODEL:-anthropic/claude-opus-5.5}
+      LLM_MODEL: ${LLM_MODEL:-}
+      LLM_ORCHESTRATOR_MODEL: ${LLM_ORCHESTRATOR_MODEL:-}
+      LLM_THINKING_LEVEL: ${LLM_THINKING_LEVEL:-low}
+      LLM_ORCHESTRATOR_THINKING_LEVEL: ${LLM_ORCHESTRATOR_THINKING_LEVEL:-minimal}
       LLM_BASE_URL: ${LLM_BASE_URL:-https://openrouter.ai/api/v1}
+      LLM_CHECKER_MODEL: ${LLM_CHECKER_MODEL:-}
+      LLM_CHECKER_THINKING_LEVEL: ${LLM_CHECKER_THINKING_LEVEL:-low}
+      TUTOR_GENERAL_KNOWLEDGE: ${TUTOR_GENERAL_KNOWLEDGE:-false}
+      TUTOR_RERANK_CANDIDATES: ${TUTOR_RERANK_CANDIDATES:-20}
+      TUTOR_RERANK_KEEP: ${TUTOR_RERANK_KEEP:-6}
       EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-e5}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-intfloat/multilingual-e5-base}
       # Boş = transkripsiyon kapalı (video için .vtt yüklenir). Örn. large-v3-turbo; model ilk

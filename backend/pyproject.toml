@@ -8,6 +8,7 @@ dependencies = [
     "anthropic>=1,<2",
     "argon2-cffi>=23.1",
     "fastapi>=0.115",
+    "google-genai>=2.31,<3",
     "openai>=3,<4",
     "uvicorn[standard]>=0.32",
     "pydantic>=2.9",

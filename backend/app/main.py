@@ -19,6 +19,7 @@ from app.api import (
     practice,
     rubrics,
     sources,
+    tutor,
 )
 from app.api.errors import ApiError, api_error_handler
 from app.core.config import settings
@@ -112,6 +113,7 @@ app.include_router(auth.router)
 app.include_router(courses.router)
 app.include_router(materials.router)
 app.include_router(ask.router)
+app.include_router(tutor.router)
 app.include_router(sources.router)
 app.include_router(practice.router)
 app.include_router(learning.router)

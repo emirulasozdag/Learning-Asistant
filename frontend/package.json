@@ -16,10 +16,15 @@
   "dependencies": {
     "@fontsource/ibm-plex-sans": "5.3.0",
     "@fontsource/source-serif-4": "5.3.0",
+    "katex": "0.16.46",
     "lucide-react": "1.52.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
-    "react-router": "7.18.4"
+    "react-markdown": "10.1.0",
+    "react-router": "7.18.4",
+    "rehype-katex": "7.0.1",
+    "remark-gfm": "4.0.1",
+    "remark-math": "6.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

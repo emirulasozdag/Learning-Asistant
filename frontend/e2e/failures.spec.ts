@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { ask, course, firstCitation, loginAsStudent, openTutor, questionBox, waitForAnswer } from "./helpers";
+import { ask, course, firstClaim, loginAsStudent, openTutor, questionBox, waitForAnswer } from "./helpers";
 
 // Hata durumları. Uygulamaya sahte veri eklenmez: `route.abort` yalnızca bağlantının
 // kopmasını taklit eder; engel kaldırılınca aynı istek gerçek API'ye gider.
@@ -11,27 +11,27 @@ test.beforeEach(async ({ page }) => {
 
 test("servise ulaşılamazsa öğrenciye söylenir; Tekrar sor yeniden dener", async ({ page }) => {
   await openTutor(page, course("A"));
-  await page.route("**/api/ask/stream", (route) => route.abort("failed"));
+  await page.route("**/api/tutor/turn/stream", (route) => route.abort("failed"));
 
   await ask(page, "İkili arama nasıl çalışır?");
   await expect(page.getByText("Ders servisine ulaşılamıyor")).toBeVisible();
   await expect(page.getByText(/Failed to fetch|İstek başarısız/)).toHaveCount(0);
   await expect(page.getByText("yeterli bilgi bulunamadı")).toHaveCount(0);
 
-  await page.unroute("**/api/ask/stream");
+  await page.unroute("**/api/tutor/turn/stream");
   await page.getByRole("button", { name: "Tekrar sor" }).click();
   await waitForAnswer(page);
-  await expect(firstCitation(page)).toBeVisible();
+  await expect(firstClaim(page)).toBeVisible();
   await expect(page.getByText("Ders servisine ulaşılamıyor")).toHaveCount(0);
 });
 
 test("akıştaki hata olayı geçici sorun olarak gösterilir, 'konu derste yok' olarak değil", async ({ page }) => {
   await openTutor(page, course("A"));
-  await page.route("**/api/ask/stream", (route) =>
+  await page.route("**/api/tutor/turn/stream", (route) =>
     route.fulfill({
       status: 200,
       contentType: "text/event-stream",
-      // backend/app/api/ask.py `_sse("error", {"detail": ...})` çıktısıyla birebir aynı biçim:
+      // backend/app/api/tutor.py `_sse("error", {"detail": ...})` çıktısıyla birebir aynı biçim:
       // "event: <ad>\ndata: <json.dumps(..., ensure_ascii=False)>\n\n".
       body: 'event: error\ndata: {"detail": "Cevap üretilirken beklenmeyen bir hata oluştu."}\n\n',
     }),
@@ -87,11 +87,11 @@ test("kaynak açılamazsa sade mesaj ve Tekrar dene; kaynak değişince eski hat
 
   await page.unroute(sources);
   await panel.getByRole("button", { name: "Tekrar dene" }).click();
-  await expect(panel.getByText(algorithms.documentTitle)).toBeVisible();
+  await expect(panel.getByText(algorithms.documentTitle, { exact: true }).first()).toBeVisible();
   await expect(panel.getByRole("heading", { name: "Kaynak açılamadı" })).toHaveCount(0);
 
-  // Başka bir bölüm hata verir; sonra ilk kaynağa dönülünce eski hata görünmez.
-  await page.getByText("İncelenen bölümler").click();
+  // Başka bir bölüm hata verir; sonra ilk kaynağa dönülünce eski hata görünmez. "Nasıl bulundu"
+  // geniş ekranda açık gelir.
   const hits = page.locator("details ol button");
   expect(await hits.count()).toBeGreaterThan(1);
   await page.route(sources, (route) => route.abort("failed"));
@@ -99,7 +99,7 @@ test("kaynak açılamazsa sade mesaj ve Tekrar dene; kaynak değişince eski hat
   await expect(panel.getByRole("heading", { name: "Kaynak açılamadı" })).toBeVisible();
 
   await page.unroute(sources);
-  await firstCitation(page).click();
-  await expect(panel.getByText(algorithms.documentTitle)).toBeVisible();
+  await firstClaim(page).click();
+  await expect(panel.getByText(algorithms.documentTitle, { exact: true }).first()).toBeVisible();
   await expect(panel.getByRole("heading", { name: "Kaynak açılamadı" })).toHaveCount(0);
 });

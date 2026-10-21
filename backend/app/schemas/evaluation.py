@@ -19,8 +19,18 @@ class AnswerSubmission(BaseModel):
         return self
 
 
+class CriterionScore(BaseModel):
+    description: str
+    awarded: float
+    points: float
+    rationale: str = ""
+
+
 class AnswerFeedback(BaseModel):
-    """Rubrik tabanlı formatif geri bildirim (resmî not değildir)."""
+    """Rubrik tabanlı formatif geri bildirim (resmî not değildir).
+
+    Cevap anahtarı ve referans cevap ancak cevap gönderildikten sonra, bu yanıtta döner.
+    """
 
     attempt_id: int
     item_id: int
@@ -31,3 +41,7 @@ class AnswerFeedback(BaseModel):
     explanation: str
     citations: list[Citation] = []
     follow_up_item_id: int | None = None
+    # [ekleme] MCQ'da doğru şık; açık uçlu sorularda örnek tam puanlık cevap ve ölçüt puanları.
+    correct_option: int | None = None
+    reference_answer: str | None = None
+    criteria: list[CriterionScore] = []

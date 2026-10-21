@@ -1,5 +1,6 @@
 import {
   CircleAlert,
+  ClipboardCheck,
   CircleSlash,
   FlaskConical,
   RotateCcw,
@@ -13,6 +14,7 @@ import type { QuickAction } from "../../services/tutorService";
 import Button from "../../ui/Button";
 import { LogoMark } from "../../ui/Logo";
 import CitedText from "./CitedText";
+import RichText from "./RichText";
 import { classifyResponse, declineExplanation } from "./outcome";
 import RetrievalDetails from "./RetrievalDetails";
 import SourceCards from "./SourceCards";
@@ -22,6 +24,8 @@ interface AnswerBlockProps extends SelectSourceProps {
   turn: Turn;
   /** Yalnızca son cevapta hızlı eylemler ve "Tekrar sor" gösterilir. */
   isLatest: boolean;
+  /** Turun ilk bloğu değilse logo yerine aynı girinti bırakılır (AI Tutor turları). */
+  showMark?: boolean;
   onQuickAction: (action: QuickAction) => void;
   onRetry: () => void;
 }
@@ -45,6 +49,7 @@ const FAILURE_COPY: Record<TutorFailure["kind"], { title: string; description: s
 export default function AnswerBlock({
   turn,
   isLatest,
+  showMark = true,
   onQuickAction,
   onRetry,
   selectedSourceId,
@@ -53,7 +58,11 @@ export default function AnswerBlock({
   const select = { selectedSourceId, onSelectSource };
   return (
     <div className="flex gap-3">
-      <LogoMark className="mt-0.5 size-5 shrink-0 text-ink" />
+      {showMark ? (
+        <LogoMark className="mt-0.5 size-5 shrink-0 text-ink" />
+      ) : (
+        <span aria-hidden className="w-5 shrink-0" />
+      )}
       <div className="min-w-0 flex-1">
         <Body
           turn={turn}
@@ -121,8 +130,8 @@ function Body({ turn, isLatest, onQuickAction, onRetry, ...select }: AnswerBlock
             <ShieldCheck size={14} aria-hidden className="text-accent" />
             Kaynaklarla kontrol ediliyor…
           </p>
-          <div className="text-md leading-7 whitespace-pre-wrap text-graphite opacity-80">
-            {draftText(turn.streamText)}
+          <div className="text-md leading-7 text-graphite opacity-80">
+            <RichText text={draftText(turn.streamText)} />
             <span aria-hidden className="ml-0.5 inline-block h-4 w-[7px] translate-y-0.5 animate-pulse bg-accent" />
           </div>
         </div>
@@ -200,20 +209,34 @@ function Body({ turn, isLatest, onQuickAction, onRetry, ...select }: AnswerBlock
           Yapay zekâ şu an kullanılamıyor; ders materyalindeki ilgili bölüm olduğu gibi gösteriliyor.
         </p>
       )}
-      <div
-        className={
-          extractive
-            ? "border-l-2 border-marker pl-4 font-mono text-sm leading-7 whitespace-pre-wrap text-ink"
-            : "text-md leading-7 whitespace-pre-wrap text-ink"
-        }
-      >
-        <CitedText
-          text={extractive ? stripIntro(response.answer ?? "") : (response.answer ?? "")}
-          pattern={/(\[\d+\])/}
-          resolve={(n) => response.citations[n - 1]}
-          {...select}
-        />
-      </div>
+      {extractive ? (
+        // LLM'siz alıntı: materyalin kendi metni, biçimlendirilmeden.
+        <div className="border-l-2 border-marker pl-4 font-mono text-sm leading-7 whitespace-pre-wrap text-ink">
+          <CitedText
+            text={stripIntro(response.answer ?? "")}
+            pattern={/(\[\d+\])/}
+            resolve={(n) => response.citations[n - 1]}
+            {...select}
+          />
+        </div>
+      ) : (
+        <div className="text-md leading-7 text-ink">
+          <RichText
+            text={response.answer ?? ""}
+            citations={{ resolve: (n) => response.citations[n - 1], ...select }}
+          />
+        </div>
+      )}
+
+      {response.coverage_gap && (
+        <p className="flex items-start gap-2 rounded-panel bg-canvas px-3 py-2 text-sm text-graphite">
+          <SearchX size={14} aria-hidden className="mt-0.5 shrink-0" />
+          <span>
+            <span className="font-medium text-ink-2">Materyalde olmayan kısım: </span>
+            {response.coverage_gap}
+          </span>
+        </p>
+      )}
 
       {response.unsupported_removed > 0 && (
         <p className="text-sm text-graphite">
@@ -234,6 +257,9 @@ function Body({ turn, isLatest, onQuickAction, onRetry, ...select }: AnswerBlock
           <Button size="sm" icon={FlaskConical} onClick={() => onQuickAction("example")}>
             Örnek ver
           </Button>
+          <Button size="sm" icon={ClipboardCheck} onClick={() => onQuickAction("quiz")}>
+            Beni test et
+          </Button>
         </div>
       )}
       <RetrievalDetails response={response} {...select} />
@@ -243,7 +269,7 @@ function Body({ turn, isLatest, onQuickAction, onRetry, ...select }: AnswerBlock
 
 /** Taslaktaki [S#] etiketleri (yarım kalmış olanlar dahil) henüz doğrulanmadığı için gizlenir. */
 function draftText(text: string): string {
-  return text.replace(/\s?\[S\d+\]/g, "").replace(/\s?\[S?\d*$/, "");
+  return text.replace(/\s?\[S\d+(?:\s*[,;]\s*S\d+)*\]/g, "").replace(/\s?\[[S\d,; ]*$/, "");
 }
 
 /** LLM'siz cevabın ilk satırı ("…en uygun kısım:") üstteki notla aynı şeyi söyler. */
