@@ -114,8 +114,8 @@ def test_select_items_include_unreviewed():
 
 
 def test_evaluate_records_error_and_continues():
-    def ask(question):
-        if "bad" in question:
+    def ask(item):
+        if "bad" in item.question:
             raise RuntimeError("boom")
         return answer()
 
@@ -128,7 +128,7 @@ def test_evaluate_records_error_and_continues():
 def test_evaluate_locates_ids_and_drops_none():
     known = {"s1": locator(1), "s2": locator(2)}
 
-    def ask(question):
+    def ask(item):
         return answer(cited_source_ids=["s1", "gone"], retrieved_source_ids=["s2", "gone", "s1"])
 
     [res] = evaluate([gold("q")], ask, known.get)

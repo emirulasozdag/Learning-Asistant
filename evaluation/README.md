@@ -18,6 +18,7 @@ yapılamayan kısımları aşağıda [Açık boşluklar](#açık-boşluklar) alt
 | `tests/` | Harness birim testleri (veritabanısız, sahte judge). Veritabanlı test: `backend/tests/test_eval_harness.py` | Evet |
 | `rubrics/` | Cevap puanı ve iddia etiketi rubriği ([`qa_answer_and_claims.md`](rubrics/qa_answer_and_claims.md)) | Evet |
 | `human_labels/` | Örneklem, değerlendirici etiketleri, judge kalibrasyonu; metin yok, takma ad ([README](human_labels/README.md)) | Evet, anonim |
+| `instruments/` | Etiketleme birimleri, değerlendirici iş yükü, pilot formları ([README](instruments/README.md)) | Evet |
 | `runs/` | Koşu kayıtları, etiketleme tabloları, judge etiketleri, raporlar (cevap ve pasaj metni ders içeriği barındırır) | Hayır (gitignore) |
 
 ## Girdi şemaları
@@ -77,7 +78,34 @@ DATABASE_URL=postgresql+psycopg://learning:learning@localhost:5432/learning_assi
   eksik girdi). Skor uydurulmaz.
 - `--files-root`: veritabanındaki göreli dosya yollarının kökü. Varsayılan `..` (repo kökü,
   docker-compose'un `./data` bağlaması).
-- Şimdilik yalnızca `full` koşulu var; `no_rag`, `basic_rag` ve `full_video_time` sonraki işlerde.
+## Dört koşul (#18)
+
+```bash
+# Dört koşul aynı sorular, aynı üretici model ve aynı indeksle (tek parmak izi) koşulur.
+python -m harness.run --gold gold_sets/BLM2512/gold_set.json --split heldout \
+    --condition all --files-root .. --out runs/
+# Tek ya da birkaç koşul: --condition full  |  --condition no_rag basic_rag
+```
+
+| Koşul | Arama | Kapı | Alıntı doğrulama / iddia kontrolü | Oynatma konumu |
+|---|---|---|---|---|
+| `no_rag` | yok | yok | yok (alıntısız) | yok |
+| `basic_rag` | yalnız anlamsal, ilk 5 | yok | yok (etiketler yalnızca kaynağa çevrilir) | yok |
+| `full` | hibrit + RRF | var | var (ürün hattı, `/ask`) | yok |
+| `full_video_time` | hibrit + RRF + video komşuları | var | var | gold sorudaki `playback` |
+
+- `no_rag` ve `basic_rag` karşılaştırma için minimal hatlardır (`harness/conditions.py`); ürün davranışı değildir.
+  İkisi de LLM olmadan koşulamaz.
+- Her koşu kaydı koşulun ayarlarını (`config.condition_settings`) ve ortak `batch_id`'yi taşır; batch için
+  `runs/<batch_id>.compare.md` yan yana metrik tablosu yazılır. Model, indeks, embedder ya da sorular koşullar
+  arasında farklıysa tablo "geçersiz karşılaştırma" uyarısı taşır.
+- Tüm koşullar aynı gold kanıtına göre denetlenir (Recall@5, alıntı kapsamı/isabeti). `no_rag`'de arama ve alıntı
+  yoktur: bu metrikler 0 değil boşluk olarak yazılır. Doğruluk ve hallucination her koşu kaydı için ayrı ayrı
+  `harness.trust` / etiketleme akışıyla hesaplanır.
+- `full_video_time` için gold soruya oynatma konumu eklenir: `"playback": {"document_sha256": "…", "time_s": 754}`
+  (öğrencinin durdurduğu video ve an; video envanterde onaylı olmalı). Konumu olmayan sorular `full` ile aynı
+  koşulur ve sayısı boşluk olarak yazılır.
+- `verification_failure_rate`: cevabın iddia kontrolü yapılamadığı (#10, judge yok/hata) soruların oranı.
 
 ## Arama kalibrasyonu (#9)
 
@@ -186,9 +214,20 @@ python -m harness.trust --run runs/<run_id>.json
 | Hallucination | Desteklenmeyen iddia içeren cevap / cevaplanmış cevaplanabilir soru; iddia düzeyinde oran da | ≤ %10 | ✅ etiketten |
 | Kapsam uyumu | Kapsam dışında reddetme / aşırı reddetme | ≥ %90 / ≤ %10 | ✅ hesaplanıyor |
 | Retrieval | Recall@5 | ≥ 0,85 | ✅ hesaplanıyor |
-| Pratik kalitesi | Kabul edilebilir item oranı | ≥ %85 | — |
-| Değerlendirme uyumu | Eğitmen skorlarıyla QWK | ≥ 0,70 | — |
-| Kullanılabilirlik | SUS; 5'li anket | ≥ 70; ≥ 4,0 | — |
+| Pratik kalitesi | Kabul edilebilir item oranı | ≥ %85 | ✅ etiketten (`harness.pilot`) |
+| Değerlendirme uyumu | Eğitmen skorlarıyla QWK | ≥ 0,70 | ✅ etiketten (`harness.pilot`) |
+| Kullanılabilirlik | SUS; 5'li anket | ≥ 70; ≥ 4,0 | ✅ anketten (`harness.pilot`) |
+
+İnsan örneklemi metrikleri (pratik kabulü, değerlendirme QWK'si, SUS, memnuniyet) koşu kaydından değil etiket
+dosyalarından hesaplanır:
+
+```bash
+python -m harness.pilot --labels human_labels/pilot/BLM2512 --out runs/
+```
+
+Dosya biçimleri `harness/pilot.py`'de, örneklem birimleri, iş yükü ve formlar
+[`instruments/README.md`](instruments/README.md)'de. Etiket yoksa ya da örneklem planlanandan küçükse metrik
+değer yerine boşlukla yazılır.
 
 Ek olarak her koşuda: cevaplanan sorularda alıntı varlığı, **alıntı kapsamı** (gold kanıtın alıntılarla
 karşılanan oranı, soru başına ortalama), **alıntı isabeti** (gold kanıta düşen alıntı / tüm alıntı), sağlayıcı
@@ -210,6 +249,14 @@ Judge modeli generator'dan farklı bir model ailesinden seçilir. Judge'a yalnı
   koşulacak. M1 kabul kanıtı ve iyileştirme issue'ları o rapordan çıkacak.
 - **Maliyet kaydı yok:** soru-cevap hattı token kullanımını döndürmüyor; koşu kaydı bunu boşluk olarak yazar.
   Gecikme (p50/p95) kaydediliyor.
+
+#18'in dış girdi bekleyen kısımları (değer uydurulmadı; envanterde `missing_inputs`):
+
+- **150 eğitmen referanslı soru + 30 kapsam dışı soru** ve kanıt konumları (şu an 0). Dört koşulun gerçek
+  karşılaştırması bu set gelince koşulur.
+- **İnsan örneklemleri:** 40 pratik sorusu incelemesi, 60 öğrenci cevabının kör puanlaması, ≥ 20 onaylı gönüllünün
+  anketi. Pilot öncesi etik/bölüm onayı ve aydınlatma metninin son sürümü (ADR-4) gerekiyor.
+- **SUS'un Türkçe uyarlaması** seçilip formun sürümü sabitlenmeli (`instruments/README.md`).
 
 ## CI
 

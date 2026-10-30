@@ -1,10 +1,12 @@
-"""Q&A baseline koşusu: gold set'i gerçek soru-cevap hattından geçirir, konfigürasyonu kaydeder.
+"""Q&A koşusu: gold set'i dört koşuldan (no_rag, basic_rag, full, full_video_time) geçirir.
 
 Kullanım (evaluation/ içinden, backend kurulu ve veritabanı açıkken):
 
     python -m harness.run --gold gold_sets/BLM2512/gold_set.json --split heldout \
-        --condition full --files-root .. --out runs/
+        --condition all --files-root .. --out runs/
 
+Birden fazla koşul aynı sorular, aynı üretici model ve aynı indeksle (tek parmak izi) koşulur;
+koşu kayıtları ortak `batch_id` taşır ve `runs/<batch_id>.compare.md` karşılaştırma tablosu yazılır.
 Her soru kendi veritabanı işleminde sorulur ve geri alınır: koşu sohbet/mesaj kaydı bırakmaz,
 eğitmen analitiğini kirletmez. Çıktı `runs/<run_id>.json` (tam kayıt) ve `.md` (özet).
 """
@@ -22,6 +24,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import urlparse
 
+from harness import conditions
 from harness.conditions import Condition
 from harness.fingerprint import file_sha256, text_sha256
 from harness.metrics import accuracy, citation, hallucination, retrieval, scope
@@ -47,8 +50,6 @@ from harness.validate import (
 
 RECALL_K = 5
 
-SUPPORTED_CONDITIONS = {Condition.FULL}
-
 
 @dataclass
 class Answer:
@@ -66,7 +67,7 @@ class Answer:
     retrieved_texts: list[str | None] = field(default_factory=list)
 
 
-AskFn = Callable[[str], Answer]
+AskFn = Callable[[GoldItem], Answer]
 LocateFn = Callable[[str], SourceLocator | None]
 
 
@@ -98,7 +99,7 @@ def evaluate(
     for item in items:
         started = clock()
         try:
-            answer = ask(item.question)
+            answer = ask(item)
         except Exception as exc:  # noqa: BLE001 — hata kaydedilir, koşu sürer
             results.append(
                 ItemResult(
@@ -159,9 +160,14 @@ def _locate_with_text(
 
 
 def compute_metrics(
-    items: Sequence[GoldItem], results: Sequence[ItemResult]
+    items: Sequence[GoldItem],
+    results: Sequence[ItemResult],
+    condition: Condition = Condition.FULL,
 ) -> tuple[dict[str, MetricValue], list[str]]:
-    """Judge gerektirmeyen metrikler; gerektirenler değer yerine açık boşlukla döner."""
+    """Judge gerektirmeyen metrikler; gerektirenler değer yerine açık boşlukla döner.
+
+    no_rag'de arama ve alıntı yoktur: bu metrikler 0 değil, "koşulda yok" boşluğu olarak yazılır.
+    """
     by_id = {item.id: item for item in items}
     ok = [r for r in results if r.error is None]
     metrics: dict[str, MetricValue] = {}
@@ -238,6 +244,27 @@ def compute_metrics(
         numerator=sum(failures),
         empty_gap="koşulan soru yok",
     )
+    # #10: cevap üretildi ama iddia kontrolü yapılamadı (judge yok / hata); alıntı gösterildi.
+    unchecked = [r.outcome == "verification_failure" for r in ok]
+    metrics["verification_failure_rate"] = _metric(
+        lambda: sum(unchecked) / len(unchecked),
+        denominator=len(unchecked),
+        numerator=sum(unchecked),
+        empty_gap="koşulan soru yok",
+    )
+    if condition is Condition.NO_RAG:
+        for name in (
+            f"retrieval_recall_at_{RECALL_K}",
+            "citation_presence_rate",
+            "citation_evidence_coverage",
+            "citation_precision",
+        ):
+            metrics[name] = MetricValue(
+                value=None,
+                denominator=0,
+                target=metrics[name].target,
+                gap="no_rag koşulunda arama/alıntı yok",
+            )
     latencies = sorted(r.latency_ms for r in ok if r.latency_ms is not None)
     metrics["latency_p50_ms"] = _metric(
         lambda: statistics.median(latencies),
@@ -327,27 +354,47 @@ def run_id_for(started: datetime, condition: Condition, split: Split | None, com
 # --- Gerçek hat (veritabanı + backend) ---------------------------------------------------------
 
 
-def _backend_ask(engine, course_id: int, llm) -> AskFn:
-    """Her soru ayrı işlemde: hat commit etse bile en sonda geri alınır."""
+def _backend_ask(
+    engine,
+    course_id: int,
+    llm,
+    condition: Condition = Condition.FULL,
+    playback_documents: dict[str, int] | None = None,
+) -> AskFn:
+    """Her soru ayrı işlemde: hat commit etse bile en sonda geri alınır.
+
+    `playback_documents`: video dokümanının SHA-256'sı → doküman kimliği (full_video_time).
+    """
     from sqlalchemy.orm import Session
 
     from app.db.models import Chunk, Course
     from app.qa import service
-    from app.schemas.ask import AskRequest
+    from app.schemas.ask import AskRequest, VideoRef
 
     def _chunk_text(db: Session, source_id: str) -> str | None:
         chunk = db.get(Chunk, int(source_id)) if source_id.isdigit() else None
         return chunk.text if chunk is not None else None
 
-    def ask(question: str) -> Answer:
+    def _video(item: GoldItem) -> VideoRef | None:
+        if condition is not Condition.FULL_VIDEO_TIME or item.playback is None:
+            return None
+        document_id = (playback_documents or {}).get(item.playback.document_sha256)
+        if document_id is None:
+            raise LookupError(f"{item.id}: oynatma konumundaki video indekste yok")
+        return VideoRef(document_id=document_id, time_s=item.playback.time_s)
+
+    def ask(item: GoldItem) -> Answer:
         with engine.connect() as connection:
             transaction = connection.begin()
             try:
                 with Session(bind=connection, join_transaction_mode="create_savepoint") as db:
                     course = db.get(Course, course_id)
-                    response = service.ask(
-                        db, course, AskRequest(course_id=course_id, question=question), llm
+                    if condition in (Condition.NO_RAG, Condition.BASIC_RAG):
+                        return _baseline_answer(db, course, item.question, llm, condition)
+                    request = AskRequest(
+                        course_id=course_id, question=item.question, video=_video(item)
                     )
+                    response = service.ask(db, course, request, llm)
                     # Judge ve değerlendirici iddiaları modelin gördüğü pasajlara göre etiketler.
                     texts = [_chunk_text(db, hit.source_id) for hit in response.retrieval]
             finally:
@@ -367,6 +414,51 @@ def _backend_ask(engine, course_id: int, llm) -> AskFn:
     return ask
 
 
+def _baseline_answer(db, course, question: str, llm, condition: Condition) -> Answer:
+    """no_rag / basic_rag: minimal karşılaştırma hatları (`harness.conditions`)."""
+    passages: list[conditions.Passage] = []
+    best_similarity = None
+    if condition is Condition.BASIC_RAG:
+        from app.embeddings.provider import get_embedder
+        from app.retrieval.dense import dense_search
+
+        embedder = get_embedder()
+        hits = dense_search(
+            db, course, embedder.embed_query(question), conditions.BASIC_K, embedder.identity
+        )
+        passages = [conditions.Passage(hit.source_id, hit.text) for hit in hits]
+        best_similarity = max((h.dense_score for h in hits if h.dense_score), default=None)
+        result = conditions.basic_rag(question, course.name, passages, llm)
+    else:
+        result = conditions.closed_book(question, course.name, llm)
+    return Answer(
+        outcome=result.outcome,
+        declined=result.outcome == "model_refusal",
+        mode="llm",
+        model=result.model,
+        text=result.text,
+        cited_source_ids=result.cited_source_ids,
+        retrieved_source_ids=[p.source_id for p in result.retrieved],
+        best_similarity=best_similarity,
+        retrieved_texts=[p.text for p in result.retrieved],
+    )
+
+
+def playback_documents(db, course, locator) -> dict[str, int]:
+    """Dersin video/ses dokümanları: SHA-256 → doküman kimliği."""
+    from sqlalchemy import select
+
+    from app.db.models import Document
+
+    documents = db.scalars(select(Document).where(Document.course_id == course.id))
+    result = {}
+    for document in documents:
+        sha = locator.document_sha256(document)
+        if sha is not None:
+            result[sha] = document.id
+    return result
+
+
 def _run_config(
     condition: Condition,
     split: Split | None,
@@ -379,8 +471,13 @@ def _run_config(
     from app.retrieval import fusion, hybrid
 
     commit, dirty = git_state(repo)
+    prompt = {
+        Condition.NO_RAG: conditions.CLOSED_BOOK_PROMPT,
+        Condition.BASIC_RAG: conditions.BASIC_RAG_PROMPT,
+    }.get(condition, SYSTEM_PROMPT)
     return RunConfig(
         condition=condition.value,
+        condition_settings=conditions.SETTINGS[condition],
         split=split,
         git_commit=commit,
         git_dirty=dirty,
@@ -390,7 +487,7 @@ def _run_config(
         llm_model=settings.generator_model if settings.llm_api_key else None,
         llm_base_url=_sanitized_url(settings.llm_endpoint),
         llm_enabled=bool(settings.llm_api_key),
-        prompt_sha256=text_sha256(SYSTEM_PROMPT),
+        prompt_sha256=text_sha256(prompt),
         embedding_provider=settings.embedding_provider,
         embedding_model=settings.embedding_model,
         retrieval={
@@ -413,7 +510,20 @@ def _sanitized_url(url: str) -> str:
     return f"{parts.scheme}://{host}{port}{parts.path}"
 
 
-def run_baseline(args: argparse.Namespace) -> RunRecord:
+def parse_conditions(values: Sequence[str]) -> list[Condition]:
+    """`all` ya da koşul adları; sıra korunur, tekrar atılır."""
+    if "all" in values:
+        return list(Condition)
+    result: list[Condition] = []
+    for value in values:
+        condition = Condition(value)
+        if condition not in result:
+            result.append(condition)
+    return result
+
+
+def run_conditions(args: argparse.Namespace) -> list[RunRecord]:
+    """Seçilen koşulları aynı sorular, model ve indeksle koşar (tek envanter/indeks kontrolü)."""
     from sqlalchemy import create_engine
     from sqlalchemy.orm import Session
 
@@ -423,9 +533,7 @@ def run_baseline(args: argparse.Namespace) -> RunRecord:
     from app.retrieval.index import inventory
     from harness.corpus import CorpusError, Locator, find_course, snapshot
 
-    condition = Condition(args.condition)
-    if condition not in SUPPORTED_CONDITIONS:
-        raise SystemExit(f"'{condition.value}' koşulu henüz uygulanmadı; şimdilik: full")
+    selected = parse_conditions(args.condition)
     split = None if args.split == "all" else Split(args.split)
 
     gold = load_gold_set(args.gold)
@@ -437,9 +545,15 @@ def run_baseline(args: argparse.Namespace) -> RunRecord:
         raise SystemExit(f"Gold set tutarsız, koşu yapılmadı:\n  {details}")
     items, selection_gaps = select_items(gold.items, split, args.include_unreviewed)
 
-    started = datetime.now(UTC)
-    config = _run_config(condition, split, args.gold, manifest_path, args.repo)
+    llm = select_client()
+    baselines = [c for c in selected if c in (Condition.NO_RAG, Condition.BASIC_RAG)]
+    if baselines and llm is None:
+        names = ", ".join(c.value for c in baselines)
+        raise SystemExit(f"{names} koşulları LLM olmadan koşulamaz (LLM_API_KEY)")
+
+    batch_started = datetime.now(UTC)
     engine = create_engine(args.database_url or settings.database_url)
+    records: list[RunRecord] = []
     with Session(engine) as db:
         course = find_course(db, gold.course_code)
         locator = Locator(db, args.files_root)
@@ -452,33 +566,69 @@ def run_baseline(args: argparse.Namespace) -> RunRecord:
             )
         identity = get_embedder().identity
         index = inventory(db, course.id)
-        config = config.model_copy(
-            update={"embedding_identity": identity, "index_fingerprint": index.fingerprint}
+        videos = playback_documents(db, course, locator)
+        commit, _ = git_state(args.repo)
+        batch_id = run_id_for(batch_started, Condition.FULL, split, commit).replace(
+            "_full_", "_batch_"
         )
-        results = evaluate(items, _backend_ask(engine, course.id, select_client()), locator.locate)
-    metrics, metric_gaps = compute_metrics(items, results)
+        for condition in selected:
+            started = datetime.now(UTC)
+            config = _run_config(condition, split, args.gold, manifest_path, args.repo)
+            config = config.model_copy(
+                update={
+                    "embedding_identity": identity,
+                    "index_fingerprint": index.fingerprint,
+                    "batch_id": batch_id if len(selected) > 1 else None,
+                }
+            )
+            ask = _backend_ask(engine, course.id, llm, condition, videos)
+            results = evaluate(items, ask, locator.locate)
+            metrics, metric_gaps = compute_metrics(items, results, condition)
+            gaps = selection_gaps + item_gaps(gold) + metric_gaps + _corpus_gaps(corpus)
+            gaps += condition_gaps(condition, items)
+            gaps += [f"Eksik girdi: {m.what} (sorumlu: {m.owner})" for m in manifest.missing_inputs]
+            if index.stale(identity):
+                gaps.append(
+                    f"{index.stale(identity)} parça etkin embedder'la ({identity}) "
+                    "vektörleştirilmemiş; anlamsal arama bunları görmedi "
+                    "(python -m app.scripts.reembed)"
+                )
+            if config.git_dirty:
+                gaps.append(
+                    "Çalışma ağacında commit'lenmemiş değişiklik var; koşu tam tekrarlanamaz"
+                )
+            if not config.llm_enabled:
+                gaps.append("LLM anahtarı yok: cevaplar LLM'siz alıntı modunda üretildi")
+            records.append(
+                RunRecord(
+                    run_id=run_id_for(started, condition, split, config.git_commit),
+                    started_at=started,
+                    finished_at=datetime.now(UTC),
+                    config=config,
+                    corpus=corpus,
+                    items=results,
+                    metrics=metrics,
+                    gaps=gaps,
+                )
+            )
+    return records
 
-    gaps = selection_gaps + item_gaps(gold) + metric_gaps + _corpus_gaps(corpus)
-    gaps += [f"Eksik girdi: {m.what} (sorumlu: {m.owner})" for m in manifest.missing_inputs]
-    if index.stale(identity):
-        gaps.append(
-            f"{index.stale(identity)} parça etkin embedder'la ({identity}) vektörleştirilmemiş; "
-            "anlamsal arama bunları görmedi (python -m app.scripts.reembed)"
-        )
-    if config.git_dirty:
-        gaps.append("Çalışma ağacında commit'lenmemiş değişiklik var; koşu tam tekrarlanamaz")
-    if not config.llm_enabled:
-        gaps.append("LLM anahtarı yok: cevaplar LLM'siz alıntı modunda üretildi")
-    return RunRecord(
-        run_id=run_id_for(started, condition, split, config.git_commit),
-        started_at=started,
-        finished_at=datetime.now(UTC),
-        config=config,
-        corpus=corpus,
-        items=results,
-        metrics=metrics,
-        gaps=gaps,
-    )
+
+def condition_gaps(condition: Condition, items: Sequence[GoldItem]) -> list[str]:
+    """Koşula özgü eksikler (ör. oynatma konumu olmayan sorular)."""
+    if condition is not Condition.FULL_VIDEO_TIME:
+        return []
+    with_playback = sum(1 for item in items if item.playback is not None)
+    if with_playback == 0:
+        return [
+            "Hiçbir soruda oynatma konumu (playback) yok: full_video_time, full ile aynı koşuldu"
+        ]
+    if with_playback < len(items):
+        return [
+            f"{len(items) - with_playback}/{len(items)} soruda oynatma konumu yok; "
+            "bu sorular full ile aynı koşuldu"
+        ]
+    return []
 
 
 def _corpus_gaps(corpus: CorpusSnapshot) -> list[str]:
@@ -490,6 +640,19 @@ def _corpus_gaps(corpus: CorpusSnapshot) -> list[str]:
     if corpus.unapproved_indexed:
         gaps.append("Onaysız doküman indekste (--allow-unapproved ile koşuldu)")
     return gaps
+
+
+def write_comparison(records: Sequence[RunRecord], out_dir: Path) -> Path | None:
+    """Aynı batch'teki koşulların karşılaştırma tablosu; tek koşulda yazılmaz."""
+    from harness.report import render_comparison
+
+    batch_id = records[0].config.batch_id if records else None
+    if batch_id is None:
+        return None
+    path = out_dir / f"{batch_id}.compare.md"
+    with path.open("x", encoding="utf-8") as file:
+        file.write(render_comparison(records))
+    return path
 
 
 def write_outputs(record: RunRecord, out_dir: Path) -> Path:
@@ -515,7 +678,13 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         required=True,
         help="Kalibrasyon ve held-out ayrı koşulur; 'all' yalnızca keşif içindir",
     )
-    parser.add_argument("--condition", default=Condition.FULL.value)
+    parser.add_argument(
+        "--condition",
+        nargs="+",
+        default=[Condition.FULL.value],
+        choices=[c.value for c in Condition] + ["all"],
+        help="Bir ya da birden fazla koşul; 'all' dördünü aynı ayarlarla koşar",
+    )
     parser.add_argument("--out", type=Path, default=Path("runs"))
     parser.add_argument(
         "--files-root",
@@ -534,11 +703,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
     # Windows konsolu (cp1254) Türkçe karakterleri bozmasın.
     sys.stdout.reconfigure(encoding="utf-8")
-    record = run_baseline(args)
-    path = write_outputs(record, args.out)
-    print(f"Koşu kaydı: {path}")
-    for gap in record.gaps:
-        print(f"  boşluk: {gap}")
+    records = run_conditions(args)
+    for record in records:
+        path = write_outputs(record, args.out)
+        print(f"Koşu kaydı ({record.config.condition}): {path}")
+        for gap in record.gaps:
+            print(f"  boşluk: {gap}")
+    comparison = write_comparison(records, args.out)
+    if comparison:
+        print(f"Karşılaştırma: {comparison}")
     return 0
 
 

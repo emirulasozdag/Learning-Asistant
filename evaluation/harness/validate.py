@@ -20,6 +20,8 @@ from harness.schemas import CorpusManifest, GoldSet, ItemKind, Split, load_gold_
 # Baseline'ın kabul edilebilir sayılması için gereken en az gerçek örnek (issue #8).
 MIN_REVIEWED_ANSWERABLE = 30
 MIN_OUT_OF_SCOPE = 30
+# Dört koşullu değerlendirmenin planlanan tam seti (ANALYSIS §9, issue #18).
+PLANNED_ANSWERABLE = 150
 
 
 def structural_errors(gold: GoldSet, manifest: CorpusManifest) -> list[str]:
@@ -35,6 +37,8 @@ def structural_errors(gold: GoldSet, manifest: CorpusManifest) -> list[str]:
                 errors.append(f"{item.id}: kanıt dışlanmış bir dokümanda")
             elif locator.document_sha256 not in approved:
                 errors.append(f"{item.id}: kanıt envanterde olmayan bir dokümanda")
+        if item.playback and item.playback.document_sha256 not in approved:
+            errors.append(f"{item.id}: oynatma konumu envanterde onaylı olmayan bir videoda")
     questions = Counter(item.question.strip().casefold() for item in gold.items)
     for question, count in questions.items():
         if count > 1:
@@ -65,6 +69,21 @@ def set_gaps(gold: GoldSet, manifest: CorpusManifest) -> list[str]:
     reviewed = sum(1 for i in gold.items if i.kind is ItemKind.ANSWERABLE and i.reviewed)
     if reviewed < MIN_REVIEWED_ANSWERABLE:
         gaps.append(f"Eğitmen incelemeli cevaplanabilir soru {reviewed}/{MIN_REVIEWED_ANSWERABLE}")
+    elif reviewed < PLANNED_ANSWERABLE:
+        gaps.append(
+            f"Planlanan tam set: eğitmen incelemeli cevaplanabilir soru "
+            f"{reviewed}/{PLANNED_ANSWERABLE} (#18)"
+        )
+    video_evidence = [
+        i
+        for i in gold.items
+        if any(loc.t_start is not None for loc in i.evidence) and i.playback is None
+    ]
+    if video_evidence:
+        gaps.append(
+            f"{len(video_evidence)} video kanıtlı soruda oynatma konumu (playback) yok: "
+            "full_video_time koşulu bu sorularda full ile aynı"
+        )
     oos = sum(1 for i in gold.items if i.kind is ItemKind.OUT_OF_SCOPE)
     if oos < MIN_OUT_OF_SCOPE:
         gaps.append(f"Kapsam dışı soru {oos}/{MIN_OUT_OF_SCOPE}")
