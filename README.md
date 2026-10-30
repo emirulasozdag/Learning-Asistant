@@ -151,6 +151,19 @@ LLM_API_KEY=<Gemini API anahtarı>
   Bu sağlayıcıda orkestratör yoktur; AI Tutor sabit akışla çalışır.
 - Anahtar boşsa sistem **LLM'siz** çalışır: cevap yerine en ilgili ders parçasını kaynağıyla gösterir.
 
+> **Önemli (#10):** Artık varsayılan `CLAIM_CHECK=required`. Judge tanımlı değilse LLM cevabı yerine kaynaktan
+> alıntı gösterilir. Judge, üreticiden farklı model ailesinden olmalıdır (Gemini dışı; örneğin OpenRouter
+> üzerinden Claude):
+>
+> ```
+> JUDGE_PROVIDER=openrouter
+> JUDGE_MODEL=anthropic/claude-sonnet-5.5
+> JUDGE_API_KEY=<OpenRouter anahtarı>
+> ```
+>
+> Lokal geliştirmede `.env`'e `CLAIM_CHECK=off` yazabilirsin (pilotta kullanılmaz). Ayrıntı:
+> [DECISIONS.md ADR-8](docs/DECISIONS.md).
+
 ### Transkripsiyonu açmak (isteğe bağlı)
 
 Altyazısı (.vtt) olmayan ders videosu/sesi (.mp4 .webm .mkv .mov .mp3 .m4a .wav, en çok 2 GB) yerelde yazıya çevrilebilir

@@ -54,7 +54,7 @@ class CourseActivity(BaseModel):
     not_covered: int
     # Doğrulanamadı ya da model reddetti.
     not_generated: int
-    # Modele ulaşılamadı; ilgili bölüm alıntılandı.
+    # Modele ulaşılamadı ya da cevap kontrol edilemedi (#10); ilgili bölüm alıntılandı.
     unavailable: int
     daily: list[DailyCount]
     top_sources: list[SourceUsage]

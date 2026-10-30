@@ -15,7 +15,7 @@ import Button from "../../ui/Button";
 import { LogoMark } from "../../ui/Logo";
 import CitedText from "./CitedText";
 import RichText from "./RichText";
-import { classifyResponse, declineExplanation } from "./outcome";
+import { classifyResponse, declineExplanation, extractiveNotice } from "./outcome";
 import RetrievalDetails from "./RetrievalDetails";
 import SourceCards from "./SourceCards";
 import type { SelectSourceProps, Turn, TutorFailure } from "./types";
@@ -205,9 +205,7 @@ function Body({ turn, isLatest, onQuickAction, onRetry, ...select }: AnswerBlock
   return (
     <div className="flex flex-col gap-4">
       {extractive && (
-        <p className="text-sm text-graphite">
-          Yapay zekâ şu an kullanılamıyor; ders materyalindeki ilgili bölüm olduğu gibi gösteriliyor.
-        </p>
+        <p className="text-sm text-graphite">{extractiveNotice(response)}</p>
       )}
       {extractive ? (
         // LLM'siz alıntı: materyalin kendi metni, biçimlendirilmeden.

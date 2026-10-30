@@ -18,7 +18,12 @@ import { useStudio } from "../../features/studio/useStudio";
 import AnswerBlock from "../../features/tutor/AnswerBlock";
 import { isStructurable, stripExtractiveIntro, structureAnswer, type Claim, type StructuredAnswer } from "../../features/tutor/claims";
 import Composer from "../../features/tutor/Composer";
-import { classifyFailure, classifyResponse, describeTutorTurn } from "../../features/tutor/outcome";
+import {
+  classifyFailure,
+  classifyResponse,
+  describeTutorTurn,
+  extractiveNotice,
+} from "../../features/tutor/outcome";
 import SourceViewer from "../../features/tutor/SourceViewer";
 import ClaimAnswer from "../../features/tutor/studio/ClaimAnswer";
 import EvidencePanel from "../../features/tutor/studio/EvidencePanel";
@@ -370,8 +375,9 @@ function TutorSession({ course }: { course: Course }) {
                   <>
                     {classifyResponse(response) === "ai_unavailable" && (
                       <p className="rounded-panel border border-line bg-surface px-3 py-2 text-sm text-graphite">
-                        Yapay zekâ şu an kullanılamıyor; ders materyalindeki ilgili bölüm olduğu gibi, cümle cümle
-                        gösteriliyor.
+                        {response.outcome === "verification_failure"
+                          ? extractiveNotice(response)
+                          : "Yapay zekâ şu an kullanılamıyor; ders materyalindeki ilgili bölüm olduğu gibi, cümle cümle gösteriliyor."}
                       </p>
                     )}
                     <ClaimAnswer

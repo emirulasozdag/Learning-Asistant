@@ -404,6 +404,13 @@ Kurallar:
 
 **Şu an (#5, PR #66 sonrası).** `AskResponse.outcome` mevcut ve kullanılıyor:
 `"answered" | "insufficient_evidence" | "unsupported" | "model_refusal" | "provider_failure"`, ayrıca `unsupported_removed`.
+
+**#10 eklemeleri (ADR-8).** `outcome` += `"verification_failure"` **[ekleme]**: cevap üretildi ama iddia kontrolü
+yapılamadı; `answer` en ilgili parçanın alıntısıdır, `mode == "extractive"`, `declined == false`.
+`AskResponse.claim_check: {status: "checked" | "not_configured" | "failed" | "off", judge_model, claims,
+unsupported, prompt_version} | null` **[ekleme]**; model cevap yazmadıysa `null`. `unsupported_removed` artık
+judge'ın çıkardığı iddiaları da sayar. `CLAIM_CHECK=required` iken `/ask/stream` ve tutor akışında `delta` / taslak
+olayı gönderilmez. Ayrıntılı kayıt yalnızca mesaj meta'sındadır (`meta.claim_check`).
 Frontend: [outcome.ts](../frontend/src/features/tutor/outcome.ts).
 
 **Eksikler.**

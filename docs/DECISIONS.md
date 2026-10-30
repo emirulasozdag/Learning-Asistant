@@ -303,6 +303,50 @@ Açık: orkestratör yönlendirme seti, judge (#10), genel bilgi için eğitmen 
 
 ---
 
+## ADR-8 — İddia kontrolü (judge) ve veri sınıfına göre model rotası
+
+**Bağlam.** FR-08 ve FR-14 (#10): alıntı doğrulaması yalnızca her cümlenin geçerli bir kaynak etiketi taşıdığını
+denetliyordu; model genel bilgisini `[S1]` ile etiketlerse geçiyordu (ADR-7). Judge'ın generator'dan farklı aileden
+olması gerekiyor (ANALYSIS §7.3) ve hassas verinin hosted modele sessizce gitmemesi isteniyor (ADR-5).
+
+**Karar (öneri).**
+- **İddia kontrolü:** alıntı doğrulamasından geçen cevap iddia birimlerine bölünür (etiketli cümle + ona bağlanan
+  etiketsiz cümleler; `verification/citations.py::claim_units`). Judge her birimi atomik bilgilere ayırır ve her
+  bilgiyi yalnızca o birimin alıntıladığı kaynaklara göre `supported` / `unsupported` etiketler
+  (`verification/judge.py`, istem sürümü `claim-judge-v1`). Kodda ek kurallar: her iddiaya tam bir karar, en az bir
+  atomik bilgi; desteklenen bilginin kaynağı iddianın kendi kaynaklarından biri olmalı (değilse `source_mismatch`).
+  Desteklenmeyen birimler cevaptan çıkarılır; kalan kapsama `MIN_COVERAGE` altındaysa cevap reddedilir (`unsupported`).
+- **Yalnızca kontrol edilmiş içerik:** `CLAIM_CHECK=required` (varsayılan) iken taslak akıtılmaz; judge yoksa,
+  ayarı geçersizse, hata verirse ya da sözleşme dışı çıktı verirse üretilen metin gösterilmez, en ilgili parça aynen
+  alıntılanır ve `outcome="verification_failure"`. Bu, `provider_failure` (üretici erişilemedi), ret ve LLM'siz
+  alıntıdan ayrı kaydedilir. `CLAIM_CHECK=off` yalnızca geliştirme içindir (`claim_check.status="off"`).
+- **Judge seçimi:** `JUDGE_PROVIDER`, `JUDGE_MODEL`, `JUDGE_API_KEY`. Aile model adından çıkarılır
+  (`llm/gateway.py::model_family`); generator'la aynı aile reddedilir (`JudgeConfigError`). Üretici Gemini iken
+  önerilen judge: OpenRouter üzerinden Claude. Judge'a soru değil, iddialar ve onaylı ders parçaları gider; kimlik gitmez.
+- **Denetim kaydı:** her cevabın iddiaları, alıntılanan kaynak kimlikleri, atomik bilgiler, karar, gerekçe, judge
+  modeli ve istem sürümü asistan mesajının `meta.claim_check` alanına yazılır (migration yok). API yanıtında yalnızca
+  özet (`AskResponse.claim_check`) döner. Hallucination oranı bu kayıttan hesaplanır
+  (`verification/hallucination.py`): desteklenmeyen iddia içeren üretimlerin oranı; kontrol edilemeyenler ayrıca sayılır.
+- **Veri sınıfına göre rota** (`llm/routing.py`, kural tabanlı, sessiz geri düşme yok):
+
+  | Veri sınıfı | Örnek | Rota |
+  |---|---|---|
+  | `course_evidence` | Soru, onaylı ders parçaları, sohbet geçmişi, judge yükü | hosted (ADR-5 A) |
+  | `student_work` | Öğrencinin değerlendirilen cevabı | `LLM_STUDENT_WORK_ROUTE`: `hosted` (varsayılan, ADR-5) ya da `local` |
+  | `personal` | Ad, e-posta, kullanıcı/oturum kimliği | her zaman local |
+
+  Yerel model `LLM_LOCAL_BASE_URL` + `LLM_LOCAL_MODEL` (OpenAI uyumlu, ör. Ollama). Yapılandırılmamışsa yerele
+  yönlenen çağrı `LocalRouteUnavailable` ile durur; değerlendirmede öğrenciye açık bir mesaj ve `503` döner.
+
+**Sonuçları.** Pilot ve değerlendirme koşuları judge yapılandırılmadan "kontrol edilmiş" sayılmaz. Judge'ın
+güvenilirliği insan etiketleriyle ölçülür (κ ≥ 0,6, #13). Genel bilgi açıklamaları (`explain_general`) kaynağa
+bağlı olmadığı için bu judge'la kontrol edilmez; `check="unchecked"` kalır ve bayrak kapalı kalmalıdır (ADR-7).
+Açık soru 6'nın model ailesi kısmı bu kararla cevaplanır; sağlayıcının veri saklama ayarlarının kaydı hâlâ açıktır.
+
+**Durum:** Önerildi · **Karar tarihi:** — · **Katılanlar:** Emir Ulaş Özdağ (@emirulasozdag, öneren)
+
+---
+
 ## Açık sorular
 
 Bunlar ekip ya da dış taraf (eğitmen, bölüm) cevabı bekleyen konulardır. Cevaplanana kadar varsayım yapılmaz.

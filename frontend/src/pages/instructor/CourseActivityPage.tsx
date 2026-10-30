@@ -240,6 +240,7 @@ const OUTCOME_BADGES: Record<string, { label: string; tone: "success" | "neutral
   unsupported: { label: "Doğrulanamadı", tone: "warning" },
   model_refusal: { label: "Yanıtlanmadı", tone: "warning" },
   provider_failure: { label: "Servis yanıt vermedi", tone: "danger" },
+  verification_failure: { label: "Kontrol edilemedi", tone: "danger" },
 };
 
 function QuestionList({ items, empty }: { items: QuestionItem[]; empty: string }) {

@@ -10,6 +10,7 @@ from app.db.models import Conversation, Course, Message
 from app.embeddings.base import Embedder
 from app.generation.answer import stream_answer
 from app.llm.base import ChatMessage, LLMClient
+from app.llm.gateway import resolve_judge
 from app.retrieval.hybrid import retrieve
 from app.retrieval.rerank import rerank
 from app.retrieval.types import RetrievalResult, VideoPosition
@@ -149,8 +150,20 @@ def answer_stream(
         retrieval.passages = retrieval.passages[:5]
     yield RetrievalEvent(_hits(retrieval, cited=set()))
 
+    judge, judge_error = (None, None)
+    if llm is not None and settings.claim_check == "required" and retrieval.relevant:
+        judge, judge_error = resolve_judge()
     response: AskResponse | None = None
-    for item in stream_answer(course, question, history, retrieval, llm):
+    for item in stream_answer(
+        course,
+        question,
+        history,
+        retrieval,
+        llm,
+        judge=judge,
+        claim_check=settings.claim_check,
+        judge_error=judge_error,
+    ):
         if isinstance(item, AskResponse):
             response = item
         else:
@@ -172,6 +185,19 @@ def answer_meta(response: AskResponse) -> dict:
         "mode": response.mode,
         "model": response.model,
         "cited_source_ids": sorted(c.source_id for c in response.citations),
+        # #10: iddia kontrolünün denetim kaydı (hallucination oranı buradan hesaplanır).
+        "claim_check": _claim_check_meta(response),
+    }
+
+
+def _claim_check_meta(response: AskResponse) -> dict | None:
+    check = response.claim_check
+    if check is None:
+        return None
+    return {
+        **check.model_dump(exclude={"records", "error"}),
+        "error": check.error,
+        "records": check.records,
     }
 
 

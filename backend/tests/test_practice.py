@@ -92,7 +92,7 @@ def chunk_id(client: TestClient, course: Course, tmp_path: Path) -> str:
 def use(monkeypatch, generator: FakeJSON, checker: FakeJSON | None = None) -> None:
     clients = {LLMRole.GENERATOR: generator, LLMRole.CHECKER: checker or generator}
     monkeypatch.setattr(
-        practice_api, "select_client", lambda role=LLMRole.GENERATOR: clients.get(role)
+        practice_api, "select_client", lambda role=LLMRole.GENERATOR, **_: clients.get(role)
     )
 
 

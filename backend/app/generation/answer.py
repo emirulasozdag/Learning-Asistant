@@ -6,6 +6,8 @@ Kaynaklar yetmiyorsa cevaba "YOK:" ile başlar. Akış bitince iddialar doğrula
 etiketler [1], [2]... olarak numaralanır; yeterli kapsama kalmazsa cevap gösterilmez.
 
 Akan metin (str parçaları) yalnızca taslaktır; son AskResponse her zaman onun yerini alır.
+İddia kontrolü zorunluyken (CLAIM_CHECK=required, #10) taslak hiç akıtılmaz: öğrenciye yalnızca
+judge'ın kontrol ettiği metin gider.
 """
 
 import logging
@@ -15,9 +17,10 @@ from collections.abc import Iterator
 from app.db.models import Course
 from app.llm.base import ChatMessage, LLMClient, LLMError, LLMRefusal
 from app.retrieval.types import RetrievalResult, RetrievedPassage
-from app.schemas.ask import AskOutcome, AskResponse
+from app.schemas.ask import AskOutcome, AskResponse, ClaimCheck
 from app.schemas.common import Citation
 from app.verification.citations import verify_answer
+from app.verification.claims import check_claims
 
 logger = logging.getLogger(__name__)
 
@@ -65,13 +68,20 @@ def stream_answer(
     history: list[ChatMessage],
     retrieval: RetrievalResult,
     llm: LLMClient | None,
+    judge: LLMClient | None = None,
+    claim_check: str = "off",
+    judge_error: str | None = None,
 ) -> Iterator[str | AskResponse]:
     """Cevabı üretir: önce metin parçaları (str), en sonda doğrulanmış AskResponse.
 
     - Soru dersle ilgisizse (alakasızlık kapısı) ya da parça yoksa: LLM çağrılmadan reddet.
     - LLM varsa: yalnızca parçalara dayanan, alıntılı cevap; model "YOK:" derse reddet.
     - LLM yoksa ya da erişilemezse: en ilgili parçayı kaynağıyla alıntıla.
+    - `claim_check="required"`: alıntı doğrulamasından geçen cevabın iddiaları `judge` ile
+      kontrol edilir; kontrol yapılamazsa üretilen metin yerine alıntı gösterilir
+      (`verification_failure`). Taslak akıtılmaz.
     """
+    stream_drafts = claim_check != "required"
     passages = retrieval.passages
     if not passages or not retrieval.relevant:
         yield AskResponse(
@@ -104,10 +114,10 @@ def stream_answer(
                 if len(stripped) < len(DECLINE_PREFIX) and DECLINE_PREFIX.startswith(stripped):
                     continue
                 declined = stripped.startswith(DECLINE_PREFIX)
-                if not declined:
+                if not declined and stream_drafts:
                     yield text
                 continue
-            if not declined:
+            if not declined and stream_drafts:
                 yield delta
     except LLMRefusal:
         yield AskResponse(
@@ -131,29 +141,61 @@ def stream_answer(
         response = _decline(reason, passages, "insufficient_evidence")
     else:
         text, gap = split_gap_note(text)
-        verification = verify_answer(text, labels)
-        if verification.dropped_claims:
-            logger.info(
-                "Doğrulanamayan %d iddia çıkarıldı (kapsama %.2f, geçersiz etiketler %s)",
-                len(verification.dropped_claims),
-                verification.coverage,
-                verification.invalid_labels,
-            )
-        if verification.accepted:
-            response = AskResponse(
-                answer=verification.text,
-                citations=[to_citation(p) for p in verification.cited],
-                unsupported_removed=len(verification.dropped_claims),
-                coverage_gap=gap,
-                mode="llm",
-            )
-        elif gap and not verification.text:
-            # Model yalnızca eksik satırını yazdı: materyal soruyu karşılamıyor demektir.
-            response = _decline(gap, passages, "insufficient_evidence")
-        else:
-            response = _decline(UNSUPPORTED, passages, "unsupported")
+        response = _verified_response(text, gap, labels, passages, judge, claim_check, judge_error)
     response.model = llm.model
     yield response
+
+
+def _verified_response(
+    text: str,
+    gap: str | None,
+    labels: dict[str, RetrievedPassage],
+    passages: list[RetrievedPassage],
+    judge: LLMClient | None,
+    claim_check: str,
+    judge_error: str | None,
+) -> AskResponse:
+    """Alıntı doğrulaması, ardından iddia kontrolü; sonuca göre cevap, ret ya da alıntı."""
+    verification = verify_answer(text, labels)
+    check: ClaimCheck | None = None
+    judge_removed = 0
+    if verification.accepted:
+        checked = check_claims(text, labels, judge, claim_check, judge_error)
+        check = checked.check
+        if not checked.usable:
+            # Üretilen metin kontrol edilmeden gösterilmez; kaynaktan aynen alıntı verilir.
+            fallback = extractive_answer(passages)
+            fallback.outcome = "verification_failure"
+            fallback.claim_check = check
+            return fallback
+        if check.unsupported:
+            judge_removed = check.unsupported
+            verification = verify_answer(checked.text, labels)
+            verification.extra_dropped = judge_removed
+    if verification.dropped_claims:
+        logger.info(
+            "Doğrulanamayan %d iddia çıkarıldı (kapsama %.2f, geçersiz etiketler %s, judge %s)",
+            len(verification.dropped_claims),
+            verification.coverage,
+            verification.invalid_labels,
+            check.unsupported if check else "-",
+        )
+    if verification.accepted:
+        return AskResponse(
+            answer=verification.text,
+            citations=[to_citation(p) for p in verification.cited],
+            unsupported_removed=len(verification.dropped_claims) + judge_removed,
+            coverage_gap=gap,
+            mode="llm",
+            claim_check=check,
+        )
+    if gap and not verification.text:
+        # Model yalnızca eksik satırını yazdı: materyal soruyu karşılamıyor demektir.
+        return _decline(gap, passages, "insufficient_evidence")
+    response = _decline(UNSUPPORTED, passages, "unsupported")
+    response.unsupported_removed = len(verification.dropped_claims) + judge_removed
+    response.claim_check = check
+    return response
 
 
 def split_gap_note(text: str) -> tuple[str, str | None]:
