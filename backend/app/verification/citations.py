@@ -46,10 +46,12 @@ class Verification:
     supported_claims: int = 0
     dropped_claims: list[str] = field(default_factory=list)
     invalid_labels: list[str] = field(default_factory=list)
+    # Bu doğrulamadan önce judge'ın çıkardığı iddia birimleri (#10); kapsamaya dahildir.
+    extra_dropped: int = 0
 
     @property
     def coverage(self) -> float:
-        total = self.supported_claims + len(self.dropped_claims)
+        total = self.supported_claims + len(self.dropped_claims) + self.extra_dropped
         return self.supported_claims / total if total else 0.0
 
     @property
@@ -116,6 +118,69 @@ def verify_answer(answer: str, labels: dict[str, RetrievedPassage]) -> Verificat
         dropped_claims=dropped,
         invalid_labels=sorted(set(invalid)),
     )
+
+
+@dataclass(frozen=True)
+class ClaimUnit:
+    """Judge'a gidecek bir iddia: etiketli cümle ve ona bağlanan etiketsiz cümleler.
+
+    `span`: birimin (bağlı etiketsiz cümleler dahil) `claim_units`'in döndürdüğü (etiketleri
+    açılmış) metindeki yeri; iddia reddedilirse `remove_claims` bu aralığı siler.
+    """
+
+    text: str
+    labels: list[str]
+    span: tuple[int, int]
+
+
+def claim_units(answer: str, labels: dict[str, RetrievedPassage]) -> tuple[str, list[ClaimUnit]]:
+    """Cevabı `verify_answer` ile aynı kurallarla iddia birimlerine ayırır.
+
+    Yalnızca en az bir geçerli etiketi olan birimler döner; alıntısız cümleler zaten
+    `verify_answer` tarafından çıkarılır. Dönen metin, etiketleri açılmış cevaptır.
+    """
+    answer = expand_grouped_labels(answer)
+    units: list[ClaimUnit] = []
+    for start, end in _blocks(answer):
+        marker = _LIST_ITEM.match(answer, start)
+        pending: list[_Sentence] = []
+        for sentence in _sentences(answer, marker.end() if marker else start, end):
+            if not sentence.claim:
+                continue
+            if not sentence.labels:
+                pending.append(sentence)
+                continue
+            group, pending = [*pending, sentence], []
+            valid = [label for label in dict.fromkeys(sentence.labels) if label in labels]
+            if not valid:
+                continue
+            body = " ".join(
+                _LABEL_WITH_SPACE.sub("", answer[g.start : g.end]).strip() for g in group
+            )
+            units.append(
+                ClaimUnit(
+                    text=re.sub(r"\s+", " ", body).strip(),
+                    labels=valid,
+                    span=(group[0].start, sentence.end),
+                )
+            )
+    return answer, units
+
+
+_EMPTY_ITEM = re.compile(r"^[ \t]*(?:[-*•]|\d+[.)])[ \t]*(?:\n|$)", re.MULTILINE)
+
+
+def remove_claims(answer: str, spans: list[tuple[int, int]]) -> str:
+    """Reddedilen iddia birimlerini metinden çıkarır; boş kalan liste maddeleri de düşer."""
+    for start, end in sorted(spans, reverse=True):
+        before, after = answer[:start], answer[end:]
+        if not before or before.endswith((" ", "\t", "\n")):
+            after = after.lstrip(" \t")
+            # Satır tamamen boşaldıysa satırı da kaldır.
+            if (not before or before.endswith("\n")) and after.startswith("\n"):
+                after = after[1:]
+        answer = before + after
+    return _EMPTY_ITEM.sub("", answer)
 
 
 def expand_grouped_labels(answer: str) -> str:

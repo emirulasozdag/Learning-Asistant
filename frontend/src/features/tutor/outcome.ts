@@ -19,7 +19,8 @@ const DECLINE_NOT_COVERED =
 
 /**
  * Backend cevabını öğrenciye gösterilecek türe çevirir; backend'in `outcome` alanını kullanır.
- * - provider_failure ya da LLM'siz mod (extractive): yapay zekâ yok, ilgili bölüm gösterildi
+ * - provider_failure, verification_failure ya da LLM'siz mod (extractive): yapay zekâ cevabı yok
+ *   (ya da kontrol edilemedi), ilgili bölüm gösterildi
  * - unsupported / model_refusal: kaynak bulundu ama dayanaklı cevap üretilemedi
  * - insufficient_evidence: soru için materyalde yeterli bilgi yok
  */
@@ -28,6 +29,7 @@ export function classifyResponse(response: AskResponse): ResponseOutcome {
     case "answered":
       return response.mode === "extractive" ? "ai_unavailable" : "answered";
     case "provider_failure":
+    case "verification_failure":
       return "ai_unavailable";
     case "unsupported":
     case "model_refusal":
@@ -35,6 +37,14 @@ export function classifyResponse(response: AskResponse): ResponseOutcome {
     case "insufficient_evidence":
       return "out_of_scope";
   }
+}
+
+/** Alıntı gösterilirken (ai_unavailable) neden yapay zekâ cevabı olmadığını söyleyen cümle. */
+export function extractiveNotice(response: AskResponse): string {
+  if (response.outcome === "verification_failure") {
+    return "Yapay zekânın cevabı bağımsız olarak kontrol edilemedi, bu yüzden gösterilmiyor; ders materyalindeki ilgili bölüm olduğu gibi gösteriliyor.";
+  }
+  return "Yapay zekâ şu an kullanılamıyor; ders materyalindeki ilgili bölüm olduğu gibi gösteriliyor.";
 }
 
 /**
@@ -61,7 +71,9 @@ export function describeTurn(turn: Turn): string {
       case "answered":
         return `Cevap hazır. ${response.citations.length} kaynak gösterildi.`;
       case "ai_unavailable":
-        return "Yapay zekâ şu an kullanılamıyor; ders materyalindeki ilgili bölüm gösterildi.";
+        return response.outcome === "verification_failure"
+          ? "Yapay zekânın cevabı kontrol edilemedi; ders materyalindeki ilgili bölüm gösterildi."
+          : "Yapay zekâ şu an kullanılamıyor; ders materyalindeki ilgili bölüm gösterildi.";
       case "not_generated":
         return "Cevap hazırlanamadı.";
       case "out_of_scope":

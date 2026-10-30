@@ -80,6 +80,15 @@ def _fast_embeddings(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "embedding_provider", "fake")
 
 
+@pytest.fixture(autouse=True)
+def _claim_check_off(monkeypatch: pytest.MonkeyPatch) -> None:
+    """İddia kontrolü (#10) yalnızca onu sınayan testlerde açılır (`test_claims.py`); diğer
+    testler sahte üreticiyle alıntı doğrulamasını sınar. Yerel .env'deki judge ayarı da sızmaz."""
+    monkeypatch.setattr(settings, "claim_check", "off")
+    monkeypatch.setattr(settings, "judge_provider", "")
+    monkeypatch.setattr(settings, "judge_model", "")
+
+
 @pytest.fixture
 def sample_pdf(tmp_path: Path) -> Path:
     return make_pdf(tmp_path / "notlar.pdf", SAMPLE_PAGES, header="BLM2512 Veri Yapilari")

@@ -11,6 +11,7 @@ from app.auth.dependencies import (
 from app.db.models import Course
 from app.generation.grade import GradingError
 from app.llm.gateway import LLMRole, select_client
+from app.llm.routing import DataClass
 from app.practice import service
 from app.schemas.evaluation import AnswerFeedback, AnswerSubmission
 from app.schemas.practice import PracticeItem, PracticeRequest
@@ -67,7 +68,13 @@ def submit_answer(
     assert course is not None
     try:
         _, feedback = service.answer_question(
-            db, question, user.user, submission, select_client(), course_name=course.name
+            db,
+            question,
+            user.user,
+            submission,
+            # Öğrencinin kendi cevabı: rota LLM_STUDENT_WORK_ROUTE'a göre (ADR-8).
+            select_client(data=DataClass.STUDENT_WORK),
+            course_name=course.name,
         )
     except service.InvalidSubmission as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc

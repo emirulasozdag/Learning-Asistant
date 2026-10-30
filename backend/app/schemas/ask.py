@@ -51,9 +51,37 @@ class RetrievalHit(BaseModel):
 # - unsupported: model cevap yazdı ama alıntı doğrulamasından geçemedi
 # - model_refusal: model soruyu yanıtlamayı reddetti
 # - provider_failure: LLM servisine ulaşılamadı; yerine en ilgili parça alıntılandı
+# - verification_failure: [ekleme, #10] cevap üretildi ama iddia kontrolü yapılamadı (judge yok,
+#   erişilemedi ya da sözleşme dışı çıktı); üretilen metin gösterilmez, en ilgili parça alıntılanır
 AskOutcome = Literal[
-    "answered", "insufficient_evidence", "unsupported", "model_refusal", "provider_failure"
+    "answered",
+    "insufficient_evidence",
+    "unsupported",
+    "model_refusal",
+    "provider_failure",
+    "verification_failure",
 ]
+
+
+class ClaimCheck(BaseModel):
+    """[ekleme, #10] İddia kontrolünün özeti. Ayrıntılı kayıt (atomik bilgiler, kararlar)
+    mesaj meta'sında tutulur; öğrenciye yalnızca bu özet döner.
+
+    status: checked (judge her iddiayı etiketledi) · not_configured (judge yok) · failed (judge
+    hatası ya da sözleşme dışı çıktı) · off (CLAIM_CHECK=off; yalnızca alıntı doğrulaması).
+    """
+
+    status: Literal["checked", "not_configured", "failed", "off"]
+    judge_model: str | None = None
+    # Judge'a giden iddia sayısı ve desteklenmeyen bulunup cevaptan çıkarılanlar.
+    claims: int = 0
+    unsupported: int = 0
+    # Denetim kaydı (iddia, alıntılanan kaynak kimlikleri, atomik bilgiler, karar, gerekçe, istem
+    # sürümü). Mesaj meta'sına yazılır; API yanıtına girmez.
+    records: list[dict] = Field(default_factory=list, exclude=True)
+    prompt_version: str | None = None
+    # Kontrol yapılamadıysa nedeni (log ve eğitmen için; öğrenciye gösterilmez).
+    error: str | None = Field(default=None, exclude=True)
 
 
 class AskResponse(BaseModel):
@@ -85,3 +113,5 @@ class AskResponse(BaseModel):
     best_similarity: float | None = None
     # Cevabı üreten model (LLM'siz modda None).
     model: str | None = None
+    # [ekleme, #10] İddia kontrolü; model cevap yazmadıysa (ret, LLM'siz mod) None.
+    claim_check: ClaimCheck | None = None

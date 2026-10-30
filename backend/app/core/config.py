@@ -41,6 +41,28 @@ class Settings(BaseSettings):
     # OpenAI uyumlu uç nokta (openrouter sağlayıcısı için). Yerel model: http://localhost:11434/v1
     llm_base_url: str = "https://openrouter.ai/api/v1"
 
+    # Yerel model rotası (ADR-8): OpenAI uyumlu yerel uç nokta (ör. Ollama) ve model. Boşsa yerel
+    # rota yapılandırılmamıştır; yerele yönlenen her çağrı açık bir hatayla durur, hosted'a
+    # sessizce düşmez.
+    llm_local_base_url: str = ""
+    llm_local_model: str = ""
+    # Öğrencinin kendi yazdığı cevap (değerlendirme) nereye gider: hosted (ADR-5: aydınlatma
+    # metninde yazılı) | local. Kişisel veri (ad, e-posta, kimlik) hiçbir ayarda hosted'a gitmez.
+    llm_student_work_route: str = "hosted"
+
+    # İddia kontrolü (#10, ADR-8): cevap atomik iddialara bölünür ve generator'dan farklı model
+    # ailesinden bir judge her iddiayı kaynağa göre etiketler.
+    # required: kontrol edilmemiş üretilmiş içerik öğrenciye gösterilmez (judge yoksa ya da
+    #   hata verirse yalnızca kaynaktan aynen alıntı gösterilir, outcome=verification_failure).
+    # off: yalnızca alıntı doğrulaması (geliştirme; pilotta kullanılmaz).
+    claim_check: str = "required"
+    # gemini | openrouter | anthropic | local. Boşsa judge yapılandırılmamıştır.
+    judge_provider: str = ""
+    judge_model: str = ""
+    # Boşsa LLM_API_KEY (sağlayıcı aynıysa). Anahtar yalnızca .env'de tutulur.
+    judge_api_key: str = ""
+    judge_base_url: str = "https://openrouter.ai/api/v1"
+
     # AI Tutor (orkestratör, `app/tutor/`). Bir turda en fazla bu kadar araç adımı.
     tutor_max_steps: int = 4
     # Kaynaklı cevapta yeniden sıralama (`retrieval/rerank.py`): aramanın bu kadar adayı hızlı

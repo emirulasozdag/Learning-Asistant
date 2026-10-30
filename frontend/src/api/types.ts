@@ -71,13 +71,27 @@ export interface RetrievalHit {
  * - unsupported: model yazdı ama alıntı doğrulamasından geçemedi
  * - model_refusal: model yanıtlamayı reddetti
  * - provider_failure: modele ulaşılamadı; en ilgili parça alıntılandı
+ * - verification_failure: cevap üretildi ama iddia kontrolü yapılamadı (#10); üretilen metin
+ *   gösterilmez, en ilgili parça alıntılandı
  */
 export type AskOutcome =
   | "answered"
   | "insufficient_evidence"
   | "unsupported"
   | "model_refusal"
-  | "provider_failure";
+  | "provider_failure"
+  | "verification_failure";
+
+/** İddia kontrolünün özeti (#10); ayrıntılı kayıt yalnızca backend'de tutulur. */
+export interface ClaimCheck {
+  /** checked: judge her iddiayı etiketledi · not_configured / failed: kontrol yapılamadı · off: kapalı. */
+  status: "checked" | "not_configured" | "failed" | "off";
+  judge_model: string | null;
+  claims: number;
+  /** Judge'ın desteklenmeyen bulup cevaptan çıkardığı iddia sayısı. */
+  unsupported: number;
+  prompt_version: string | null;
+}
 
 export interface AskResponse {
   /** [1], [2]... işaretleri `citations` sırasına karşılık gelir. */
@@ -98,6 +112,8 @@ export interface AskResponse {
   similarity_threshold: number | null;
   best_similarity: number | null;
   model: string | null;
+  /** İddia kontrolü; model cevap yazmadıysa null. */
+  claim_check?: ClaimCheck | null;
 }
 
 /**

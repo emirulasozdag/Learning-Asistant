@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from pydantic import BaseModel, Field
 
 from app.llm.base import LLMClient, LLMError
+from app.llm.routing import LocalRouteUnavailable
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +63,12 @@ class Grade:
     model: str | None = None
 
 
+LOCAL_UNAVAILABLE = (
+    "Cevaplar bu derste yerel modelle değerlendiriliyor ama yerel model şu an kurulu değil; "
+    "cevabın başka bir yere gönderilmedi. Eğitmenine bildir."
+)
+
+
 class GradingError(Exception):
     """Açık uçlu cevap değerlendirilemedi (model yok, erişilemedi ya da çıktı geçersiz)."""
 
@@ -107,6 +114,10 @@ def grade_open_answer(
             user_prompt,
             GradeOutput,
         )
+    except LocalRouteUnavailable as exc:
+        # Öğrenci cevabı yerele yönlendi ama yerel model yok: hosted'a gönderilmedi (ADR-8).
+        logger.error("Değerlendirme yapılamadı: %s", exc)
+        raise GradingError(LOCAL_UNAVAILABLE) from exc
     except LLMError as exc:
         raise GradingError("Cevap şu an değerlendirilemedi; biraz sonra tekrar dene.") from exc
 
