@@ -1,5 +1,7 @@
 """Koşu kaydından okunabilir özet: metrikler paydalarıyla, hesaplanamayanlar boşluk olarak."""
 
+from collections.abc import Sequence
+
 from harness.schemas import MetricValue, RunRecord
 
 
@@ -53,4 +55,52 @@ def render_markdown(record: RunRecord) -> str:
     if errors:
         lines += ["", "## Hatalar", ""]
         lines += [f"- `{item.id}`: {item.error}" for item in errors]
+    return "\n".join(lines) + "\n"
+
+
+def render_comparison(records: Sequence[RunRecord]) -> str:
+    """Aynı batch'teki koşulların metrikleri yan yana; kontrol edilen ayarlar başta.
+
+    Koşullar arasında model, indeks ya da gold set farklıysa karşılaştırma geçersizdir ve bu
+    açıkça yazılır.
+    """
+    first = records[0].config
+    lines = [
+        f"# Koşul karşılaştırması `{first.batch_id}`",
+        "",
+        f"- Split: `{first.split.value if first.split else 'all'}` · soru: {len(records[0].items)}",
+        f"- LLM: {first.llm_provider} `{first.llm_model or 'kapalı'}`",
+        f"- Embedding: `{first.embedding_identity or first.embedding_model}` · indeks: "
+        f"`{(first.index_fingerprint or '?')[:16]}…`",
+        f"- Gold set: `{first.gold_set_sha256[:16]}…` · commit: `{first.git_commit or '?'}`",
+    ]
+    controlled = ("llm_model", "index_fingerprint", "gold_set_sha256", "embedding_identity")
+    mismatched = [
+        field for field in controlled if len({getattr(r.config, field) for r in records}) > 1
+    ]
+    if mismatched or len({tuple(i.id for i in r.items) for r in records}) > 1:
+        lines += [
+            "",
+            f"**Geçersiz karşılaştırma:** koşullar arasında farklı: {mismatched or 'sorular'}",
+        ]
+
+    names = list(dict.fromkeys(name for r in records for name in r.metrics))
+    header = "| Metrik | " + " | ".join(r.config.condition for r in records) + " |"
+    lines += ["", "## Metrikler", "", header, "|---" * (len(records) + 1) + "|"]
+    for name in names:
+        cells = []
+        for record in records:
+            metric = record.metrics.get(name)
+            cells.append("—" if metric is None or metric.value is None else fmt(metric.value))
+        lines.append(f"| {name} | " + " | ".join(cells) + " |")
+
+    lines += ["", "## Koşul ayarları", ""]
+    for record in records:
+        settings = ", ".join(f"{k}={v}" for k, v in record.config.condition_settings.items())
+        lines.append(f"- `{record.config.condition}`: {settings} (`{record.run_id}`)")
+    lines += [
+        "",
+        "Değeri olmayan metrikler (—) için her koşunun kendi raporundaki boşluklara bakın; "
+        "doğruluk ve hallucination judge/insan etiketiyle hesaplanır (`harness.trust`).",
+    ]
     return "\n".join(lines) + "\n"

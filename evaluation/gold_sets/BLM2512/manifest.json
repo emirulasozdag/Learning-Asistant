@@ -20,6 +20,31 @@
       "blocking": ["#8", "#13"]
     },
     {
+      "what": "Planlanan tam set: 150 eğitmen referanslı cevaplanabilir soru + kanıt konumu (video sorularında oynatma konumu)",
+      "owner": "Dersin eğitmeni / TA",
+      "blocking": ["#18"]
+    },
+    {
+      "what": "40 pratik sorusunun eğitmen/TA incelemesi (kabul + ret nedeni)",
+      "owner": "Dersin eğitmeni / TA",
+      "blocking": ["#18"]
+    },
+    {
+      "what": "60 öğrenci cevabının eğitmen/TA tarafından kör puanlanması (onaylı denemelerden)",
+      "owner": "Dersin eğitmeni / TA",
+      "blocking": ["#18", "#20"]
+    },
+    {
+      "what": "Pilot için etik/bölüm onayı, aydınlatma metninin son sürümü ve en az 20 onaylı gönüllü",
+      "owner": "Ekip → bölüm",
+      "blocking": ["#18", "#23"]
+    },
+    {
+      "what": "Kullanılacak SUS Türkçe uyarlamasının seçimi ve anket formunun sürümü",
+      "owner": "Ekip (Evaluation)",
+      "blocking": ["#18"]
+    },
+    {
       "what": "En az 30 kapsam dışı soru (eğitmen onaylı)",
       "owner": "Ekip, eğitmen onayıyla",
       "blocking": ["#8", "#13"]

@@ -82,6 +82,13 @@ class Review(_Strict):
     reviewed_at: datetime
 
 
+class Playback(_Strict):
+    """Öğrencinin soruyu sorarken durdurduğu video ve an (full_video_time koşulu, #18)."""
+
+    document_sha256: Sha256
+    time_s: float = Field(ge=0)
+
+
 class GoldItem(_Strict):
     id: str = Field(pattern=r"^[A-Za-z0-9_.-]{1,64}$")
     split: Split
@@ -95,6 +102,8 @@ class GoldItem(_Strict):
     origin: Literal["instructor", "past_exam", "team_draft"]
     review: Review | None = None
     notes: str | None = Field(default=None, max_length=2000)
+    # Video bağlamlı soruda oynatma konumu; yalnızca full_video_time koşulunda kullanılır.
+    playback: Playback | None = None
 
     @model_validator(mode="after")
     def _check_kind(self) -> Self:
@@ -227,6 +236,10 @@ class RunConfig(_Strict):
     # vektörleştirilirse değişir. Eski kayıtlarda boştur.
     embedding_identity: str | None = None
     index_fingerprint: str | None = None
+    # Koşulun hattı (arama, kapı, doğrulama, oynatma konumu; `conditions.SETTINGS`) ve aynı
+    # sorularla birlikte koşulan koşulların ortak kimliği. Eski kayıtlarda boştur.
+    condition_settings: dict[str, str | bool | int] = {}
+    batch_id: str | None = None
 
 
 class ItemResult(_Strict):
