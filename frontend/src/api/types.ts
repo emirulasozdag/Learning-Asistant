@@ -502,6 +502,18 @@ export interface SourceDetail {
   /** Yalnızca PDF: sayfa görüntüsü ve alıntılanan satırların yeri (sayfaya oranla 0–1). */
   page_image_url: string | null;
   highlights: Highlight[];
+  /** Yalnızca video: aynı içeriğin onaylı dokümanlardaki karşılıkları, en benzer önce (#19). */
+  alternatives: SourceAlternative[];
+}
+
+export interface SourceAlternative {
+  source_id: string;
+  document_id: number;
+  document_title: string;
+  material_type: MaterialType;
+  page: number | null;
+  /** Video parçasına kosinüs benzerliği (0–1). */
+  similarity: number;
 }
 
 export interface Highlight {

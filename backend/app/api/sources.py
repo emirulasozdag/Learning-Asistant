@@ -10,7 +10,9 @@ router = APIRouter(prefix="/sources", tags=["sources"])
 
 @router.get("/{source_id}", response_model=SourceDetail)
 def get_source(source_id: str, user: AuthUser, db: DbSession) -> SourceDetail:
-    """FR-18: alıntıya tıklanınca ilgili parça ve orijinal dosyada o sayfa.
+    """FR-18: alıntıya tıklanınca ilgili parça ve orijinal dosyada o sayfa ya da video aralığı.
+
+    Video parçasında `alternatives`, aynı içeriğin onaylı dokümanlardaki karşılıklarıdır (#19).
 
     Yalnızca parçanın dersinin üyelerine açılır; diğerlerine kaynak yokmuş gibi 404.
     """
@@ -22,4 +24,4 @@ def get_source(source_id: str, user: AuthUser, db: DbSession) -> SourceDetail:
         chunk.document.approved_at is None or chunk.document.status != "ready"
     ) and role != "instructor":
         raise not_found_error("source_not_found")
-    return source_detail(chunk)
+    return source_detail(db, chunk)
