@@ -11,6 +11,7 @@ from app.auth.dependencies import (
 from app.db.models import Course
 from app.generation.grade import GradingError
 from app.llm.gateway import LLMRole, select_client
+from app.llm.release import releasing
 from app.llm.routing import DataClass
 from app.practice import service
 from app.schemas.evaluation import AnswerFeedback, AnswerSubmission
@@ -42,9 +43,10 @@ def generate_practice(request: PracticeRequest, user: AuthUser, db: DbSession) -
             service.PracticeContext(
                 topic=request.topic, source_id=request.source_id, follow_up_of=follow_up
             ),
-            select_client(),
-            select_client(LLMRole.CHECKER),
-            reranker=select_client(LLMRole.RERANKER),
+            # Model çağrıları açık veritabanı işlemi içinde beklemez (#94, ADR-9).
+            releasing(select_client(), db.commit),
+            releasing(select_client(LLMRole.CHECKER), db.commit),
+            reranker=releasing(select_client(LLMRole.RERANKER), db.commit),
         )
     except service.NoValidItem as exc:
         raise ApiError(status.HTTP_422_UNPROCESSABLE_CONTENT, exc.reason, "no_valid_item") from exc
@@ -73,7 +75,7 @@ def submit_answer(
             user.user,
             submission,
             # Öğrencinin kendi cevabı: rota LLM_STUDENT_WORK_ROUTE'a göre (ADR-8).
-            select_client(data=DataClass.STUDENT_WORK),
+            releasing(select_client(data=DataClass.STUDENT_WORK), db.commit),
             course_name=course.name,
         )
     except service.InvalidSubmission as exc:
