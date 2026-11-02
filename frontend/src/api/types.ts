@@ -14,12 +14,18 @@ export type ErrorCode =
   | "ingestion_failed"
   | "course_exists"
   | "no_valid_item"
+  // Pratik sorusu yok, kontrolden geçmemiş ya da kullanıcı dersin üyesi değil.
   | "practice_item_not_found"
   | "invalid_video"
   | "not_authenticated"
   | "insufficient_role"
+  // Aydınlatma metninin güncel sürümü kabul edilmeden soru sorulamaz (ADR-4).
+  | "consent_required"
+  // Bu e-postayla bir hesap zaten var.
+  | "email_exists"
   | "not_implemented"
   | "validation_error"
+  // İptal edilecek süren bir işlem yok (doküman hazır ya da başarısız).
   | "document_not_processing";
 
 /** Hata zarfı: `detail` kullanıcıya gösterilebilir metin, `code` programın kullandığı sabit. */
