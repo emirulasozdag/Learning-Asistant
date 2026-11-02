@@ -58,7 +58,9 @@ def get_conversation(
         db.add(conversation)
         db.flush()
         return conversation
-    conversation = db.get(Conversation, conversation_id)
+    # populate_existing: oturumda yüklü kopya yerine veritabanına bakılır. Uzun bir tur sırasında
+    # silinen sohbet böylece "bulunamadı" olur (#88).
+    conversation = db.get(Conversation, conversation_id, populate_existing=True)
     if (
         conversation is None
         or conversation.course_id != course.id
