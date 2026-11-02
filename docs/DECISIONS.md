@@ -363,7 +363,9 @@ tutuyordu. Ekibin zaten çalıştırdığı tek altyapı PostgreSQL.
   aynı döngüyü API sürecinde bir iş parçacığında çalıştırır; yalnızca tek süreçli yerel geliştirme içindir.
 - **Uzun adım işlem dışında:** iş alınır ve işlem kapanır. Transkripsiyon ve vektörleştirme açık işlem olmadan
   çalışır. Sonuç sonda kısa bir işlemle, iş satırı kilitlenerek yazılır. `/ask` da aramadan sonra işlemi kapatır;
-  LLM ve judge çağrıları açık işlem içinde beklemez.
+  LLM ve judge çağrıları açık işlem içinde beklemez. AI Tutor turu da model istemcilerini her çağrıdan önce okuma işlemini
+  kapatan bir sarmalayıcıyla kullanır (`llm/release.py`, #88). `/practice` ve `/practice/{id}/answer` uç
+  noktaları henüz bu kurala geçmedi.
 - **Canlılık ve kurtarma:** çalışan iş `JOB_HEARTBEAT_INTERVAL_S` (15 sn) aralıkla `heartbeat_at` yazar.
   `JOB_STALE_AFTER_S` (120 sn) sessiz kalan iş sahipsizdir: deneme hakkı varsa yeniden kuyruğa alınır (medya diskte
   kalır), yoksa başarısız olur (`JOB_MAX_ATTEMPTS` = 2; bellek yetmezliği gibi süreci öldüren iş döngüye girmez).
