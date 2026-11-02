@@ -1,13 +1,13 @@
-"""Altyazısı olmayan ders videosu/sesi: yükleme kaydı ve arka plan transkripsiyonu (ADR-6).
+"""Altyazısı olmayan ders videosu/sesi: yükleme kaydı ve transkripsiyon işi (ADR-6, ADR-9).
 
-Akış: yükleme isteği medyayı diske akıtır, dokümanı `status="processing"` olarak kaydeder ve
-201 döner; `run_transcription` arka planda (FastAPI BackgroundTasks) çalışır. Bitince transkript
-WebVTT olarak saklanır (dokümanın dosyası odur), medya silinir; zamanlı parçalar mevcut altyazı
-yolundaki gibi üretilir. Hata olursa doküman `failed` olur ve nedeni `error`a yazılır.
+Akış: yükleme isteği medyayı diske akıtır, dokümanı `status="processing"` olarak ve
+transkripsiyon işini kuyruğa aynı işlemde kaydeder, 201 döner. İşi çalıştırıcı
+(`app/jobs/worker.py`) alır. Bitince transkript WebVTT olarak saklanır (dokümanın dosyası
+odur), medya silinir; zamanlı parçalar mevcut altyazı yolundaki gibi üretilir. Kalıcı hatada
+doküman `failed` olur ve nedeni `error`a yazılır.
 
-Uyarı: süren iş sunucu sürecinin içinde koşar. docker-compose'taki `--reload`, kod değişince
-süreci yeniden başlatır ve süren işi öldürür; açılışta `fail_interrupted_documents` takılı
-kalan dokümanları `failed` yapar, eğitmen dosyayı yeniden yükler.
+Süreç iş sürerken durursa (yeniden başlatma, çökme) medya diskte kalır; iş yeniden kuyruğa
+alınır (`jobs.queue.recover_stale`), eğitmenin dosyayı yeniden yüklemesi gerekmez.
 """
 
 import logging
@@ -15,7 +15,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import BinaryIO
 
-from sqlalchemy import func, select
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -24,18 +24,25 @@ from app.embeddings.base import Embedder
 from app.embeddings.provider import get_embedder
 from app.ingestion.chunking import chunk_timed_segments
 from app.ingestion.cleaning import normalize_timed_segments
-from app.ingestion.documents import validate_media_url
+from app.ingestion.documents import validate_media_url, validate_upload_fields
 from app.ingestion.parsers.vtt_parser import write_vtt
 from app.ingestion.pipeline import add_chunks
 from app.ingestion.transcribe import Transcriber, TranscriptionError
 from app.ingestion.types import IngestionError
+from app.jobs.queue import (
+    TRANSCRIPTION,
+    ClaimedJob,
+    JobCancelled,
+    JobSuperseded,
+    enqueue,
+    locked_job,
+)
 from app.schemas.materials import MaterialType
 
 logger = logging.getLogger(__name__)
 
 MEDIA_EXTENSIONS = frozenset({".mp4", ".webm", ".mkv", ".mov", ".mp3", ".m4a", ".wav"})
 COPY_CHUNK_BYTES = 1024 * 1024
-INTERRUPTED_MESSAGE = "İşlem yarıda kaldı; dosyayı yeniden yükleyin."
 TRANSCRIPTION_DISABLED_MESSAGE = (
     "Bu sunucuda transkripsiyon kapalı; videonun altyazısını (.vtt) yükleyin."
 )
@@ -54,12 +61,14 @@ def create_media_document(
     media_url: str | None,
     approved_by: int,
 ) -> tuple[Document, Path]:
-    """Medyayı diske parça parça kopyalar (belleğe okunmaz) ve `processing` doküman kaydeder.
+    """Medyayı diske parça parça kopyalar (belleğe okunmaz); `processing` doküman ve
+    transkripsiyon işini kaydeder.
 
     Kapalıysa, boyut sınırı aşılırsa ya da dosya boşsa `IngestionError`; kayıt ve dosya kalmaz.
     """
     if not settings.transcription_model:
         raise IngestionError(TRANSCRIPTION_DISABLED_MESSAGE)
+    validate_upload_fields(filename, title)
     if media_url is not None:
         validate_media_url(media_url)
     extension = Path(filename).suffix.lower()
@@ -83,6 +92,7 @@ def create_media_document(
         size = _copy_limited(source, path, settings.max_media_bytes)
         if size == 0:
             raise IngestionError("Dosya boş.")
+        enqueue(db, TRANSCRIPTION, document, path)
         db.commit()
     except Exception:
         db.rollback()
@@ -103,93 +113,65 @@ def _copy_limited(source: BinaryIO, path: Path, limit: int) -> int:
     return size
 
 
-def run_transcription(
+def transcription_job(
     session_factory: Callable[[], Session],
-    document_id: int,
-    media_path: Path,
+    job: ClaimedJob,
     transcriber: Transcriber,
+    should_stop: Callable[[], bool],
     embedder: Embedder | None = None,
 ) -> None:
-    """Arka plan işi: transkripsiyon → zamanlı parçalar → vektörler; kendi oturumunu açar.
+    """Transkripsiyon işi: transkript → zamanlı parçalar → vektörler → doküman `ready`.
 
-    Başarıda doküman `ready`, transkript WebVTT dosyası dokümanın dosyası olur. Hatada `failed`
-    ve Türkçe kısa neden; parça yazılmaz. Her durumda medya dosyası silinir.
+    Uzun adımlar (transkripsiyon, vektörleştirme) açık bir veritabanı işlemi olmadan çalışır;
+    önce gereken alanlar okunup oturum kapanır, sonuç sonda kısa bir işlemle yazılır.
+    Kalıcı hatada `TranscriptionError`/`IngestionError`, iptalde `JobCancelled`, doküman ya da
+    iş silindiyse `JobSuperseded` yükselir; dokümanın durumunu çalıştırıcı yazar.
     """
-    try:
-        with session_factory() as db:
-            try:
-                _transcribe_document(db, document_id, media_path, transcriber, embedder)
-            except Exception as exc:
-                db.rollback()
-                if isinstance(exc, TranscriptionError | IngestionError):
-                    message = str(exc)
-                else:
-                    logger.exception("Transkripsiyon beklenmeyen bir hatayla bitti")
-                    message = "Beklenmeyen bir hata oluştu."
-                _mark_failed(db, document_id, message)
-    finally:
-        media_path.unlink(missing_ok=True)
+    with session_factory() as db:
+        document = db.get(Document, job.document_id)
+        if document is None:  # Doküman silindi (iş de onunla silinir).
+            raise JobSuperseded(job.id)
+        language = db.get(Course, document.course_id).language  # type: ignore[union-attr]
 
-
-def _transcribe_document(
-    db: Session,
-    document_id: int,
-    media_path: Path,
-    transcriber: Transcriber,
-    embedder: Embedder | None,
-) -> None:
-    document = db.get(Document, document_id)
-    if document is None:  # Süren işin dokümanı silindi.
-        return
-    course = db.get(Course, document.course_id)
-    assert course is not None
-    segments, duration_s, warnings = transcriber.transcribe(media_path, course.language)
+    segments, duration_s, warnings = transcriber.transcribe(
+        job.input_path, language, should_stop=should_stop
+    )
     for warning in warnings:
-        logger.warning("Doküman %s: %s", document_id, warning)
+        logger.warning("Doküman %s: %s", job.document_id, warning)
     cleaned, _ = normalize_timed_segments(segments)
     embedder = embedder or get_embedder()
     drafts = chunk_timed_segments(cleaned, embedder)
     if not drafts:
         raise TranscriptionError("Medyada konuşma bulunamadı.")
     vectors = embedder.embed_passages([draft.text for draft in drafts])
+    if should_stop():
+        raise JobCancelled(job.id)
 
-    vtt_path = settings.upload_dir / str(course.id) / f"{document.id}.vtt"
-    document.file_path = str(vtt_path)
-    document.filename = f"{document.title[:290]}.vtt"
-    document.page_count = 0
-    document.duration_s = duration_s
-    document.transcript_source = "asr"
-    document.transcript_model = transcriber.identity
-    document.status = "ready"
-    document.error = None
-    try:
-        write_vtt(vtt_path, cleaned)
-        add_chunks(db, course, document, drafts, vectors, embedder)
-        db.commit()
-    except Exception:
-        vtt_path.unlink(missing_ok=True)
-        raise
-
-
-def _mark_failed(db: Session, document_id: int, message: str) -> None:
-    document = db.get(Document, document_id)
-    if document is None:
-        return
-    document.status = "failed"
-    document.error = message
-    document.file_path = ""
-    db.commit()
-
-
-def fail_interrupted_documents(session_factory: Callable[[], Session]) -> int:
-    """Açılışta `processing`de kalmış dokümanları `failed` yapar; artık medya dosyalarını siler."""
     with session_factory() as db:
-        stuck = db.scalars(select(Document).where(Document.status == "processing")).all()
-        for document in stuck:
-            document.status = "failed"
-            document.error = INTERRUPTED_MESSAGE
-            course_dir = settings.upload_dir / str(document.course_id)
-            for leftover in course_dir.glob(f"{document.id}.*"):
-                leftover.unlink(missing_ok=True)
-        db.commit()
-        return len(stuck)
+        row = locked_job(db, job)
+        if row.cancel_requested:
+            raise JobCancelled(job.id)
+        document = db.get(Document, job.document_id)
+        course = db.get(Course, document.course_id) if document else None
+        if document is None or course is None:
+            raise JobSuperseded(job.id)
+        vtt_path = settings.upload_dir / str(course.id) / f"{document.id}.vtt"
+        document.file_path = str(vtt_path)
+        document.filename = f"{document.title[:290]}.vtt"
+        document.page_count = 0
+        document.duration_s = duration_s
+        document.transcript_source = "asr"
+        document.transcript_model = transcriber.identity
+        document.status = "ready"
+        document.error = None
+        row.status = "succeeded"
+        row.error = None
+        row.finished_at = func.now()
+        try:
+            write_vtt(vtt_path, cleaned)
+            add_chunks(db, course, document, drafts, vectors, embedder)
+            db.commit()
+        except Exception:
+            vtt_path.unlink(missing_ok=True)
+            raise
+    job.input_path.unlink(missing_ok=True)

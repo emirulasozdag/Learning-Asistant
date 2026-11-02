@@ -7,7 +7,6 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import CurrentUser, not_found_error, require_course_role
 from app.db.models import Course, Document
 from app.db.session import SessionLocal, get_db
-from app.ingestion.transcribe import Transcriber, get_transcriber
 from app.schemas.ask import VideoRef
 from app.schemas.common import Role
 from app.schemas.materials import MaterialType
@@ -21,9 +20,6 @@ def get_session_factory() -> Callable[[], Session]:
 
 
 SessionFactory = Annotated[Callable[[], Session], Depends(get_session_factory)]
-
-
-TranscriberDep = Annotated[Transcriber, Depends(get_transcriber)]
 
 
 def get_course_for(db: Session, user: CurrentUser, course_id: int, *roles: Role) -> Course:

@@ -1,5 +1,5 @@
 import re
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 
 from sqlalchemy import select
@@ -82,12 +82,25 @@ def ask_stream(
     (iddialar çıkarılmış, cevap reddedilmiş ya da LLM'siz alıntıya düşülmüş olabilir).
     LLM'e yalnızca soru, parçalar ve sohbet geçmişi gider; kullanıcı kimliği gitmez (ADR-5).
     """
-    conversation = get_conversation(db, course, request.conversation_id, user_id)
-    history = conversation_history(db, conversation)
+    # Var olan sohbet yalnızca okunur; yenisi cevapla birlikte yazılır. Uzun üretim (LLM,
+    # judge) sırasında açık bir veritabanı işlemi kalmaz (#21): arama bitince işlem kapatılır.
+    conversation = (
+        get_conversation(db, course, request.conversation_id, user_id)
+        if request.conversation_id is not None
+        else None
+    )
+    history = conversation_history(db, conversation) if conversation is not None else []
 
     response: AskResponse | None = None
     for event in answer_stream(
-        db, course, request.question, history, llm, video=request.video, embedder=embedder
+        db,
+        course,
+        request.question,
+        history,
+        llm,
+        video=request.video,
+        embedder=embedder,
+        release=db.commit,
     ):
         if isinstance(event, DoneEvent):
             response = event.response
@@ -95,6 +108,8 @@ def ask_stream(
             yield event
     assert response is not None
 
+    # Sohbet üretim sürerken silindiyse ConversationNotFound; yeni sohbet burada açılır.
+    conversation = get_conversation(db, course, request.conversation_id, user_id)
     response.conversation_id = conversation.id
     db.add_all(
         [
@@ -121,6 +136,7 @@ def answer_stream(
     embedder: Embedder | None = None,
     search_query: str | None = None,
     reranker: LLMClient | None = None,
+    release: Callable[[], None] | None = None,
 ) -> Iterator[QAEvent]:
     """Kaynaklı cevap hattı (arama → üretim → alıntı doğrulama); hiçbir şey kaydetmez.
 
@@ -128,6 +144,8 @@ def answer_stream(
     `search_query`: aramada sorunun yerine kullanılır (ör. Türkçe soru için materyalin dilinde
     yazılmış ifade); cevap yine öğrencinin sorusuna göre üretilir.
     `reranker`: verilirse geniş aday listesi bu modelle yeniden sıralanır (`retrieval/rerank.py`).
+    `release`: verilirse aramadan hemen sonra çağrılır (ör. `db.commit`); model çağrıları açık
+    bir veritabanı işlemi içinde beklemez.
     """
     # Takip sorusu ("peki karmaşıklığı ne?") tek başına eksik kalabilir; önceki soru
     # bağlam olarak ayrıca aranır.
@@ -142,6 +160,8 @@ def answer_stream(
         embedder=embedder,
         context=previous_question,
     )
+    if release is not None:
+        release()
     if use_rerank and retrieval.relevant:
         assert reranker is not None
         query = f"{question}\n({search_query})" if search_query else question

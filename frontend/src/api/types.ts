@@ -19,7 +19,8 @@ export type ErrorCode =
   | "not_authenticated"
   | "insufficient_role"
   | "not_implemented"
-  | "validation_error";
+  | "validation_error"
+  | "document_not_processing";
 
 /** Hata zarfı: `detail` kullanıcıya gösterilebilir metin, `code` programın kullandığı sabit. */
 export interface ApiErrorBody {

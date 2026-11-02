@@ -176,8 +176,10 @@ TRANSCRIPTION_MODEL=large-v3-turbo
 
 Sonra `docker compose up --build`. Model ilk açılışta indirilir (~1,6 GB), sonra internetsiz çalışır. CPU'da 1 saatlik bir
 ders dakikalar sürer; yükleme hemen döner, doküman "İşleniyor" görünür ve bitince "İndekslendi" olur (liste kendiliğinden
-yenilenir). Süren iş sunucu yeniden başlarsa (ör. `--reload`) "Başarısız" olur; dosyayı yeniden yükleyin. Hızlı deneme için
-`TRANSCRIPTION_MODEL=tiny` (düşük doğruluk).
+yenilenir). İşi docker-compose'taki ayrı `worker` servisi çalıştırır (ADR-9); API'nin `--reload`'u işi kesmez. Çalıştırıcı
+yeniden başlarsa iş kendiliğinden yeniden denenir. Eğitmen süren işi iptal edebilir (`POST /api/documents/{id}/cancel`).
+Hızlı deneme için `TRANSCRIPTION_MODEL=tiny` (düşük doğruluk). Sınırlar, iş durumları ve kurtarma adımları:
+[docs/OPERATIONS.md](docs/OPERATIONS.md).
 
 ### AI Tutor (orkestratör)
 `POST /api/tutor/turn` (ve `/turn/stream`) bir öğrenci mesajını bir tura dönüştürür: orkestratör modeli araç
@@ -223,6 +225,10 @@ python -m app.scripts.seed_demo
 uvicorn app.main:app --reload
 pytest
 ```
+
+`uvicorn` tek başına çalışırken uzun işleri (transkripsiyon) API süreci çalıştırır (`JOB_WORKER=inline`). `--reload` süren
+işi keser; iş en geç iki dakika içinde yeniden denenir. Ayrı çalıştırıcı için `JOB_WORKER=external` ve
+`python -m app.jobs.worker` (ADR-9).
 
 Testler modeli indirmez; sahte bir embedder kullanır. Veritabanı gerektiren testler yalnızca `TEST_DATABASE_URL` tanımlıysa çalışır, yoksa atlanır (CI'da tanımlı).
 Bu veritabanının tabloları her testte boşaltılır, o yüzden ayrı bir test veritabanı kullanın:

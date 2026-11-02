@@ -89,11 +89,11 @@ def ingest_document(
     db.flush()
 
     path = settings.upload_dir / str(course.id) / f"{document.id}{extension}"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(content)
     timings: dict[str, int] = {}
     parsed: ParsedVtt | None = None
     try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content)
         with _timed(timings, "parse"):
             try:
                 if is_video:

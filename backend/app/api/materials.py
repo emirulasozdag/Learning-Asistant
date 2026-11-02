@@ -1,17 +1,24 @@
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, BinaryIO
 
-from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
 
-from app.api.deps import DbSession, SessionFactory, TranscriberDep, get_course_for
+from app.api.deps import DbSession, get_course_for
 from app.api.errors import ApiError
 from app.auth.dependencies import AuthUser, CurrentUser, not_found_error, require_course_role
 from app.db.models import Document
-from app.ingestion.documents import chunk_previews, list_documents, to_document_out
-from app.ingestion.media import create_media_document, is_media, run_transcription
-from app.ingestion.pipeline import IngestionError, ingest_document
+from app.ingestion.documents import (
+    chunk_previews,
+    document_files,
+    list_documents,
+    to_document_out,
+    validate_upload_fields,
+)
+from app.ingestion.media import create_media_document, is_media
+from app.ingestion.pipeline import MAX_UPLOAD_BYTES, IngestionError, ingest_document
 from app.ingestion.rendering import page_image_path, remove_cached_pages
+from app.jobs.queue import request_cancel
 from app.schemas.common import Role
 from app.schemas.materials import ChunkPreview, DocumentOut, MaterialType
 
@@ -33,9 +40,6 @@ def upload_material(
     course_id: int,
     user: AuthUser,
     db: DbSession,
-    background: BackgroundTasks,
-    session_factory: SessionFactory,
-    transcriber: TranscriberDep,
     material_type: Annotated[MaterialType, Form()],
     file: Annotated[UploadFile, File()],
     declaration: Annotated[bool, Form()] = False,
@@ -51,7 +55,8 @@ def upload_material(
 
     Ders videosu/sesi (.mp4 .webm .mkv .mov .mp3 .m4a .wav) yalnızca sunucuda transkripsiyon
     açıksa (`TRANSCRIPTION_MODEL`) kabul edilir: dosya diske akıtılır, doküman `processing`
-    olarak 201 döner (rapor yok) ve transkripsiyon arka planda sürer. Kapalıyken 422.
+    olarak 201 döner (rapor yok) ve transkripsiyon kuyruktaki iş olarak sürer (ADR-9).
+    Kapalıyken 422. Boyut sınırı istek gövdesi okunurken uygulanır (`app/core/limits.py`).
     """
     course = get_course_for(db, user, course_id, "instructor")
     if not declaration:
@@ -75,16 +80,14 @@ def upload_material(
             )
         except IngestionError as exc:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
-        background.add_task(
-            run_transcription, session_factory, document.id, media_path, transcriber
-        )
         return to_document_out(document, 0)
     try:
+        validate_upload_fields(filename, title)
         document, report = ingest_document(
             db,
             course,
             filename=filename,
-            content=file.file.read(),
+            content=_read_limited(file.file, MAX_UPLOAD_BYTES),
             material_type=material_type,
             title=title,
             media_url=media_url,
@@ -112,14 +115,35 @@ def document_chunks(document_id: int, user: AuthUser, db: DbSession) -> list[Chu
 
 @router.delete("/documents/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_document(document_id: int, user: AuthUser, db: DbSession) -> None:
-    """Dokümanı, parçalarını, dosyasını ve sayfa görüntülerini siler (yalnızca eğitmen)."""
+    """Dokümanı, parçalarını, dosyalarını ve sayfa görüntülerini siler (yalnızca eğitmen).
+
+    İşlenen dokümanın işi de silinir; çalışan iş sonucu yazmadan biter.
+    """
     document = _get_document(db, user, document_id, "instructor")
-    path = Path(document.file_path) if document.file_path else None
+    files = document_files(document.course_id, document.id, document.file_path)
     db.delete(document)
     db.commit()
-    if path:
+    for path in files:
         path.unlink(missing_ok=True)
     remove_cached_pages(document_id)
+
+
+@router.post("/documents/{document_id}/cancel", response_model=DocumentOut)
+def cancel_processing(document_id: int, user: AuthUser, db: DbSession) -> DocumentOut:
+    """Süren işlemi (transkripsiyon) iptal eder (yalnızca eğitmen).
+
+    Kuyruktaki iş hemen iptal olur ve doküman `failed` döner. Çalışan iş durması için
+    işaretlenir; doküman birkaç saniye içinde `failed` olur. İşlenmeyen dokümanda 409.
+    """
+    document = _get_document(db, user, document_id, "instructor")
+    if document.status != "processing" or not request_cancel(db, document):
+        raise ApiError(
+            status.HTTP_409_CONFLICT,
+            "Bu doküman şu anda işlenmiyor.",
+            "document_not_processing",
+        )
+    db.refresh(document)
+    return to_document_out(document, 0)
 
 
 @router.get("/documents/{document_id}/pages/{page}.png")
@@ -149,6 +173,14 @@ def document_file(document_id: int, user: AuthUser, db: DbSession) -> FileRespon
         content_disposition_type="inline",
         headers={"Cache-Control": "private, no-store"},
     )
+
+
+def _read_limited(source: BinaryIO, limit: int) -> bytes:
+    """Dosyayı sınırı aşınca durarak okur; sınırı aşan dosya belleğe alınmaz."""
+    content = source.read(limit + 1)
+    if len(content) > limit:
+        raise IngestionError(f"Dosya {limit // (1024 * 1024)} MB sınırını aşıyor.")
+    return content
 
 
 def _get_document(db: DbSession, user: CurrentUser, document_id: int, *roles: Role) -> Document:
