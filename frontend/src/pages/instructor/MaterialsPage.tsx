@@ -2,6 +2,7 @@ import { CircleAlert, ServerOff } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router";
 
+import { ApiError } from "../../api/client";
 import type { DocumentOut, IngestionReport } from "../../api/types";
 import DocumentDrawer from "../../features/materials/DocumentDrawer";
 import Dropzone from "../../features/materials/Dropzone";
@@ -32,6 +33,8 @@ export default function MaterialsPage() {
   const [openDocument, setOpenDocument] = useState<DocumentOut | null>(null);
   const [toDelete, setToDelete] = useState<DocumentOut | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [toCancel, setToCancel] = useState<DocumentOut | null>(null);
+  const [cancelling, setCancelling] = useState(false);
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
@@ -144,6 +147,33 @@ export default function MaterialsPage() {
     }
   }
 
+  async function confirmCancel() {
+    if (!toCancel) return;
+    setCancelling(true);
+    try {
+      const updated = await courseService.cancelMaterial(toCancel.id);
+      setDocuments((list) => list?.map((d) => (d.id === updated.id ? updated : d)) ?? null);
+      if (openDocument?.id === updated.id) setOpenDocument(updated);
+      toast.show({
+        tone: "success",
+        title: `${toCancel.title} işlemi iptal ediliyor`,
+        description: "Çalışan işlem birkaç saniye içinde durur; liste kendiliğinden güncellenir.",
+      });
+      reloadDocuments();
+    } catch (reason) {
+      if (reason instanceof ApiError && reason.code === "document_not_processing") {
+        toast.show({ tone: "neutral", title: "Bu doküman artık işlenmiyor", description: "Liste güncellendi." });
+        await courseService.materials(courseId).then(setDocuments, () => undefined);
+        reloadDocuments();
+      } else {
+        setNotice(reason instanceof Error ? reason.message : String(reason));
+      }
+    } finally {
+      setCancelling(false);
+      setToCancel(null);
+    }
+  }
+
   const totals = materialTotals(documents ?? []);
   const totalChunks = documents?.reduce((sum, d) => sum + d.chunk_count, 0) ?? 0;
   const busy = pending.some((p) => p.status === "processing");
@@ -215,6 +245,7 @@ export default function MaterialsPage() {
           selectedId={openDocument?.id ?? null}
           onOpen={setOpenDocument}
           onDelete={setToDelete}
+          onCancel={setToCancel}
           onRetry={(item) => void upload(item)}
           onDismiss={(item) => setPending((list) => list.filter((p) => p.key !== item.key))}
         />
@@ -230,6 +261,29 @@ export default function MaterialsPage() {
         report={openDocument ? reports[openDocument.id] : undefined}
         onClose={() => setOpenDocument(null)}
       />
+
+      <Dialog
+        open={toCancel !== null}
+        onClose={() => setToCancel(null)}
+        title="İşlem iptal edilsin mi?"
+        description={
+          toCancel
+            ? `“${toCancel.title}” için süren transkripsiyon durdurulacak ve doküman başarısız olarak işaretlenecek.`
+            : undefined
+        }
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setToCancel(null)}>
+              Vazgeç
+            </Button>
+            <Button variant="danger" loading={cancelling} onClick={() => void confirmCancel()} data-autofocus>
+              İptal et
+            </Button>
+          </>
+        }
+      >
+        <p className="text-base text-graphite">Dokümanı daha sonra silip yeniden yükleyebilirsin.</p>
+      </Dialog>
 
       <Dialog
         open={toDelete !== null}
