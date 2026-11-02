@@ -1,4 +1,4 @@
-import { ExternalLink, RotateCcw, Trash2, X } from "lucide-react";
+import { ExternalLink, RotateCcw, Square, Trash2, X } from "lucide-react";
 
 import type { DocumentOut, MaterialType } from "../../api/types";
 import { documentExtent, documentIndexStatus, materialLabel } from "../../labels";
@@ -23,6 +23,7 @@ interface MaterialsTableProps {
   selectedId: number | null;
   onOpen: (document: DocumentOut) => void;
   onDelete: (document: DocumentOut) => void;
+  onCancel: (document: DocumentOut) => void;
   onRetry: (upload: PendingUpload) => void;
   onDismiss: (upload: PendingUpload) => void;
 }
@@ -33,6 +34,7 @@ export default function MaterialsTable({
   selectedId,
   onOpen,
   onDelete,
+  onCancel,
   onRetry,
   onDismiss,
 }: MaterialsTableProps) {
@@ -137,6 +139,14 @@ export default function MaterialsTable({
                   >
                     <ExternalLink size={14} aria-hidden />
                   </a>
+                )}
+                {document.status === "processing" && (
+                  <IconButton
+                    icon={Square}
+                    label={`${document.title} işlemini iptal et`}
+                    size="sm"
+                    onClick={() => onCancel(document)}
+                  />
                 )}
                 <IconButton
                   icon={Trash2}
