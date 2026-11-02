@@ -347,7 +347,10 @@ yönteminden bağımsız, opak bir URL'dir.
   raporu yok, saklamak yeni bir alan gerektirir; açık soru).
 
 **Bilinen sınırlamalar / kalibre edilmemiş değerler.**
-- `video_window_s = 120` ve `video_weight = 0.5` kalibre **edilmedi**; eval'de ("full + video time" ile "full") ayarlanacak.
+- `video_window_s = 120` ve `video_weight = 0.5` kalibre **edilmedi**. Ölçüm aracı hazır (#19):
+  `python -m harness.time_prior` aynı sorularda önceliksiz aramayı pencere × ağırlık ızgarasıyla karşılaştırır, ders
+  (video) başına ve kanıtın yerine göre (pencere içi / aynı video uzak / başka doküman) Recall@5 verir. Gold sette
+  oynatma konumlu soru olmadığı için henüz koşulmadı (#18 dış girdileri).
 - Bağlamsız sorular ("bu adımı açıklar mısın") soru metninden hesaplanan alakasızlık kapısında takılıp "materyalde yok" cevabı
   alabilir; öncelik kapıdan **sonra** devreye girer. #9 kalibrasyonunu bozmamak için bu PR'da çözülmedi.
 - Boş (`""`) `media_url` gönderilirse form ayrıştırıcısı onu "verilmedi" sayar.
@@ -371,6 +374,9 @@ IngestionReport                        + { duration_s?: float | null, cues_read?
 RetrievalHit                           + { t_start: float | null, t_end: float | null }
 Citation / SourceDetail (video parçası):  page = null; t_start, t_end dolu (saniye)
 SourceDetail.media_url:  oynatılabilir URL (opak); arayüz t_start'a sarar
+SourceDetail.alternatives (#19):  SourceAlternative[]  — yalnızca video parçasında dolu
+SourceAlternative:  { source_id, document_id, document_title, material_type, page: int | null,
+                      similarity: float }
 Document (ORM)                         + { duration_s: float | null, media_url: str(1000) | null }
 Chunk (ORM)                            + Index(document_id, t_start)
 ```
@@ -386,6 +392,11 @@ Kurallar:
 - `Document.media_url` harici bir URL ise **yalnızca `https`** kabul edilir (doğrulama bu PR'da; `javascript:` gibi
   şemalar reddedilir). Alan boşsa ve medya dosyası saklanıyorsa URL dosya uç noktasından üretilir.
 - `media_url` dönmezse arayüz oynatıcıyı göstermez, metin ve zamanı gösterir.
+- **Doküman karşılıkları (#19) [ekleme].** Video parçasının `SourceDetail.alternatives` alanı, aynı içeriği taşıyan
+  en çok 3 doküman parçasıdır (slayt, ders notu sayfası): aynı dersin onaylı ve `ready`, video olmayan dokümanları,
+  aynı embedder'ın vektörleri, kosinüs benzerliği `RETRIEVAL_MIN_SIMILARITY` üstünde, en benzer önce. Eşiği geçen
+  yoksa boş liste. Video olmayan parçada her zaman boş. Amaç: videoyu açamayan ya da metinden okumak isteyen öğrenci
+  aynı kanıtı dokümanda bulur. Arayüzde gösterimi #22'nin işidir.
 - `IngestionReport` video alanları yalnızca video/altyazı yüklemesinde dolar; sayfa tabanlı dosyalarda `null`
   (`warnings` boş liste). Mevcut alanlar değişmedi.
 

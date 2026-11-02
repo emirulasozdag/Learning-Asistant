@@ -116,6 +116,19 @@ python -m harness.retrieval_sweep --gold gold_sets/BLM2512/gold_set.json --split
     --files-root .. --out runs/ [--follow-ups takip.json]
 ```
 
+Video-zaman önceliğinin katkısı (#19):
+
+```bash
+# Oynatma konumlu sorular önceliksiz ve pencere × ağırlık değişkeleriyle aranır (LLM yok).
+# Ders (video) başına ve kanıtın yerine göre Recall@5; önceliksize göre iyileşen/kötüleşen soru sayısı.
+python -m harness.time_prior --gold gold_sets/BLM2512/gold_set.json --split calibration \
+    --files-root .. --out runs/
+```
+
+Öneri yalnızca calibration'da yapılır ve "başka doküman" kanıtını (slayt, not) tabandan aşağı iten değişke
+önerilmez. Oynatma konumlu soru yoksa, tek bir derse aitse ya da bir derste 10'dan az soru varsa boşluk olarak
+yazılır.
+
 - **Kapı:** soru, en iyi anlamsal benzerlik `RETRIEVAL_MIN_SIMILARITY` (0,78) ya da en iyi parçanın IDF
   ağırlıklı anahtar kelime kapsaması `RETRIEVAL_MIN_KEYWORD_COVERAGE` (0,5) üstündeyse dersle ilgili
   sayılır. Eskiden tek bir ortak kelime yetiyordu; ders dili `tr` olup materyal İngilizce olunca
