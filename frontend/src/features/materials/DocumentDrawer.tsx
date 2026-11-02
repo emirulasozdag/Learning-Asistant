@@ -64,6 +64,18 @@ function DocumentDetail({ document, report }: { document: DocumentOut; report?: 
           {documentExtent(document)}, {document.chunk_count} parça
         </Meta>
         <Meta label="Yüklendi">{formatRelative(document.created_at)}</Meta>
+        {document.media_url && (
+          <Meta label="Video adresi">
+            <a
+              href={document.media_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="break-all text-accent hover:underline"
+            >
+              {document.media_url}
+            </a>
+          </Meta>
+        )}
       </dl>
 
       {report && <IngestionReport report={report} />}

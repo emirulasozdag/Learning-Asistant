@@ -7,6 +7,7 @@ import type { DocumentOut, IngestionReport } from "../../api/types";
 import DocumentDrawer from "../../features/materials/DocumentDrawer";
 import Dropzone from "../../features/materials/Dropzone";
 import MaterialsTable, { type PendingUpload } from "../../features/materials/MaterialsTable";
+import VideoUrlStep, { type StagedVideo } from "../../features/materials/VideoUrlStep";
 import { useCourseOutlet } from "../../features/courses/courseOutlet";
 import { courseService, guessMaterialType } from "../../services/courseService";
 import { documentExtent, materialTotals } from "../../labels";
@@ -26,6 +27,7 @@ export default function MaterialsPage() {
   const [documents, setDocuments] = useState<DocumentOut[] | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
   const [pending, setPending] = useState<PendingUpload[]>([]);
+  const [staged, setStaged] = useState<StagedVideo[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   // ADR-3: yükleme, eğitmenin onaylı materyal beyanıyla yapılır (backend `declaration=true` ister).
   const [declared, setDeclared] = useState(false);
@@ -84,7 +86,7 @@ export default function MaterialsPage() {
         list.map((p) => (p.key === item.key ? { ...p, status: "processing", error: undefined } : p)),
       );
       try {
-        const document = await courseService.uploadMaterial(courseId, item.type, item.file);
+        const document = await courseService.uploadMaterial(courseId, item.type, item.file, item.mediaUrl);
         setPending((list) => list.filter((p) => p.key !== item.key));
         setDocuments((list) => [document, ...(list ?? [])]);
         reloadDocuments();
@@ -117,14 +119,43 @@ export default function MaterialsPage() {
     [courseId, toast, reloadDocuments],
   );
 
+  // Video/altyazı dosyaları önce adres adımına gider; diğerleri hemen yüklenir.
   async function addFiles(files: File[]) {
     setNotice(null);
-    const items: PendingUpload[] = files.map((file, index) => ({
-      key: `${Date.now()}-${index}-${file.name}`,
-      file,
-      type: guessMaterialType(file.name),
+    const stamp = uploadStamp();
+    const isVideo = (file: File) => guessMaterialType(file.name) === "video";
+    const videos = files.filter(isVideo);
+    if (videos.length > 0) {
+      setStaged((list) => [
+        ...list,
+        ...videos.map((file, index) => ({ key: `${stamp}-v${index}-${file.name}`, file, url: "" })),
+      ]);
+    }
+    return startUploads(
+      files
+        .filter((file) => !isVideo(file))
+        .map((file, index) => ({
+          key: `${stamp}-${index}-${file.name}`,
+          file,
+          type: guessMaterialType(file.name),
+          status: "processing",
+        })),
+    );
+  }
+
+  async function confirmStaged() {
+    const items: PendingUpload[] = staged.map((video) => ({
+      key: video.key,
+      file: video.file,
+      type: "video",
+      mediaUrl: video.url.trim() || undefined,
       status: "processing",
     }));
+    setStaged([]);
+    return startUploads(items);
+  }
+
+  async function startUploads(items: PendingUpload[]) {
     setPending((list) => [...items, ...list]);
     // Sırayla: embedding modeli aynı anda tek dosyada çalışsın.
     for (const item of items) await upload(item);
@@ -215,6 +246,15 @@ export default function MaterialsPage() {
         disabled={!declared}
         compact={Boolean(documents && documents.length > 0)}
       />
+
+      {staged.length > 0 && (
+        <VideoUrlStep
+          items={staged}
+          onChange={setStaged}
+          onConfirm={() => void confirmStaged()}
+          onCancel={() => setStaged([])}
+        />
+      )}
 
       {notice && (
         <p role="alert" className="flex items-center gap-2 rounded-control bg-danger-soft px-3 py-2 text-base text-danger">
@@ -318,4 +358,9 @@ function Stat({ label, value }: { label: string; value: number | string }) {
       <dd className="text-xl leading-tight font-bold text-ink tabular-nums">{value}</dd>
     </div>
   );
+}
+
+/** Yükleme anahtarları için zaman damgası (bileşen dışında, render saflığı kuralı için). */
+function uploadStamp() {
+  return Date.now();
 }
