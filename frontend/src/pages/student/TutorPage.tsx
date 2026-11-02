@@ -303,6 +303,11 @@ function TutorSession({ course }: { course: Course }) {
     setSelection({ ...current, sourceOverride: id });
   }
 
+  /** Panelin içinden başka kaynağa geçer; kapanınca odak yine ilk açan öğeye döner. */
+  function switchSource(id: string) {
+    setSelection({ ...current, sourceOverride: id });
+  }
+
   function closeSource() {
     setSelection({ ...current, claim: null, sourceOverride: null });
     const opener = sourceOpener.current;
@@ -439,6 +444,7 @@ function TutorSession({ course }: { course: Course }) {
               claimNumber={!current.sourceOverride ? (selectedClaim?.number ?? null) : null}
               anchorRef={setAnchorElement}
               onClose={closeSource}
+              onSelectSource={switchSource}
             />
           </div>
         )}
@@ -482,7 +488,7 @@ function TutorSession({ course }: { course: Course }) {
         />
       </div>
 
-      {mobileSource && <SourceViewer sourceId={mobileSource} onClose={closeSource} />}
+      {mobileSource && <SourceViewer sourceId={mobileSource} onClose={closeSource} onSelectSource={switchSource} />}
 
       {/* Ekran okuyucu için durum duyurusu: yalnızca durum değişince güncellenir. */}
       <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">

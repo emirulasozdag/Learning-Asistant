@@ -10,6 +10,7 @@ import EmptyState from "../../../ui/EmptyState";
 import IconButton from "../../../ui/IconButton";
 import Skeleton from "../../../ui/Skeleton";
 import PageImage from "../PageImage";
+import SourceAlternatives from "../SourceAlternatives";
 import { useSourceDetail } from "../useSourceDetail";
 import ProvenanceTable from "./ProvenanceTable";
 
@@ -25,6 +26,7 @@ export default function EvidencePanel({
   claimNumber,
   anchorRef,
   onClose,
+  onSelectSource,
 }: {
   sourceId: string;
   course: Course;
@@ -33,6 +35,8 @@ export default function EvidencePanel({
   claimNumber: number | null;
   anchorRef: (element: HTMLElement | null) => void;
   onClose: () => void;
+  /** Video alıntısının doküman karşılığı seçilince aynı panelde açılır. */
+  onSelectSource: (sourceId: string) => void;
 }) {
   const { source, failure, retry } = useSourceDetail(sourceId);
   const [copied, setCopied] = useState(false);
@@ -135,6 +139,8 @@ export default function EvidencePanel({
               </p>
             </details>
           )}
+
+          {isVideo && <SourceAlternatives alternatives={source.alternatives} onSelect={onSelectSource} />}
 
           <ProvenanceTable course={course} source={source} document={document} />
         </div>
