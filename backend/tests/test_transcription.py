@@ -1,7 +1,7 @@
 """Altyazısız ders videosu/sesi: yerel transkripsiyon akışı (sahte transkriptör, gerçek DB).
 
-TestClient'ta BackgroundTasks yanıt gönderildikten sonra, istek dönmeden önce çalışır; bu yüzden
-upload çağrısı döndüğünde arka plan işi bitmiştir.
+Yükleme işi kuyruğa yazar (ADR-9); testler kuyruğu `run_jobs` ile açıkça çalıştırır.
+Kuyruğun kendisi (iptal, kurtarma, yeniden deneme): `test_jobs.py`.
 """
 
 import os
@@ -17,11 +17,11 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.db.models import Chunk, Course, Document
 from app.embeddings.fake import FakeEmbedder
-from app.ingestion.media import INTERRUPTED_MESSAGE, fail_interrupted_documents, run_transcription
 from app.ingestion.parsers.vtt_parser import parse_vtt, write_vtt
-from app.ingestion.transcribe import Transcriber, TranscriptionError, get_transcriber
+from app.ingestion.transcribe import Transcriber, TranscriptionError
 from app.ingestion.types import RawSegment
-from app.main import app
+from app.jobs.queue import TRANSCRIPTION, enqueue
+from app.jobs.worker import run_pending
 from app.retrieval.hybrid import retrieve
 from tests.conftest import enroll, make_user, make_vtt, session_factory
 from tests.test_video import LESSON, add_video
@@ -38,7 +38,7 @@ class FakeTranscriber:
         self.segments, self.duration_s, self.error = segments, duration_s, error
         self.calls: list[tuple[str, str]] = []
 
-    def transcribe(self, path: Path, language: str):
+    def transcribe(self, path: Path, language: str, should_stop=lambda: False):
         self.calls.append((path.suffix, language))
         assert path.is_file()
         if self.error:
@@ -48,10 +48,19 @@ class FakeTranscriber:
 
 @pytest.fixture
 def transcriber(api, monkeypatch: pytest.MonkeyPatch) -> FakeTranscriber:
-    fake = FakeTranscriber()
     monkeypatch.setattr(settings, "transcription_model", "tiny")
-    app.dependency_overrides[get_transcriber] = lambda: fake
-    return fake
+    return FakeTranscriber()
+
+
+@pytest.fixture
+def run_jobs(db: Session, db_engine, transcriber: FakeTranscriber):
+    """Kuyruktaki işleri sahte transkriptörle çalıştırır; çalışan iş sayısını döndürür."""
+
+    def run() -> int:
+        db.commit()  # Testin oturumu açık işlem bırakmasın.
+        return run_pending(session_factory(db_engine), transcriber, FakeEmbedder())
+
+    return run
 
 
 def upload_media(client: TestClient, course_id: int, name: str = "ders.mp4", **kwargs):
@@ -86,7 +95,7 @@ def unfinished(course: Course, user, status: str, **fields) -> Document:
 
 
 def test_media_upload_is_processed_into_timed_chunks(
-    client: TestClient, db: Session, course: Course, transcriber: FakeTranscriber
+    client: TestClient, db: Session, course: Course, transcriber: FakeTranscriber, run_jobs
 ) -> None:
     response = upload_media(client, course.id, data={"title": "Ders 1"})
 
@@ -94,6 +103,8 @@ def test_media_upload_is_processed_into_timed_chunks(
     body = response.json()
     assert (body["status"], body["chunk_count"], body["report"]) == ("processing", 0, None)
     assert body["material_type"] == "video"
+    assert transcriber.calls == []  # Yükleme yalnızca kuyruğa yazar.
+    assert run_jobs() == 1
     assert transcriber.calls == [(".mp4", "tr")]
 
     document = refreshed(db, body["id"])
@@ -128,6 +139,7 @@ def test_failed_transcription_marks_document_failed_and_cleans_up(
     db: Session,
     course: Course,
     transcriber: FakeTranscriber,
+    run_jobs,
     error: Exception | None,
     segments: list[RawSegment],
     message: str,
@@ -135,6 +147,7 @@ def test_failed_transcription_marks_document_failed_and_cleans_up(
     transcriber.error, transcriber.segments = error, segments
 
     response = upload_media(client, course.id)
+    run_jobs()
 
     assert response.status_code == 201
     document = refreshed(db, response.json()["id"])
@@ -185,9 +198,10 @@ def test_unsupported_extension_is_rejected(
 
 @pytest.mark.parametrize("name", ["a.mp4", "a.webm", "a.mkv", "a.mov", "a.mp3", "a.m4a", "A.WAV"])
 def test_all_media_extensions_are_accepted(
-    client: TestClient, course: Course, transcriber: FakeTranscriber, name: str
+    client: TestClient, course: Course, transcriber: FakeTranscriber, run_jobs, name: str
 ) -> None:
     assert upload_media(client, course.id, name).status_code == 201
+    assert run_jobs() == 1
     assert transcriber.calls[-1][0] == Path(name).suffix.lower()
 
 
@@ -269,36 +283,6 @@ def test_unfinished_documents_are_instructor_only_and_not_searchable(
     assert retrieve(db, course, question, k=10, embedder=FakeEmbedder()).passages == []
 
 
-def test_documents_stuck_in_processing_are_failed_on_startup(
-    db: Session, db_engine, user, course: Course, api
-) -> None:
-    stuck = unfinished(course, user, "processing")
-    done = add_video(db, course)
-    db.add(stuck)
-    db.commit()
-    leftover = settings.upload_dir / str(course.id) / f"{stuck.id}.mp4"
-    leftover.parent.mkdir(parents=True, exist_ok=True)
-    leftover.write_bytes(b"x")
-
-    assert fail_interrupted_documents(session_factory(db_engine)) == 1
-
-    assert refreshed(db, stuck.id).status == "failed"
-    assert refreshed(db, stuck.id).error == INTERRUPTED_MESSAGE
-    assert refreshed(db, done.id).status == "ready"
-    assert not leftover.exists()
-
-
-def test_document_deleted_while_processing_leaves_nothing(
-    db: Session, db_engine, tmp_path: Path
-) -> None:
-    media = tmp_path / "a.wav"
-    media.write_bytes(b"x")
-
-    run_transcription(session_factory(db_engine), 999, media, FakeTranscriber(), FakeEmbedder())
-
-    assert not media.exists() and db.scalars(select(Chunk)).all() == []
-
-
 def test_write_vtt_roundtrips_and_sanitizes(tmp_path: Path) -> None:
     path = tmp_path / "a.vtt"
     write_vtt(
@@ -342,13 +326,11 @@ def test_real_model_reports_no_speech_for_silence(
     db.commit()
     media = silent_wav(tmp_path / "sessiz.wav")
 
-    run_transcription(
-        session_factory(db_engine),
-        document.id,
-        media,
-        FasterWhisperTranscriber(os.environ.get("TRANSCRIPTION_MODEL") or "tiny"),
-        FakeEmbedder(),
-    )
+    enqueue(db, TRANSCRIPTION, document, media)
+    db.commit()
+
+    model = os.environ.get("TRANSCRIPTION_MODEL") or "tiny"
+    run_pending(session_factory(db_engine), FasterWhisperTranscriber(model), FakeEmbedder())
 
     failed = refreshed(db, document.id)
     assert failed.status == "failed" and failed.error == "Medyada konuşma bulunamadı."

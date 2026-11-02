@@ -319,13 +319,21 @@ yönteminden bağımsız, opak bir URL'dir.
   (ör. `large-v3-turbo`) medya kabul edilir. VTT/PDF/PPTX yolu bundan etkilenmez.
 - **Kabul edilen medya:** `.mp4 .webm .mkv .mov .mp3 .m4a .wav` (sabit küme); sınır `Settings.max_media_bytes` = 2 GB
   (VTT/PDF/PPTX için 50 MB aynen). Medya belleğe okunmaz, diske parça parça kopyalanır; aşılırsa `422`, dosya kalmaz.
+  **#21:** istek gövdesi okunurken de sınırlanır: `Content-Length` ya da gelen bayt sayısı yükleme için
+  `max_media_bytes + 1 MB`, diğer istekler için `MAX_REQUEST_BYTES` (2 MB) üstündeyse `413 file_too_large`, gövde
+  okunmaz. Dosya adı ya da başlık 300 karakteri aşarsa `422`.
   Diğer uzantı `422`. Dil = `course.language` (otomatik algılama yok).
-- **Durum makinesi.** Yükleme `201` döner: `status="processing"`, `chunk_count = 0`, `report = null`. Arka plan işi (kendi
-  DB oturumu) bitince `ready` (zamanlı parçalar yazılır) ya da `failed` (`error`: "Medya dosyası çözülemedi." /
-  "Medyada konuşma bulunamadı." / "Transkripsiyon modeli yüklenemedi." / "Beklenmeyen bir hata oluştu."; parça yazılmaz).
-  `processing`den `ready`/`failed`e geçiş tek yönlüdür; başarısız dokümanın yeniden denenmesi yoktur (silinip yeniden
-  yüklenir). Uygulama açılışında `processing`de kalmış dokümanlar `failed` ("İşlem yarıda kaldı; dosyayı yeniden
-  yükleyin.") yapılır; `--reload` kod değişince süren işi öldürür.
+- **Durum makinesi.** Yükleme `201` döner: `status="processing"`, `chunk_count = 0`, `report = null`. Doküman ve
+  transkripsiyon işi aynı işlemde yazılır; işi kuyruktan çalıştırıcı alır (#21, ADR-9). İş bitince `ready` (zamanlı
+  parçalar yazılır) ya da `failed` (`error`: "Medya dosyası çözülemedi." / "Medyada konuşma bulunamadı." /
+  "Transkripsiyon modeli yüklenemedi." / "Beklenmeyen bir hata oluştu." / "İşlem eğitmen tarafından iptal edildi." /
+  "İşlem yarıda kaldı; dosyayı yeniden yükleyin."; parça yazılmaz). `processing`den `ready`/`failed`e geçiş tek
+  yönlüdür; başarısız doküman silinip yeniden yüklenir. Süreç iş sürerken durursa (ör. `--reload`) medya diskte kalır
+  ve iş yeniden denenir (en çok `JOB_MAX_ATTEMPTS`); beklenmeyen hata da bir kez yeniden denenir.
+- **İptal (#21) [ekleme].** `POST /documents/{id}/cancel` (yalnızca eğitmen) → `200 DocumentOut`. Kuyruktaki iş hemen
+  iptal olur, doküman `failed` döner. Çalışan iş işaretlenir, birkaç saniye içinde durur ve doküman `failed` olur
+  (bu sırada yanıt `processing` gösterebilir). İşlenmeyen dokümanda `409 document_not_processing`. Öğrenciye `404`.
+  İşlenen dokümanı silmek (`DELETE /documents/{id}`) işi ve medyayı da siler.
 - **Saklama.** Başarıda transkript WebVTT olarak yazılır ve dokümanın `file_path`i olur (`filename = "<başlık>.vtt"`); medya
   dosyası silinir. Başarısızlıkta da medya silinir (`file_path = ""`). `duration_s` = medyanın süresi,
   `transcript_source = "asr"`, `transcript_model` = ör. `faster-whisper/large-v3-turbo/int8`. VTT yüklemesi

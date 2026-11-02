@@ -1,5 +1,6 @@
 """Yüklenmiş dokümanları listeleme ve önizleme (eğitmen ekranı)."""
 
+from pathlib import Path
 from urllib.parse import urlsplit
 
 from sqlalchemy import func, select
@@ -11,6 +12,9 @@ from app.ingestion.types import IngestionError
 from app.schemas.materials import ChunkPreview, DocumentOut, MaterialType
 
 MAX_MEDIA_URL_LENGTH = 1000
+# Document.title / Document.filename sütun uzunlukları.
+MAX_TITLE_LENGTH = 300
+MAX_FILENAME_LENGTH = 300
 
 
 def file_url(document_id: int, page: int | None = None) -> str:
@@ -35,6 +39,23 @@ def validate_media_url(url: str) -> None:
         raise IngestionError(
             "Medya adresi geçerli bir https adresi olmalı (en fazla 1000 karakter)."
         )
+
+
+def validate_upload_fields(filename: str, title: str | None) -> None:
+    """Sütuna sığmayan ad/başlık veritabanı hatası (500) yerine anlaşılır 422 olur."""
+    if len(Path(filename).name) > MAX_FILENAME_LENGTH:
+        raise IngestionError(f"Dosya adı en fazla {MAX_FILENAME_LENGTH} karakter olabilir.")
+    if title is not None and len(title) > MAX_TITLE_LENGTH:
+        raise IngestionError(f"Başlık en fazla {MAX_TITLE_LENGTH} karakter olabilir.")
+
+
+def document_files(course_id: int, document_id: int, file_path: str = "") -> list[Path]:
+    """Dokümana ait diskteki dosyalar: kayıtlı dosya ve aynı kimlikle kalmış ara dosyalar
+    (işlenmeyi bekleyen medya, yarım transkript)."""
+    files = set((settings.upload_dir / str(course_id)).glob(f"{document_id}.*"))
+    if file_path:
+        files.add(Path(file_path))
+    return sorted(files)
 
 
 def list_documents(db: Session, course_id: int, approved_only: bool = False) -> list[DocumentOut]:

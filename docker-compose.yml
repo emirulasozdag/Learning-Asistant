@@ -42,6 +42,8 @@ services:
       RETRIEVAL_MIN_KEYWORD_COVERAGE: ${RETRIEVAL_MIN_KEYWORD_COVERAGE:-0.5}
       RETRIEVAL_FOLLOW_UP_MIN_SIMILARITY: ${RETRIEVAL_FOLLOW_UP_MIN_SIMILARITY:-0.77}
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
+      # Uzun işleri (transkripsiyon) aşağıdaki `worker` servisi çalıştırır (ADR-9); `--reload` işi kesmez.
+      JOB_WORKER: external
       # Yerel geliştirme ve sunum: demo hesapları açılışta oluşturulur, giriş ekranında tek tıkla
       # (şifresiz) girilir ve derslerin katılım kodları görünür. Bu dosya yalnızca yerel geliştirme
       # içindir; uygulamanın kendi varsayılanı kapalıdır. Gerçek kurulumda SEED_DEV_ACCOUNTS=false
@@ -77,6 +79,31 @@ services:
     depends_on:
       db:
         condition: service_healthy
+
+  # Kuyruktaki uzun işleri çalıştırır (ADR-9, docs/OPERATIONS.md). Yeniden başlarsa süren iş yeniden denenir.
+  worker:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-learning}:${POSTGRES_PASSWORD:-learning}@db:5432/${POSTGRES_DB:-learning_assistant}
+      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-e5}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-intfloat/multilingual-e5-base}
+      TRANSCRIPTION_MODEL: ${TRANSCRIPTION_MODEL:-}
+      JOB_MAX_ATTEMPTS: ${JOB_MAX_ATTEMPTS:-2}
+      # Modelleri `api` indirir; çalıştırıcı önbellekten kullanır.
+      HF_HUB_OFFLINE: "1"
+    command: python -m app.jobs.worker
+    volumes:
+      - ./backend/app:/code/app
+      - ./data:/code/data
+      - models:/models
+    depends_on:
+      db:
+        condition: service_healthy
+      api:
+        condition: service_started
+    # docker stop SIGTERM gönderir; süren iş en çok bu kadar beklenir, sonra iş yeniden denenir.
+    stop_grace_period: 30s
+    restart: unless-stopped
 
   web:
     build: ./frontend

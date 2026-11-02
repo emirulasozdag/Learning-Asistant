@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
@@ -82,6 +82,20 @@ class Settings(BaseSettings):
     transcription_model: str = ""
     # Medya (video/ses) yükleme sınırı; VTT/PDF/PPTX için 50 MB sınırı ayrıdır.
     max_media_bytes: int = 2 * 1024 * 1024 * 1024
+    # Yükleme dışındaki isteklerin gövde sınırı (JSON); aşılırsa 413 (#21).
+    max_request_bytes: int = 2 * 1024 * 1024
+
+    # Uzun işler (transkripsiyon) veritabanındaki kuyruktan çalışır (ADR-9).
+    # inline: API süreci içinde bir iş parçacığı çalıştırır (tek süreçli yerel geliştirme).
+    # external: işleri ayrı süreç çalıştırır (`python -m app.jobs.worker`, docker-compose'ta
+    # `worker`); API yalnızca kuyruğa yazar.
+    job_worker: Literal["inline", "external"] = "inline"
+    job_poll_interval_s: float = 2.0
+    # Çalışan iş bu aralıkla "yaşıyorum" der; bu kadar süre sessiz kalan iş sahipsiz sayılır.
+    job_heartbeat_interval_s: float = 15.0
+    job_stale_after_s: float = 120.0
+    # Süreç çöktüğü için yarıda kalan iş en çok bu kadar kez denenir (OOM döngüsü olmasın).
+    job_max_attempts: int = 2
 
     # Alakasızlık kapısı (`retrieval/hybrid.py`): soru, en iyi anlamsal benzerlik ya da en iyi
     # parçanın anahtar kelime kapsaması (IDF ağırlıklı, 0–1) eşiğin üstündeyse dersle ilgili

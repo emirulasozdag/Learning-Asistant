@@ -347,6 +347,40 @@ Açık soru 6'nın model ailesi kısmı bu kararla cevaplanır; sağlayıcının
 
 ---
 
+## ADR-9 — Uzun işler: veritabanında kalıcı iş kuyruğu ve ayrı çalıştırıcı
+
+**Bağlam.** #21: transkripsiyon FastAPI `BackgroundTasks` ile API süreci içinde çalışıyordu. Süreç yeniden başlarsa
+(`--reload`, çökme, dağıtım) iş kayboluyor, doküman açılışta "başarısız" yapılıyor ve eğitmen dosyayı yeniden
+yüklemek zorunda kalıyordu. İptal yoktu. Arka plan işi, transkripsiyon sürerken açık bir veritabanı işlemi
+tutuyordu. Ekibin zaten çalıştırdığı tek altyapı PostgreSQL.
+
+**Karar (öneri).**
+- **Kuyruk:** `processing_jobs` tablosu (yeni aracı yok: Redis/Celery/RQ eklenmez). İş, dokümanla aynı işlemde
+  yazılır. Durumlar: `queued → running → succeeded | failed | cancelled`. Doküman API'de aynı üç durumu korur
+  (`processing | ready | failed`); iş satırı denetim kaydıdır (deneme sayısı, son hata, zamanlar).
+- **Çalıştırıcı:** `python -m app.jobs.worker` (docker-compose'ta `worker` servisi, `JOB_WORKER=external`). İşi
+  `SELECT … FOR UPDATE SKIP LOCKED` ile alır; birden çok çalıştırıcı güvenle çalışır. `JOB_WORKER=inline` (varsayılan)
+  aynı döngüyü API sürecinde bir iş parçacığında çalıştırır; yalnızca tek süreçli yerel geliştirme içindir.
+- **Uzun adım işlem dışında:** iş alınır ve işlem kapanır. Transkripsiyon ve vektörleştirme açık işlem olmadan
+  çalışır. Sonuç sonda kısa bir işlemle, iş satırı kilitlenerek yazılır. `/ask` da aramadan sonra işlemi kapatır;
+  LLM ve judge çağrıları açık işlem içinde beklemez.
+- **Canlılık ve kurtarma:** çalışan iş `JOB_HEARTBEAT_INTERVAL_S` (15 sn) aralıkla `heartbeat_at` yazar.
+  `JOB_STALE_AFTER_S` (120 sn) sessiz kalan iş sahipsizdir: deneme hakkı varsa yeniden kuyruğa alınır (medya diskte
+  kalır), yoksa başarısız olur (`JOB_MAX_ATTEMPTS` = 2; bellek yetmezliği gibi süreci öldüren iş döngüye girmez).
+  Kalıcı hata (bozuk medya, konuşma yok) yeniden denenmez. Beklenmeyen hata hakkı varsa yeniden denenir.
+- **İptal:** `POST /documents/{id}/cancel`. Kuyruktaki iş hemen biter. Çalışan iş işaretlenir; çalıştırıcı bir
+  sonraki canlılık kontrolünde görür ve transkripsiyon segment arasında durur. Sonuç yazılmadan önce iş satırı
+  yeniden denetlenir. İptal edilen ya da silinen dokümanın dosyaları silinir.
+
+**Sonuçları.** docker-compose'a ikinci bir backend süreci eklenir; embedding modeli o süreçte de belleğe alınır
+(e5-base ~1 GB RAM). Kuyruk yoklamayla çalışır (`JOB_POLL_INTERVAL_S` = 2 sn); iş başlangıcı en çok bu kadar gecikir.
+Faster-whisper bir segmentin ortasında kesilemez; iptal en geç bir segment sonra görülür. Operasyon notları:
+[OPERATIONS.md](OPERATIONS.md).
+
+**Durum:** Önerildi · **Karar tarihi:** — · **Katılanlar:** Emir Ulaş Özdağ (@emirulasozdag, öneren)
+
+---
+
 ## Açık sorular
 
 Bunlar ekip ya da dış taraf (eğitmen, bölüm) cevabı bekleyen konulardır. Cevaplanana kadar varsayım yapılmaz.

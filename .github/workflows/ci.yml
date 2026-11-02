@@ -42,6 +42,18 @@ jobs:
       - run: pip install -e ".[dev]"
       - run: ruff check . ../evaluation
       - run: ruff format --check . ../evaluation
+      # Temiz başlangıç (#21): boş veritabanında migration'lar baştan sona uygulanır, modellerle
+      # aynı olduğu denetlenir (`alembic check`), geri alınır ve yeniden uygulanır.
+      - name: Clean-start migrations
+        env:
+          DATABASE_URL: postgresql+psycopg://learning:learning@localhost:5432/clean_start
+          PGPASSWORD: learning
+        run: |
+          psql -h localhost -U learning -d learning_assistant_test -c "CREATE DATABASE clean_start"
+          alembic upgrade head
+          alembic check
+          alembic downgrade base
+          alembic upgrade head
       - run: pytest -q
       # Değerlendirme harness'inin birim testleri (veritabanısız).
       - run: pytest -q ../evaluation/tests

@@ -5,12 +5,14 @@ bu bağımlılığı kurmaz, sahte `Transcriber` enjekte eder.
 """
 
 import logging
+from collections.abc import Callable
 from functools import cache
 from pathlib import Path
 from typing import Protocol
 
 from app.core.config import settings
 from app.ingestion.types import RawSegment
+from app.jobs.queue import JobCancelled
 
 logger = logging.getLogger(__name__)
 
@@ -28,8 +30,13 @@ class Transcriber(Protocol):
     # Dokümana yazılan model kimliği (ör. faster-whisper/large-v3-turbo/int8).
     identity: str
 
-    def transcribe(self, path: Path, language: str) -> tuple[list[RawSegment], float, list[str]]:
-        """(zamanlı segmentler, medya süresi sn, uyarılar). Konuşma yoksa segment listesi boş."""
+    def transcribe(
+        self, path: Path, language: str, should_stop: Callable[[], bool] = lambda: False
+    ) -> tuple[list[RawSegment], float, list[str]]:
+        """(zamanlı segmentler, medya süresi sn, uyarılar). Konuşma yoksa segment listesi boş.
+
+        `should_stop` True dönerse (iş iptal edildi) `JobCancelled` ile yarıda bırakılır.
+        """
         ...
 
 
@@ -45,7 +52,9 @@ class FasterWhisperTranscriber:
         self.model_name = model_name
         self.identity = f"faster-whisper/{model_name}/{COMPUTE_TYPE}"
 
-    def transcribe(self, path: Path, language: str) -> tuple[list[RawSegment], float, list[str]]:
+    def transcribe(
+        self, path: Path, language: str, should_stop: Callable[[], bool] = lambda: False
+    ) -> tuple[list[RawSegment], float, list[str]]:
         try:
             model = load_model(self.model_name)
         except Exception as exc:
@@ -65,7 +74,10 @@ class FasterWhisperTranscriber:
 
         segments: list[RawSegment] = []
         doubtful = 0
+        # Segmentler üretildikçe çözülür (uzun süren kısım burası); iptal segment arasında görülür.
         for raw in raw_segments:
+            if should_stop():
+                raise JobCancelled(path.name)
             segments.append(RawSegment(text=raw.text, t_start=raw.start, t_end=raw.end))
             if raw.no_speech_prob > MAX_NO_SPEECH_PROB or raw.avg_logprob < MIN_AVG_LOGPROB:
                 doubtful += 1

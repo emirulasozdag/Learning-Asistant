@@ -28,6 +28,8 @@ ErrorCode = Literal[
     "email_exists",
     "not_implemented",
     "validation_error",
+    # #21: iptal edilecek süren bir işlem yok (doküman hazır ya da başarısız).
+    "document_not_processing",
 ]
 
 

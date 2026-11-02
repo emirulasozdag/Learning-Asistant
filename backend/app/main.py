@@ -23,9 +23,11 @@ from app.api import (
 )
 from app.api.errors import ApiError, api_error_handler
 from app.core.config import settings
+from app.core.limits import RequestSizeLimit
 from app.db.session import SessionLocal
 from app.embeddings.provider import get_embedder
-from app.ingestion.media import fail_interrupted_documents
+from app.jobs.queue import recover_stale
+from app.jobs.worker import start_inline
 from app.retrieval.index import stale_chunk_count
 
 logger = logging.getLogger(__name__)
@@ -57,25 +59,25 @@ def _warn_stale_vectors(identity: str) -> None:
         )
 
 
-def _fail_interrupted_transcriptions() -> None:
-    """Önceki süreç transkripsiyon sürerken durduysa doküman "işleniyor"da takılı kalmasın."""
+def _recover_jobs() -> None:
+    """Önceki süreç iş sürerken durduysa iş yeniden kuyruğa alınır ya da başarısız biter."""
     try:
-        count = fail_interrupted_documents(SessionLocal)
+        with SessionLocal() as db:
+            recover_stale(db)
     except Exception:
-        logger.exception("Yarıda kalan transkripsiyonlar işaretlenemedi")
-        return
-    if count:
-        logger.warning(
-            "%d doküman işlem sürerken yarıda kaldı; başarısız olarak işaretlendi", count
-        )
+        logger.exception("Yarıda kalan işler toparlanamadı")
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     # Embedding modeli arka planda belleğe alınır; ilk soru/yükleme beklemesin.
     threading.Thread(target=_warm_up_embedder, daemon=True).start()
-    _fail_interrupted_transcriptions()
+    _recover_jobs()
+    # Uzun işler kuyruktan çalışır (ADR-9); `external` iken ayrı `worker` süreci çalıştırır.
+    worker = start_inline(SessionLocal) if settings.job_worker == "inline" else None
     yield
+    if worker is not None:
+        worker.stop()
 
 
 app = FastAPI(title="Interactive Learning Assistant API", version="0.0.1", lifespan=lifespan)
@@ -100,6 +102,9 @@ async def reject_cross_site_writes(
     return await call_next(request)
 
 
+# Sınırı aşan gövde okunmadan reddedilir (#21). CORS'un içinde: 413 cevabı da CORS
+# başlıklarını alır, tarayıcı hatayı okuyabilir.
+app.add_middleware(RequestSizeLimit)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
