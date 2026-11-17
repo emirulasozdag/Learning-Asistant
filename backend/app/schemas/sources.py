@@ -1,6 +1,12 @@
+from typing import Literal
+
 from pydantic import BaseModel
 
 from app.schemas.materials import MaterialType
+
+# readable: okundu · partial: okundu, güveni düşük kelimeler var · unreadable: yazı var ama
+# okunamadı · no_text: yazı bulunmadı (ör. fotoğraf, etiketsiz diyagram). Son ikisinde `text` boş.
+FrameStatus = Literal["readable", "partial", "unreadable", "no_text"]
 
 
 class Highlight(BaseModel):
@@ -22,6 +28,28 @@ class SourceAlternative(BaseModel):
     page: int | None = None
     # Video parçasına anlamsal benzerlik (kosinüs, 0–1).
     similarity: float
+
+
+class FrameRef(BaseModel):
+    """Ders videosundan çıkarılan kare (#24, ADR-10).
+
+    Orijinal kanıt karenin görüntüsü (`image_url`) ve zamanıdır. `text` OCR'ın türettiği metindir,
+    orijinal kanıt değildir; kontrol edilmeden cevapta kanıt olarak alıntılanmaz (#26).
+    """
+
+    frame_id: int
+    document_id: int
+    # Slaytın ekranda sabit kaldığı aralık ve görüntünün alındığı an (saniye).
+    t_start: float
+    t_end: float
+    t_frame: float
+    image_url: str
+    status: FrameStatus
+    text: str | None = None
+    # Okunan kelimelerin ortalama OCR güveni (0–1).
+    confidence: float | None = None
+    # Metni türeten araç, ör. "tesseract/5.5.0/tur+eng".
+    extractor: str
 
 
 class SourceDetail(BaseModel):
@@ -46,3 +74,6 @@ class SourceDetail(BaseModel):
     # Yalnızca video parçası: aynı içeriğin dokümandaki karşılıkları (videoyu açamayan ya da
     # metinden okumak isteyen öğrenci için), en benzer önce. Diğer parçalarda boş.
     alternatives: list[SourceAlternative] = []
+    # Yalnızca video parçası: parçanın aralığında ekranda olan kareler, zamana göre (#24).
+    # Kare çıkarılmadıysa (altyazıyla yüklenen video, özellik kapalı) boş.
+    frames: list[FrameRef] = []

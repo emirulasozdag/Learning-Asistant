@@ -82,6 +82,10 @@ class Settings(BaseSettings):
     transcription_model: str = ""
     # Medya (video/ses) yükleme sınırı; VTT/PDF/PPTX için 50 MB sınırı ayrıdır.
     max_media_bytes: int = 2 * 1024 * 1024 * 1024
+    # Medyadan kare çıkarma ve karelerdeki yazının yerel OCR'ı (#24, ADR-10). off: kapalı
+    # (varsayılan); ocr: transkripsiyon işi medyayı silmeden önce slayt karelerini çıkarır ve
+    # Tesseract ile okur. Yalnızca medya yüklemesinde çalışır (.vtt yüklemesinde video yoktur).
+    frame_extraction: Literal["off", "ocr"] = "off"
     # Yükleme dışındaki isteklerin gövde sınırı (JSON); aşılırsa 413 (#21).
     max_request_bytes: int = 2 * 1024 * 1024
 

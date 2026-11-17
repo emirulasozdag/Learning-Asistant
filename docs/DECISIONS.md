@@ -18,6 +18,7 @@ hukuk birimi onayı alınmalıdır (bkz. ANALYSIS §13.1, "KVKK" riski).
 | 5 | Hosted modelle veri paylaşımı | Kabul edildi | 2026-10-20 | Nisanur İlhan (öneren), Emir Ulaş Özdağ (@emirulasozdag), Mehmet Akif Kurt (@saintpeterslibiri) |
 | 6 | Transkripsiyon: yerel faster-whisper | Önerildi | — | — |
 | 7 | AI Tutor mimarisi, köken politikası ve Gemini | **Önerildi** | — | Mehmet Akif Kurt (@saintpeterslibiri, öneren) |
+| 10 | Ders videosu kareleri: yerel çıkarma, yerel OCR ve ayrı indeks | Önerildi | — | Nisanur İlhan (öneren) |
 
 ---
 
@@ -380,6 +381,41 @@ Faster-whisper bir segmentin ortasında kesilemez; iptal en geç bir segment son
 [OPERATIONS.md](OPERATIONS.md).
 
 **Durum:** Önerildi · **Karar tarihi:** — · **Katılanlar:** Emir Ulaş Özdağ (@emirulasozdag, öneren)
+
+---
+
+## ADR-10 — Ders videosu kareleri: yerel çıkarma, yerel OCR ve ayrı indeks
+
+**Bağlam.** #24 (S05-A): slaytta yazan ama konuşmada geçmeyen bilgi (formül, kod, diyagram etiketi) bugün
+aranamıyor; arama yalnızca transkripti görüyor. Kareden türetilen metin model ya da OCR ürünüdür; orijinal ders
+materyaliyle aynı güvende değildir. Ses gibi görüntü de sunucuda kalmalı (ADR-5, ADR-6). Ekipte ücretli görsel model
+erişimi herkeste yok.
+
+**Karar (öneri).**
+- **Kaynak:** kareler yalnızca yüklenen medya dosyasından, transkripsiyon işinin içinde, medya silinmeden önce
+  çıkarılır. Yalnızca `.vtt` yüklenen videoda medya olmadığı için kare yoktur. `FRAME_EXTRACTION=off` (varsayılan)
+  ya da `ocr`.
+- **Kare seçimi:** video düzenli aralıkla örneklenir; görüntü bir süre sabit kalınca (slayt, duraklatılmış ekran) bir
+  kare alınır ve ekranda kaldığı aralık (`t_start`–`t_end`) saklanır. Sürekli hareketli görüntüden kare alınmaz.
+  Video başına kare sayısı sınırlıdır.
+- **Okuma: yerel Tesseract** (Türkçe + İngilizce dil paketleri, Docker imajında). Hosted görsel model bu kararın
+  parçası değildir; isteğe bağlı ikinci yol olarak ayrıca önerilir (ADR-5, ADR-8 rotasıyla).
+- **Açık durum:** her karenin durumu `readable | partial | unreadable | no_text`. Okunamayan ve yazısız kareler
+  saklanır ama aranmaz; içerik uydurulmaz.
+- **Ayrı indeks:** kareler ve türetilmiş metin `video_frames` tablosundadır, `chunks`a girmez. Kendi vektörü
+  (aynı embedder) ve kelime indeksi vardır. Orijinal kanıt karenin görüntüsü ve zamanıdır; OCR metni
+  `FrameRef.text` olarak ayrıca işaretlenir.
+- **Cevaba girişi:** OCR metni `/ask` ve AI Tutor cevaplarında kanıt olarak **kullanılmaz**; görsel kanıtın kontrol
+  kuralları #26'nın (S05-B) işidir. Kareler kaynak görüntüleyicide (`SourceDetail.frames`) ve doküman
+  uç noktalarında görünür.
+- **Erişim ve saklama:** kare görüntüsü dokümanın erişim kuralına tabidir (üyelik, onay, `ready`; ADR-3). Doküman
+  silinince ya da işi başarısız olunca kareler ve görüntü dosyaları silinir.
+
+**Sonuçları.** Docker imajı Tesseract ile büyür (~40 MB). Transkripsiyon işi kare çıkarma ve OCR süresi kadar uzar.
+OCR diyagramdaki yazıyı okur ama okları, şekli ve yerleşimi yorumlamaz; diyagram anlamı görsel model gerektirir
+(#24 kriter 4 bu sınırla değerlendirilir). Kare seçim eşikleri gerçek ders videolarında kalibre edilmelidir.
+
+**Durum:** Önerildi · **Karar tarihi:** — · **Katılanlar:** Nisanur İlhan (öneren)
 
 ---
 

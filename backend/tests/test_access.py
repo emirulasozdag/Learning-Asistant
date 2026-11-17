@@ -292,6 +292,13 @@ ISOLATION_CASES = {
     "chunks": lambda c, d, s: ("GET", f"/documents/{d}/chunks", {}, "document_not_found"),
     "file": lambda c, d, s: ("GET", f"/documents/{d}/file", {}, "document_not_found"),
     "page_image": lambda c, d, s: ("GET", f"/documents/{d}/pages/1.png", {}, "document_not_found"),
+    "frames": lambda c, d, s: ("GET", f"/documents/{d}/frames", {}, "document_not_found"),
+    "frame_image": lambda c, d, s: (
+        "GET",
+        f"/documents/{d}/frames/1.png",
+        {},
+        "document_not_found",
+    ),
     "delete_document": lambda c, d, s: ("DELETE", f"/documents/{d}", {}, "document_not_found"),
     "list_materials": lambda c, d, s: ("GET", f"/courses/{c}/materials", {}, "course_not_found"),
     "upload": lambda c, d, s: (
@@ -431,6 +438,8 @@ def test_skeleton_routes_return_501_for_authorised_members(client_for, world) ->
     )
     review = {"target_type": "message", "target_id": 1, "decision": "approve"}
     assert instructor.post("/instructor/reviews", json=review).status_code == 501
+    assert student.get(f"/documents/{world.doc}/frames").status_code == 501
+    assert student.get(f"/documents/{world.doc}/frames/1.png").status_code == 501
 
 
 # --- 8. Yükleme beyanı ---
