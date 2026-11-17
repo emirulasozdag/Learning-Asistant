@@ -225,6 +225,8 @@ def _answer_from_course(
         embedder=ctx.embedder,
         search_query=args.search_query,
         reranker=ctx.reranker,
+        # Judge bu hattın içinde seçilir (sarmalanmaz): arama bitince okuma işlemi kapanır.
+        release=ctx.db.commit,
     ):
         if isinstance(event, RetrievalEvent):
             yield RetrievalHitsEvent(index, event.hits)

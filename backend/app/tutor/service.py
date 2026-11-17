@@ -3,6 +3,10 @@
 Sohbetler `/ask` ile aynı tablolarda tutulur; asistan mesajının `meta`'sı cevap özetini
 (`answer_meta`, eğitmen etkinliği bunu okur), blokları ve turun izini taşır. LLM'e kullanıcı
 kimliği gitmez (ADR-5).
+
+Model çağrıları açık bir veritabanı işlemi içinde beklemez (#88): istemciler her çağrıdan önce
+okuma işlemini kapatır (`llm/release.py`); yeni sohbet ve mesajlar tur sonunda kısa bir işlemle
+yazılır.
 """
 
 from collections.abc import Iterator
@@ -12,9 +16,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.db.models import Course, Message, User
+from app.db.models import Conversation, Course, Message, User
 from app.embeddings.base import Embedder
 from app.llm.base import LLMClient, ToolCallingClient
+from app.llm.release import releasing
 from app.qa.service import answer_meta, conversation_history, get_conversation
 from app.schemas.tutor import (
     ClarificationBlock,
@@ -46,42 +51,58 @@ def turn_stream(
     checker: LLMClient | None = None,
     reranker: LLMClient | None = None,
 ) -> Iterator[TutorEvent | TurnDoneEvent]:
-    conversation = get_conversation(db, course, request.conversation_id, user.id if user else None)
-    ctx = TurnContext(
-        db=db,
-        course=course,
-        message=request.message,
-        history=conversation_history(db, conversation),
-        generator=generator,
-        checker=checker,
-        reranker=reranker,
-        user=user,
-        conversation_id=conversation.id,
-        recent_source_ids=_recent_sources(db, conversation.id),
-        video=request.video,
-        embedder=embedder,
-        general_enabled=settings.tutor_general_knowledge,
-    )
-    trace = yield from run_turn(ctx, orchestrator)
-    response = TutorTurnResponse(conversation_id=conversation.id, blocks=ctx.blocks, trace=trace)
-    meta = {
-        **_summary(ctx),
-        "tutor": True,
-        "blocks": [block.model_dump(mode="json") for block in ctx.blocks],
-        "trace": trace.model_dump(mode="json"),
-    }
-    db.add_all(
-        [
-            Message(conversation_id=conversation.id, role="user", content=request.message),
-            Message(
-                conversation_id=conversation.id,
-                role="assistant",
-                content=transcript(ctx.blocks),
-                meta=meta,
-            ),
-        ]
-    )
+    user_id = user.id if user else None
+    conversation = get_conversation(db, course, request.conversation_id, user_id)
+    created = request.conversation_id is None
+    # Yeni sohbetin kimliği akıştaki bloklara girer: kısa bir işlemle hemen yazılır, tur
+    # başarısız olursa silinir. Model çağrıları açık işlem içinde beklemez.
     db.commit()
+    try:
+        ctx = TurnContext(
+            db=db,
+            course=course,
+            message=request.message,
+            history=conversation_history(db, conversation),
+            generator=releasing(generator, db.commit),
+            checker=releasing(checker, db.commit),
+            reranker=releasing(reranker, db.commit),
+            user=user,
+            conversation_id=conversation.id,
+            recent_source_ids=_recent_sources(db, conversation.id),
+            video=request.video,
+            embedder=embedder,
+            general_enabled=settings.tutor_general_knowledge,
+        )
+        trace = yield from run_turn(ctx, releasing(orchestrator, db.commit))
+        # Sohbet tur sürerken silindiyse ConversationNotFound (mesaj yazılmaz).
+        get_conversation(db, course, conversation.id, user_id)
+        response = TutorTurnResponse(
+            conversation_id=conversation.id, blocks=ctx.blocks, trace=trace
+        )
+        meta = {
+            **_summary(ctx),
+            "tutor": True,
+            "blocks": [block.model_dump(mode="json") for block in ctx.blocks],
+            "trace": trace.model_dump(mode="json"),
+        }
+        db.add_all(
+            [
+                Message(conversation_id=conversation.id, role="user", content=request.message),
+                Message(
+                    conversation_id=conversation.id,
+                    role="assistant",
+                    content=transcript(ctx.blocks),
+                    meta=meta,
+                ),
+            ]
+        )
+        db.commit()
+    except BaseException:
+        # Hata ya da akışı okuyan istemci ayrıldı (GeneratorExit): boş yeni sohbet kalmasın.
+        db.rollback()
+        if created:
+            _discard_empty(db, conversation.id)
+        raise
     yield TurnDoneEvent(response)
 
 
@@ -101,6 +122,14 @@ def turn(
         if isinstance(event, TurnDoneEvent):
             return event.response
     raise RuntimeError("Tutor turu sonuçsuz bitti")
+
+
+def _discard_empty(db: Session, conversation_id: int) -> None:
+    """Bu turda açılmış ve mesajı olmayan sohbeti siler."""
+    conversation = db.get(Conversation, conversation_id)
+    if conversation is not None and not conversation.messages:
+        db.delete(conversation)
+        db.commit()
 
 
 def _recent_sources(db: Session, conversation_id: int, turns: int = 3) -> list[str]:
