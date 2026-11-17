@@ -44,8 +44,8 @@ export const courseService = {
     return api.materials(courseId, signal);
   },
 
-  uploadMaterial(courseId: number, type: MaterialType, file: File): Promise<DocumentOut> {
-    return api.uploadMaterial(courseId, type, file);
+  uploadMaterial(courseId: number, type: MaterialType, file: File, mediaUrl?: string): Promise<DocumentOut> {
+    return api.uploadMaterial(courseId, type, file, undefined, mediaUrl);
   },
 
   deleteMaterial(documentId: number): Promise<void> {
@@ -63,6 +63,21 @@ export const courseService = {
 
 /** Altyazısız ders videosu/sesi; sunucuda transkripsiyon açıksa yerelde yazıya çevrilir. */
 export const MEDIA_EXTENSIONS = [".mp4", ".webm", ".mkv", ".mov", ".mp3", ".m4a", ".wav"];
+
+/** Video adresi (https) doğrulaması; geçerliyse null, değilse kısa Türkçe mesaj. Boş değer "verilmedi" sayılır. */
+export function mediaUrlError(value: string): string | null {
+  const url = value.trim();
+  if (!url) return null;
+  if (/\s/.test(url)) return "Adreste boşluk olmamalı.";
+  if (url.length > 1000) return "Adres en fazla 1000 karakter olabilir.";
+  if (!/^https:\/\//i.test(url)) return "Adres https:// ile başlamalı.";
+  try {
+    if (!new URL(url).hostname) return "Geçerli bir adres gir.";
+  } catch {
+    return "Geçerli bir adres gir.";
+  }
+  return null;
+}
 
 /** Dosya adından materyal türü tahmini (yükleme sonrası değiştirilebilir hale getirilecek). */
 export function guessMaterialType(filename: string): MaterialType {

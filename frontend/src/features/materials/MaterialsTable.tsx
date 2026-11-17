@@ -13,6 +13,8 @@ export interface PendingUpload {
   key: string;
   file: File;
   type: MaterialType;
+  /** Yalnızca video dosyalarında, isteğe bağlı oynatma adresi (https). */
+  mediaUrl?: string;
   status: "processing" | "failed";
   error?: string;
 }
