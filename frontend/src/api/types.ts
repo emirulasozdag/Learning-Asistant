@@ -556,6 +556,34 @@ export interface SourceDetail {
   highlights: Highlight[];
   /** Yalnızca video: aynı içeriğin onaylı dokümanlardaki karşılıkları, en benzer önce (#19). */
   alternatives: SourceAlternative[];
+  /** Yalnızca video: parçanın aralığında ekranda olan kareler, zamana göre (#24). */
+  frames: FrameRef[];
+}
+
+/**
+ * readable: okundu · partial: okundu, güveni düşük kelimeler var · unreadable: yazı var ama
+ * okunamadı · no_text: yazı bulunmadı. Son ikisinde `text` null.
+ */
+export type FrameStatus = "readable" | "partial" | "unreadable" | "no_text";
+
+/**
+ * Ders videosundan çıkarılan kare (#24, ADR-10). Orijinal kanıt görüntü ve zamandır; `text`
+ * OCR'ın türettiği metindir, kanıt olarak alıntılanmaz.
+ */
+export interface FrameRef {
+  frame_id: number;
+  document_id: number;
+  /** Slaytın ekranda sabit kaldığı aralık ve görüntünün alındığı an (saniye). */
+  t_start: number;
+  t_end: number;
+  t_frame: number;
+  image_url: string;
+  status: FrameStatus;
+  text: string | null;
+  /** Okunan kelimelerin ortalama OCR güveni (0–1). */
+  confidence: number | null;
+  /** Metni türeten araç, ör. "tesseract/5.5.0/tur+eng". */
+  extractor: string;
 }
 
 export interface SourceAlternative {

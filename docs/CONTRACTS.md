@@ -454,6 +454,48 @@ Kurallar:
   #14 PR d ile geldi — **[ekleme]**; mevcut dokümanlar `ready` olur, mevcut video dokümanları `transcript_source = "vtt"`.
 - Davranış (VTT okuma, oynatma önceliği, `media_url`, `invalid_video`) #14 PR b+c ile geldi.
 
+### 4.1 Video kareleri ve türetilmiş metin (#24, ADR-10)
+
+**Durum:** sözleşme (bu bölüm, tablo, migration, tipler); uç noktalar `501` döner, `SourceDetail.frames` boş liste.
+Davranış #24'ün uygulama PR'ında gelir. #25 (görsel bağlam ve saklama) bu tabloyu genişletecekse burada önerir.
+
+**Kurallar.**
+- Kare yalnızca yüklenen medya dosyasından, transkripsiyon işinde, medya silinmeden önce çıkarılır
+  (`FRAME_EXTRACTION=ocr`; varsayılan `off`). `.vtt` ile yüklenen videoda kare yoktur.
+- Orijinal kanıt karenin görüntüsü (`image_url`) ve zamanıdır: `t_start`–`t_end` slaytın ekranda sabit kaldığı
+  aralık, `t_frame` görüntünün alındığı an (saniye, videonun başından; `t_start <= t_frame <= t_end`).
+- `text` OCR'ın türettiği metindir; `chunks`a girmez, `/ask` ve AI Tutor cevaplarında kanıt olarak alıntılanmaz
+  (görsel kanıt kuralları #26). Durum: `readable` (okundu), `partial` (okundu, güveni düşük kelimeler var),
+  `unreadable` (yazı var ama okunamadı), `no_text` (yazı yok). Son ikisinde `text`, `confidence`, vektör ve kelime
+  indeksi `null`; kare yine listelenir.
+- Erişim dokümanınkiyle aynıdır (§3): dersin üyesi değilse, doküman onaysızsa ya da `ready` değilse eğitmen dışındakilere
+  `404` (`document_not_found`). Başka dokümanın kare kimliği `404`.
+- Doküman silinince ya da işi başarısız olunca kareler ve görüntü dosyaları silinir.
+
+**Sözleşme.**
+
+```
+FrameStatus = "readable" | "partial" | "unreadable" | "no_text"
+FrameRef { frame_id: int, document_id: int, t_start: float, t_end: float, t_frame: float,
+           image_url: str, status: FrameStatus, text: str | null, confidence: float | null,  # 0–1
+           extractor: str }                                   # ör. "tesseract/5.5.0/tur+eng"
+SourceDetail + { frames: FrameRef[] }   # yalnızca video parçasında: aralığıyla örtüşen kareler, zamana göre
+
+GET /documents/{id}/frames                → FrameRef[]   (zamana göre; dersin üyeleri)
+GET /documents/{id}/frames/{frame_id}.png → image/png    (Cache-Control: private, no-cache)
+
+VideoFrame (ORM, tablo video_frames) { id, document_id → documents (CASCADE), course_id → courses (CASCADE),
+  ordinal: int, t_start: float, t_end: float, t_frame: float, image_path: str(500), status: str(16),
+  text: text | null, confidence: float | null, extractor: str(200), search_vector: tsvector | null,
+  embedding: vector(768) | null, embedding_model: str(200) | null, created_at }
+  UNIQUE (document_id, ordinal); CHECK status; CHECK t_start <= t_frame <= t_end
+  Index: course_id; (document_id, t_start); search_vector (GIN); embedding (HNSW, kosinüs)
+Settings.frame_extraction: "off" | "ocr"  (FRAME_EXTRACTION; docker-compose api + worker)
+```
+
+**Koddan farklar.** Hepsi **[ekleme]**: `video_frames` tablosu (migration `d6e2a9c4b1f8`), `FrameRef`,
+`SourceDetail.frames`, iki uç nokta (şimdilik `501`), `FRAME_EXTRACTION`. Mevcut alan ve davranış değişmedi.
+
 ---
 
 ## 5. Ret ve hata sonuçları
