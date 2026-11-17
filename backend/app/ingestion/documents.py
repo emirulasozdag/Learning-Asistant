@@ -1,5 +1,6 @@
 """Yüklenmiş dokümanları listeleme ve önizleme (eğitmen ekranı)."""
 
+import shutil
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -50,12 +51,30 @@ def validate_upload_fields(filename: str, title: str | None) -> None:
 
 
 def document_files(course_id: int, document_id: int, file_path: str = "") -> list[Path]:
-    """Dokümana ait diskteki dosyalar: kayıtlı dosya ve aynı kimlikle kalmış ara dosyalar
-    (işlenmeyi bekleyen medya, yarım transkript)."""
+    """Dokümana ait diskteki dosyalar: kayıtlı dosya, aynı kimlikle kalmış ara dosyalar
+    (işlenmeyi bekleyen medya, yarım transkript) ve kare görüntülerinin klasörleri (ADR-10).
+    Silmek için `remove_paths`."""
     files = set((settings.upload_dir / str(course_id)).glob(f"{document_id}.*"))
     if file_path:
         files.add(Path(file_path))
+    files.update(frame_dir(course_id, document_id, staging=staging) for staging in (False, True))
     return sorted(files)
+
+
+def frame_dir(course_id: int, document_id: int, staging: bool = False) -> Path:
+    """Dokümanın kare görüntüleri. `staging`: iş sürerken yazılan geçici klasör; sonuç
+    yazılınca asıl klasör olur."""
+    name = f"{document_id}.partial" if staging else str(document_id)
+    return settings.upload_dir / str(course_id) / "frames" / name
+
+
+def remove_paths(paths: list[Path]) -> None:
+    """Dosyaları ve klasörleri siler; olmayanları atlar."""
+    for path in paths:
+        if path.is_dir():
+            shutil.rmtree(path, ignore_errors=True)
+        else:
+            path.unlink(missing_ok=True)
 
 
 def list_documents(db: Session, course_id: int, approved_only: bool = False) -> list[DocumentOut]:

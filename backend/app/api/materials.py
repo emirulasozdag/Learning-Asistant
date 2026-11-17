@@ -3,16 +3,18 @@ from typing import Annotated, BinaryIO
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
+from sqlalchemy import select
 
 from app.api.deps import DbSession, get_course_for
 from app.api.errors import ApiError
-from app.api.not_implemented import not_implemented
 from app.auth.dependencies import AuthUser, CurrentUser, not_found_error, require_course_role
-from app.db.models import Document
+from app.db.models import Document, VideoFrame
 from app.ingestion.documents import (
     chunk_previews,
     document_files,
+    frame_dir,
     list_documents,
+    remove_paths,
     to_document_out,
     validate_upload_fields,
 )
@@ -23,6 +25,7 @@ from app.jobs.queue import request_cancel
 from app.schemas.common import Role
 from app.schemas.materials import ChunkPreview, DocumentOut, MaterialType
 from app.schemas.sources import FrameRef
+from app.sources.lookup import to_frame_ref
 
 router = APIRouter(tags=["materials"])
 
@@ -117,23 +120,42 @@ def document_chunks(document_id: int, user: AuthUser, db: DbSession) -> list[Chu
 
 @router.get("/documents/{document_id}/frames", response_model=list[FrameRef])
 def document_frames(document_id: int, user: AuthUser, db: DbSession) -> list[FrameRef]:
-    """Videodan çıkarılan kareler, zamana göre; okunamayanlar durumlarıyla birlikte (#24)."""
-    _get_document(db, user, document_id)
-    not_implemented("Video kareleri")
+    """Videodan çıkarılan kareler, zamana göre; okunamayanlar durumlarıyla birlikte (#24).
+
+    Kare çıkarılmamış dokümanda (PDF, altyazıyla yüklenen video, özellik kapalı) boş liste.
+    """
+    document = _get_document(db, user, document_id)
+    frames = db.scalars(
+        select(VideoFrame).where(VideoFrame.document_id == document.id).order_by(VideoFrame.ordinal)
+    )
+    return [to_frame_ref(frame) for frame in frames]
 
 
 @router.get("/documents/{document_id}/frames/{frame_id}.png")
 def document_frame_image(
     document_id: int, frame_id: int, user: AuthUser, db: DbSession
 ) -> FileResponse:
-    """Karenin orijinal görüntüsü (#24)."""
-    _get_document(db, user, document_id)
-    not_implemented("Video karesi görüntüsü")
+    """Karenin orijinal görüntüsü (#24). Başka dokümanın karesi ya da dosyası olmayan kare 404."""
+    document = _get_document(db, user, document_id)
+    frame = db.get(VideoFrame, frame_id)
+    image = Path(frame.image_path) if frame is not None else None
+    if (
+        frame is None
+        or frame.document_id != document.id
+        or image is None
+        or not image.is_file()
+        or not image.resolve().is_relative_to(frame_dir(document.course_id, document.id).resolve())
+    ):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Kare görüntüsü yok")
+    # Sayfa görüntüsü gibi: oturumla yetkilendirilir, tarayıcı her seferinde sunucuya sorar.
+    return FileResponse(
+        image, media_type="image/png", headers={"Cache-Control": "private, no-cache"}
+    )
 
 
 @router.delete("/documents/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_document(document_id: int, user: AuthUser, db: DbSession) -> None:
-    """Dokümanı, parçalarını, dosyalarını ve sayfa görüntülerini siler (yalnızca eğitmen).
+    """Dokümanı, parçalarını, dosyalarını, sayfa ve kare görüntülerini siler (yalnızca eğitmen).
 
     İşlenen dokümanın işi de silinir; çalışan iş sonucu yazmadan biter.
     """
@@ -141,8 +163,7 @@ def delete_document(document_id: int, user: AuthUser, db: DbSession) -> None:
     files = document_files(document.course_id, document.id, document.file_path)
     db.delete(document)
     db.commit()
-    for path in files:
-        path.unlink(missing_ok=True)
+    remove_paths(files)
     remove_cached_pages(document_id)
 
 

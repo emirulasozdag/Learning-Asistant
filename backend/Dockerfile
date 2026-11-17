@@ -7,6 +7,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /code
 
+# Video karelerindeki yazı için yerel OCR (ADR-10): Tesseract ve Türkçe/İngilizce dil paketleri.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-tur tesseract-ocr-eng \
+    && rm -rf /var/lib/apt/lists/*
+
 # Yalnızca CPU'lu torch: GPU sürümünden birkaç GB küçük; embedding için yeterli.
 RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
 

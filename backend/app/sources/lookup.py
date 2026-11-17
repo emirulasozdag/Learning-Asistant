@@ -2,11 +2,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.db.models import Chunk, Document
+from app.db.models import Chunk, Document, VideoFrame
 from app.ingestion.documents import document_media_url, file_url
 from app.ingestion.rendering import find_highlights, is_pdf
+from app.retrieval.frames import frames_overlapping
 from app.schemas.materials import MaterialType
-from app.schemas.sources import SourceAlternative, SourceDetail
+from app.schemas.sources import FrameRef, SourceAlternative, SourceDetail
 
 MAX_ALTERNATIVES = 3
 
@@ -19,7 +20,8 @@ def find_chunk(db: Session, source_id: str) -> Chunk | None:
 
 
 def source_detail(db: Session, chunk: Chunk) -> SourceDetail:
-    """Parça metni, sayfası, PDF'te sayfa görüntüsü ve işaretler; videoda doküman karşılıkları."""
+    """Parça metni, sayfası, PDF'te sayfa görüntüsü ve işaretler; videoda doküman karşılıkları
+    ve parçanın aralığında ekranda olan kareler (#24)."""
     source_id = str(chunk.id)
     document = chunk.document
     pdf = is_pdf(document) and chunk.page is not None
@@ -47,6 +49,32 @@ def source_detail(db: Session, chunk: Chunk) -> SourceDetail:
         alternatives=(
             document_alternatives(db, chunk) if document.material_type == MaterialType.VIDEO else []
         ),
+        frames=(
+            [
+                to_frame_ref(frame)
+                for frame in frames_overlapping(db, document.id, chunk.t_start, chunk.t_end)
+            ]
+            if chunk.t_start is not None and chunk.t_end is not None
+            else []
+        ),
+    )
+
+
+def to_frame_ref(frame: VideoFrame) -> FrameRef:
+    """Kare kaydı → API görünümü; görüntü dokümanın erişim kuralıyla sunulur (ADR-10)."""
+    return FrameRef(
+        frame_id=frame.id,
+        document_id=frame.document_id,
+        t_start=frame.t_start,
+        t_end=frame.t_end,
+        t_frame=frame.t_frame,
+        image_url=(
+            f"{settings.public_api_prefix}/documents/{frame.document_id}/frames/{frame.id}.png"
+        ),
+        status=frame.status,
+        text=frame.text,
+        confidence=frame.confidence,
+        extractor=frame.extractor,
     )
 
 

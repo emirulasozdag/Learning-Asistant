@@ -28,6 +28,9 @@ Birden çok `worker` aynı veritabanında güvenle çalışabilir: iş `FOR UPDA
 | İş canlılık aralığı | 15 sn | `JOB_HEARTBEAT_INTERVAL_S` | — |
 | İşin sahipsiz sayılması | 120 sn sessizlik | `JOB_STALE_AFTER_S` | Yeniden kuyruğa alınır ya da başarısız olur |
 | Kuyruk yoklama aralığı | 2 sn | `JOB_POLL_INTERVAL_S` | — |
+| Video başına kare (ADR-10) | 300 | sabit (`FrameParams.max_frames`) | Sonraki sahneler atlanır, günlüğe uyarı |
+| Kare görüntüsü genişliği | 1920 px | sabit (`FrameParams.max_image_width`) | Küçültülür |
+| Tek karenin OCR süresi | 120 sn | sabit (`ocr.TIMEOUT_S`) | Kare `unreadable` |
 
 Gövde sınırı istek okunurken uygulanır (`app/core/limits.py`): çok parçalı form uç fonksiyondan önce geçici dosyaya
 yazıldığı için sınır orada denetlenirse sınırı aşan dosya da diske yazılmış olurdu. Önde bir ters vekil (nginx vb.)
@@ -35,6 +38,17 @@ varsa onun gövde sınırı da en az medya sınırı kadar olmalı.
 
 Ölçülmemiş değerler: transkripsiyon süresi (CPU'da `large-v3-turbo` ile 1 saatlik ders "dakikalar", ölçüm yok) ve
 `worker`'ın bellek kullanımı (embedding modeli + whisper modeli). Pilot öncesi gerçek ders kaydıyla ölçülmeli.
+
+**Kare adımı (`FRAME_EXTRACTION=ocr`, ADR-10).** Transkripsiyondan sonra, medya silinmeden önce çalışır; kareler önce
+`data/uploads/<ders>/frames/<doküman>.partial/`a yazılır, sonuç yazılınca `frames/<doküman>/` olur. Kare adımı yapılamazsa
+(video çözülemedi, Tesseract yok) günlüğe uyarı yazılır ve doküman karesiz `ready` olur; iş başarısız sayılmaz. Doküman
+silinince ya da işi başarısız/iptal olunca kare klasörleri de silinir. Ölçülen: 720p sentetik slayt videosunda kare
+seçimi örnek başına ~10 ms; OCR kare başına ~1 sn (üç okuma). Kendi kayıtlarımız (PowerPoint, 1080p, `tiny`): 86 sn'lik
+Türkçe ders (5 slayt) ve 52 sn'lik İngilizce ders (5 slayt; İngilizce ve Türkçe derse ayrı ayrı yüklendi): slayt başına
+bir kare, geçişler doğru; iş ~20 sn. 72 sn'lik zor durumlar kaydı (konuşmacı kamerası açık, koyu tema, madde madde
+açılan slayt, küçük yoğun yazı, fotoğraf, 1 sn'den kısa slayt, aynı slayta dönüş): 9 kare; kamera sahneleri bölmedi,
+her madde ayrı kare, fotoğraf `no_text`, kısa slayt atlandı, dönülen slayt ayrı kare; yoğun yazıda 7 satırdan ikisinin
+ilk kelimesi eksik. Uzun gerçek ders kayıtlarında ölçülmedi.
 
 ## İş durumları
 

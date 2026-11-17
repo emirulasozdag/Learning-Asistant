@@ -179,6 +179,8 @@ def test_expired_session_is_rejected(client: TestClient, db) -> None:
         ("POST", "/ask"),
         ("GET", "/sources/1"),
         ("GET", "/documents/1/file"),
+        ("GET", "/documents/1/frames"),
+        ("GET", "/documents/1/frames/1.png"),
         ("GET", "/courses/1/materials"),
     ],
 )
@@ -438,8 +440,6 @@ def test_skeleton_routes_return_501_for_authorised_members(client_for, world) ->
     )
     review = {"target_type": "message", "target_id": 1, "decision": "approve"}
     assert instructor.post("/instructor/reviews", json=review).status_code == 501
-    assert student.get(f"/documents/{world.doc}/frames").status_code == 501
-    assert student.get(f"/documents/{world.doc}/frames/1.png").status_code == 501
 
 
 # --- 8. Yükleme beyanı ---

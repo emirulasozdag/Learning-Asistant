@@ -413,8 +413,21 @@ Kurallar:
 
 ### 4.1 Video kareleri ve türetilmiş metin (#24, ADR-10)
 
-**Durum:** sözleşme (bu bölüm, tablo, migration, tipler); uç noktalar `501` döner, `SourceDetail.frames` boş liste.
-Davranış #24'ün uygulama PR'ında gelir. #25 (görsel bağlam ve saklama) bu tabloyu genişletecekse burada önerir.
+**Durum:** koda geçti (#24): sözleşme PR #98, davranış #24'ün uygulama PR'ı. Kare seçimi `ingestion/frames.py`, OCR
+`ingestion/ocr.py`, iş adımı `ingestion/lecture_frames.py`, arama `retrieval/frames.py` (cevaplara bağlı değil).
+#25 (görsel bağlam ve saklama) bu tabloyu genişletecekse burada önerir.
+
+**Davranış.**
+- Kare: görüntü 2 sn sabit kalınca alınır (`t_frame` = sabitlik başı + 2 sn); `t_end` görüntünün değiştiği ilk örnek
+  (0,5 sn hassasiyet). Köşedeki küçük hareketli bölge (konuşmacı kamerası) karşılaştırmaya katılmaz; ekranın çeyreğinden
+  büyük hareketten kare alınmaz. Aynı slayta 10 sn içinde dönülürse yeni kare yerine önceki karenin aralığı uzar.
+- OCR: güveni 60'ın altındaki kelime (1–2 karakterlik parçada 80) metne girmez (tahmin yok); okunamayan kelime payı
+  %25'i aşarsa `partial`. Görüntü üç biçimde okunur (gri ton; siyah-beyaz ve koyu dolu kutuların içi ters çevrilmiş;
+  yarı boyut, çok büyük başlıklar için), daha çok kelimeyi güvenle okuyan seçilir; hepsinde diyagramın ince
+  çizgileri silinir. Tesseract'ın tanımadığı matematik işaretleri (Σ, üst simge) metne girmez.
+- Kare adımı yapılamazsa (video çözülemedi, Tesseract yok) doküman karesiz `ready` olur; iş başarısız sayılmaz.
+- Görüntü uç noktası yalnızca dokümanın kare klasöründeki dosyayı sunar; başka dokümanın kare kimliği ya da dosyası
+  olmayan kare `404` ("Kare görüntüsü yok"; hata zarfında `code` yok, sayfa görüntüsü gibi).
 
 **Kurallar.**
 - Kare yalnızca yüklenen medya dosyasından, transkripsiyon işinde, medya silinmeden önce çıkarılır
@@ -451,7 +464,8 @@ Settings.frame_extraction: "off" | "ocr"  (FRAME_EXTRACTION; docker-compose api 
 ```
 
 **Koddan farklar.** Hepsi **[ekleme]**: `video_frames` tablosu (migration `d6e2a9c4b1f8`), `FrameRef`,
-`SourceDetail.frames`, iki uç nokta (şimdilik `501`), `FRAME_EXTRACTION`. Mevcut alan ve davranış değişmedi.
+`SourceDetail.frames`, iki uç nokta, `FRAME_EXTRACTION` (PR #98). Uygulama PR'ı sözleşmeyi değiştirmedi; mevcut alan ve
+davranış değişmedi (`FRAME_EXTRACTION=off` iken transkripsiyon işi önceki gibidir).
 
 ---
 
