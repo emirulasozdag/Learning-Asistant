@@ -63,7 +63,10 @@ def course_activity(db: Session, course_id: int, today: date | None = None) -> C
             continue
         questions.append(
             QuestionItem(
-                question=pending.content, outcome=_outcome(meta), asked_at=pending.created_at
+                question=pending.content,
+                outcome=_outcome(meta),
+                asked_at=pending.created_at,
+                answer_message_id=message.id,
             )
         )
         askers.append(user_id)

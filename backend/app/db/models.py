@@ -251,13 +251,16 @@ class PracticeQuestion(Base):
     """Kaynak pasaja bağlı pratik sorusu (#15, #16; CONTRACTS.md §2).
 
     Kontrolden geçmeyen sorular da `status="rejected"` olarak saklanır (kabul oranı ölçümü);
-    öğrenciye yalnızca `released` sorular gösterilir. `answer_key` ve `explanation` öğrenci
-    cevap vermeden hiçbir yanıtta dönmez.
+    öğrenciye yalnızca `released` sorular gösterilir. Eğitmenin düzelttiği soru `withdrawn` olur
+    ve artık öğrenciye sunulmaz (#20); otomatik kontrolün reddettikleriyle karışmaz.
+    `answer_key` ve `explanation` öğrenci cevap vermeden hiçbir yanıtta dönmez.
     """
 
     __tablename__ = "practice_questions"
     __table_args__ = (
-        CheckConstraint("status IN ('released', 'rejected')", name="ck_practice_status"),
+        CheckConstraint(
+            "status IN ('released', 'rejected', 'withdrawn')", name="ck_practice_status"
+        ),
         Index("ix_practice_questions_course_id", "course_id"),
     )
 
@@ -352,3 +355,42 @@ class PracticeAttempt(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     question: Mapped[PracticeQuestion] = relationship(foreign_keys=[question_id])
+
+
+class InstructorReview(Base):
+    """Eğitmenin bir asistan cevabını ya da pratik sorusunu onayı / düzeltmesi (#20, FR-16).
+
+    Her karar ayrı satırdır (geçmiş korunur); hedef silinince kararı da silinir. Asistan cevabı
+    yalnızca araştırma kaydını açmış bir öğrencinin sohbetindeyse incelenebilir (ADR-4).
+    """
+
+    __tablename__ = "instructor_reviews"
+    __table_args__ = (
+        CheckConstraint(
+            "target_type IN ('message', 'practice_item')", name="ck_instructor_reviews_target_type"
+        ),
+        CheckConstraint(
+            "decision IN ('approve', 'correct')", name="ck_instructor_reviews_decision"
+        ),
+        CheckConstraint(
+            "(target_type = 'message' AND message_id IS NOT NULL AND question_id IS NULL)"
+            " OR (target_type = 'practice_item' AND question_id IS NOT NULL"
+            " AND message_id IS NULL)",
+            name="ck_instructor_reviews_one_target",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    course_id: Mapped[int] = mapped_column(ForeignKey("courses.id", ondelete="CASCADE"), index=True)
+    target_type: Mapped[str] = mapped_column(String(16))
+    message_id: Mapped[int | None] = mapped_column(
+        ForeignKey("messages.id", ondelete="CASCADE"), index=True
+    )
+    question_id: Mapped[int | None] = mapped_column(
+        ForeignKey("practice_questions.id", ondelete="CASCADE"), index=True
+    )
+    decision: Mapped[str] = mapped_column(String(16))
+    correction: Mapped[str | None] = mapped_column(Text)
+    # İnceleyen eğitmen; hesabı silinirse karar kalır, kişi boşalır.
+    reviewer_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

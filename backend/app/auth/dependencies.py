@@ -24,6 +24,7 @@ _NOT_FOUND_DETAIL: dict[ErrorCode, str] = {
     "source_not_found": "Kaynak bulunamadı",
     "conversation_not_found": "Sohbet bulunamadı",
     "practice_item_not_found": "Pratik sorusu bulunamadı",
+    "message_not_found": "Cevap bulunamadı",
 }
 
 

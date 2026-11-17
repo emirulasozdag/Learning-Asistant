@@ -1,6 +1,6 @@
-"""İskelet endpoint'lerinin var olduğunu ve yetki denetiminin 501'den önce geldiğini doğrular.
+"""Korunan endpoint'lerin oturumsuz isteği 401 ile reddettiğini doğrular (veritabanı gerekmez).
 
-Oturumsuz istek 401 alır (veritabanı gerekmez); yetkili üyenin 501 aldığı test_access.py'de.
+Yetkili üyenin hâlâ 501 aldığı iskelet uçlar test_access.py'de.
 Bir özellik uygulandığında ilgili satır buradan kaldırılıp gerçek testine taşınır.
 """
 
