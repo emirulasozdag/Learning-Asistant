@@ -305,6 +305,9 @@ export const api = {
   documentChunks: (documentId: number) =>
     request<ChunkPreview[]>(`/documents/${documentId}/chunks`),
 
+  cancelDocument: (documentId: number) =>
+    request<DocumentOut>(`/documents/${documentId}/cancel`, { method: "POST" }),
+
   deleteDocument: async (documentId: number) => {
     const response = await send(`${BASE}/documents/${documentId}`, { method: "DELETE" });
     if (!response.ok) throw await httpError(response);

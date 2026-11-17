@@ -52,6 +52,10 @@ export const courseService = {
     return api.deleteDocument(documentId);
   },
 
+  cancelMaterial(documentId: number): Promise<DocumentOut> {
+    return api.cancelDocument(documentId);
+  },
+
   chunks(documentId: number) {
     return api.documentChunks(documentId);
   },
