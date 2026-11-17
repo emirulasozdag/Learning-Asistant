@@ -2,8 +2,8 @@
 
 Sprint 1: Course, Document, Chunk, Conversation, Message. #11: User, AuthSession, Enrollment
 (DECISIONS.md ADR-1, 2, 4). #15: PracticeQuestion, PracticeRubric, PracticeAttempt. #21:
-ProcessingJob (ADR-9). Kalan varlıklar (ClaimCheck, InstructorReview, ...) ilgili özelliklerle
-eklenecek — docs/ANALYSIS.md §8.
+ProcessingJob (ADR-9). #24: VideoFrame (ADR-10). Kalan varlıklar (ClaimCheck, InstructorReview,
+...) ilgili özelliklerle eklenecek — docs/ANALYSIS.md §8.
 
 Model değişince: `alembic revision --autogenerate -m "açıklama"`.
 """
@@ -172,6 +172,61 @@ class Chunk(Base):
     embedding_model: Mapped[str | None] = mapped_column(String(200))
 
     document: Mapped[Document] = relationship(back_populates="chunks")
+
+
+class VideoFrame(Base):
+    """Ders videosundan çıkarılan kare ve ondan türetilen metin (#24, ADR-10).
+
+    Orijinal kanıt karenin kendisidir: görüntü dosyası (`image_path`) ve slaytın ekranda sabit
+    kaldığı aralık (`t_start`–`t_end`, videonun başından saniye). `text` OCR'ın türettiği metindir;
+    `chunks`a girmez, kendi vektörü ve kelime indeksiyle ayrı aranır. Okunamayan (`unreadable`)
+    ve yazısız (`no_text`) karelerde `text`, vektör ve kelime indeksi boştur; kare yine saklanır.
+    Doküman silinince kareler de silinir.
+    """
+
+    __tablename__ = "video_frames"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('readable', 'partial', 'unreadable', 'no_text')",
+            name="ck_video_frames_status",
+        ),
+        CheckConstraint(
+            "t_start <= t_frame AND t_frame <= t_end", name="ck_video_frames_time_order"
+        ),
+        UniqueConstraint("document_id", "ordinal", name="uq_video_frames_document_ordinal"),
+        Index("ix_video_frames_course_id", "course_id"),
+        Index("ix_video_frames_document_id_t_start", "document_id", "t_start"),
+        Index("ix_video_frames_search_vector", "search_vector", postgresql_using="gin"),
+        Index(
+            "ix_video_frames_embedding_hnsw",
+            "embedding",
+            postgresql_using="hnsw",
+            postgresql_ops={"embedding": "vector_cosine_ops"},
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    document_id: Mapped[int] = mapped_column(ForeignKey("documents.id", ondelete="CASCADE"))
+    # Ders izolasyonu için tekrar tutulur (Chunk gibi): arama bu sütunla filtrelenir.
+    course_id: Mapped[int] = mapped_column(ForeignKey("courses.id", ondelete="CASCADE"))
+    # Videodaki sıra (0'dan, zamana göre).
+    ordinal: Mapped[int]
+    # Slaytın ekranda sabit kaldığı aralık ve görüntünün alındığı an (saniye).
+    t_start: Mapped[float]
+    t_end: Mapped[float]
+    t_frame: Mapped[float]
+    image_path: Mapped[str] = mapped_column(String(500))
+    # readable | partial (okundu, güveni düşük kelimeler var) | unreadable | no_text
+    status: Mapped[str] = mapped_column(String(16))
+    text: Mapped[str | None] = mapped_column(Text)
+    # Okunan kelimelerin ortalama OCR güveni (0–1); yazı bulunmadıysa boş.
+    confidence: Mapped[float | None]
+    # Metni türeten araç ve ayarı, ör. "tesseract/5.5.0/tur+eng".
+    extractor: Mapped[str] = mapped_column(String(200))
+    search_vector: Mapped[str | None] = mapped_column(TSVECTOR)
+    embedding: Mapped[list[float] | None] = mapped_column(Vector(EMBEDDING_DIM))
+    embedding_model: Mapped[str | None] = mapped_column(String(200))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class ProcessingJob(Base):

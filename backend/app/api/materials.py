@@ -6,6 +6,7 @@ from fastapi.responses import FileResponse
 
 from app.api.deps import DbSession, get_course_for
 from app.api.errors import ApiError
+from app.api.not_implemented import not_implemented
 from app.auth.dependencies import AuthUser, CurrentUser, not_found_error, require_course_role
 from app.db.models import Document
 from app.ingestion.documents import (
@@ -21,6 +22,7 @@ from app.ingestion.rendering import page_image_path, remove_cached_pages
 from app.jobs.queue import request_cancel
 from app.schemas.common import Role
 from app.schemas.materials import ChunkPreview, DocumentOut, MaterialType
+from app.schemas.sources import FrameRef
 
 router = APIRouter(tags=["materials"])
 
@@ -111,6 +113,22 @@ def list_materials(course_id: int, user: AuthUser, db: DbSession) -> list[Docume
 def document_chunks(document_id: int, user: AuthUser, db: DbSession) -> list[ChunkPreview]:
     """Sistemin dokümandan çıkardığı parçalar (sayfa numaralarıyla)."""
     return chunk_previews(_get_document(db, user, document_id))
+
+
+@router.get("/documents/{document_id}/frames", response_model=list[FrameRef])
+def document_frames(document_id: int, user: AuthUser, db: DbSession) -> list[FrameRef]:
+    """Videodan çıkarılan kareler, zamana göre; okunamayanlar durumlarıyla birlikte (#24)."""
+    _get_document(db, user, document_id)
+    not_implemented("Video kareleri")
+
+
+@router.get("/documents/{document_id}/frames/{frame_id}.png")
+def document_frame_image(
+    document_id: int, frame_id: int, user: AuthUser, db: DbSession
+) -> FileResponse:
+    """Karenin orijinal görüntüsü (#24)."""
+    _get_document(db, user, document_id)
+    not_implemented("Video karesi görüntüsü")
 
 
 @router.delete("/documents/{document_id}", status_code=status.HTTP_204_NO_CONTENT)

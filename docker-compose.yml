@@ -38,6 +38,8 @@ services:
       # Boş = transkripsiyon kapalı (video için .vtt yüklenir). Örn. large-v3-turbo; model ilk
       # açılışta indirilir (download_models), sonrası internetsiz çalışır.
       TRANSCRIPTION_MODEL: ${TRANSCRIPTION_MODEL:-}
+      # off = kapalı; ocr = medya yüklemesinde slayt karelerini çıkar ve yerel OCR ile oku (ADR-10).
+      FRAME_EXTRACTION: ${FRAME_EXTRACTION:-off}
       RETRIEVAL_MIN_SIMILARITY: ${RETRIEVAL_MIN_SIMILARITY:-0.78}
       RETRIEVAL_MIN_KEYWORD_COVERAGE: ${RETRIEVAL_MIN_KEYWORD_COVERAGE:-0.5}
       RETRIEVAL_FOLLOW_UP_MIN_SIMILARITY: ${RETRIEVAL_FOLLOW_UP_MIN_SIMILARITY:-0.77}
@@ -88,6 +90,7 @@ services:
       EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-e5}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-intfloat/multilingual-e5-base}
       TRANSCRIPTION_MODEL: ${TRANSCRIPTION_MODEL:-}
+      FRAME_EXTRACTION: ${FRAME_EXTRACTION:-off}
       JOB_MAX_ATTEMPTS: ${JOB_MAX_ATTEMPTS:-2}
       # Modelleri `api` indirir; çalıştırıcı önbellekten kullanır.
       HF_HUB_OFFLINE: "1"
