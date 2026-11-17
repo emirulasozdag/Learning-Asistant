@@ -305,18 +305,23 @@ export const api = {
   documentChunks: (documentId: number) =>
     request<ChunkPreview[]>(`/documents/${documentId}/chunks`),
 
+  cancelDocument: (documentId: number) =>
+    request<DocumentOut>(`/documents/${documentId}/cancel`, { method: "POST" }),
+
   deleteDocument: async (documentId: number) => {
     const response = await send(`${BASE}/documents/${documentId}`, { method: "DELETE" });
     if (!response.ok) throw await httpError(response);
   },
 
-  uploadMaterial: (courseId: number, materialType: MaterialType, file: File, title?: string) => {
+  uploadMaterial: (courseId: number, materialType: MaterialType, file: File, title?: string, mediaUrl?: string) => {
     const form = new FormData();
     form.append("material_type", materialType);
     form.append("file", file);
     // ADR-3: eğitmen dosyanın bu ders için onaylı materyal olduğunu beyan eder (formda işaretlenir).
     form.append("declaration", "true");
     if (title) form.append("title", title);
+    // Yalnızca video yüklemelerinde ve doluysa gönderilir; backend başka dosyada 422 verir.
+    if (mediaUrl) form.append("media_url", mediaUrl);
     return request<DocumentOut>(`/courses/${courseId}/materials`, { method: "POST", body: form });
   },
 };

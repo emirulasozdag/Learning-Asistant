@@ -9,6 +9,7 @@ import EmptyState from "../../ui/EmptyState";
 import IconButton from "../../ui/IconButton";
 import Skeleton from "../../ui/Skeleton";
 import PageImage from "./PageImage";
+import SourceAlternatives from "./SourceAlternatives";
 import { useSourceDetail } from "./useSourceDetail";
 
 /**
@@ -19,10 +20,13 @@ import { useSourceDetail } from "./useSourceDetail";
 export default function SourcePanel({
   sourceId,
   onClose,
+  onSelectSource,
   modal = false,
 }: {
   sourceId: string;
   onClose: () => void;
+  /** Video alıntısının doküman karşılığı seçilince aynı panelde açılır. */
+  onSelectSource?: (sourceId: string) => void;
   modal?: boolean;
 }) {
   const { source: current, failure, retry } = useSourceDetail(sourceId);
@@ -120,6 +124,9 @@ export default function SourcePanel({
               </span>
             </p>
           </Sheet>
+        )}
+        {current && isVideo && onSelectSource && (
+          <SourceAlternatives alternatives={current.alternatives} onSelect={onSelectSource} />
         )}
       </div>
     </Root>

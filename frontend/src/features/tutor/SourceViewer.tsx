@@ -11,7 +11,15 @@ const FOCUSABLE =
  * diyalog olarak açılır; ikisi aynı anda render edilmez. Kapanınca odak, paneli açan
  * düğmeye (o artık yoksa soru alanına) geri döner.
  */
-export default function SourceViewer({ sourceId, onClose }: { sourceId: string; onClose: () => void }) {
+export default function SourceViewer({
+  sourceId,
+  onClose,
+  onSelectSource,
+}: {
+  sourceId: string;
+  onClose: () => void;
+  onSelectSource?: (sourceId: string) => void;
+}) {
   const desktop = useIsDesktop();
   // Render sırasında okunur: alt bileşenlerin efektleri odağı panele taşımadan önce.
   const [opener] = useState(() => document.activeElement as HTMLElement | null);
@@ -31,13 +39,13 @@ export default function SourceViewer({ sourceId, onClose }: { sourceId: string; 
   if (desktop) {
     return (
       <div className="w-[min(46%,560px)] shrink-0 border-l border-line">
-        <SourcePanel key={sourceId} sourceId={sourceId} onClose={onClose} />
+        <SourcePanel key={sourceId} sourceId={sourceId} onClose={onClose} onSelectSource={onSelectSource} />
       </div>
     );
   }
   return (
     <ModalFrame onClose={onClose}>
-      <SourcePanel key={sourceId} sourceId={sourceId} onClose={onClose} modal />
+      <SourcePanel key={sourceId} sourceId={sourceId} onClose={onClose} onSelectSource={onSelectSource} modal />
     </ModalFrame>
   );
 }
