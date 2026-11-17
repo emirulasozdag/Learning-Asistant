@@ -15,7 +15,7 @@ from app.auth.passwords import (
     verify_password,
 )
 from app.core.config import settings
-from app.db.models import Conversation, Enrollment, User
+from app.db.models import Conversation, Enrollment, PracticeAttempt, User
 from app.schemas.auth import Consent, ConsentUpdate, Me, Membership, RegisterRequest, UserOut
 
 _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -114,8 +114,10 @@ def update_consent(db: Session, user: User, data: ConsentUpdate) -> Consent:
 
 
 def delete_my_data(db: Session, user: User) -> None:
-    """Verilerimi sil (ADR-4): kullanıcının bütün sohbetleri ve mesajları silinir."""
+    """Verilerimi sil (ADR-4): kullanıcının bütün sohbetleri, mesajları ve pratik cevapları
+    (öğrenme kaydı) silinir. Ürettirdiği sorular dersin malıdır, kalır."""
     db.execute(delete(Conversation).where(Conversation.user_id == user.id))
+    db.execute(delete(PracticeAttempt).where(PracticeAttempt.user_id == user.id))
     db.commit()
 
 

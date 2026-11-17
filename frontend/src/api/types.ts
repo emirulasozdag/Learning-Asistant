@@ -16,6 +16,8 @@ export type ErrorCode =
   | "no_valid_item"
   // Pratik sorusu yok, kontrolden geçmemiş ya da kullanıcı dersin üyesi değil.
   | "practice_item_not_found"
+  // İncelenecek asistan cevabı yok ya da eğitmen onu göremez (#20).
+  | "message_not_found"
   | "invalid_video"
   | "not_authenticated"
   | "insufficient_role"
@@ -265,9 +267,37 @@ export interface AnswerFeedback {
   criteria: { description: string; awarded: number; points: number; rationale: string }[];
 }
 
+/** Öğrencinin kendi öğrenme kaydı (#20): yalnızca araştırma kaydı açıkken yapılan denemeler. */
 export interface LearningRecord {
   course_id: number;
-  attempts: { item_id: number; concept: string | null; score: number; max_score: number }[];
+  /** Araştırma kaydı şu an açık mı; kapalıysa yeni denemeler kayda yazılmaz. */
+  logging_enabled: boolean;
+  attempts: AttemptSummary[];
+  concepts: ConceptProgress[];
+}
+
+export interface AttemptSummary {
+  item_id: number;
+  attempt_id: number;
+  type: PracticeType;
+  concept: string | null;
+  score: number;
+  max_score: number;
+  missing_concepts: string[];
+  attempted_at: string;
+  /** Soru sonradan eğitmen tarafından geri çekildi. */
+  withdrawn: boolean;
+}
+
+export interface ConceptProgress {
+  concept: string;
+  attempts: number;
+  /** 0..1 */
+  last_score_ratio: number;
+  best_score_ratio: number;
+  /** Son denemede hâlâ eksik görünen kavramlar. */
+  open_gaps: string[];
+  source: Citation | null;
 }
 
 /** Dersin soru-cevap etkinliği (eğitmen): kayıtlı mesajlardan hesaplanır, anonim. */
@@ -291,12 +321,18 @@ export interface QuestionItem {
   question: string;
   outcome: AskOutcome;
   asked_at: string;
+  /** Asistanın cevabı: eğitmen onayı/düzeltmesi için hedef (#20). */
+  answer_message_id: number | null;
 }
 
+/** Sınıfın sık hatası (#20): anonim, en az üç öğrencide görülenler. */
 export interface MistakeSummary {
   concept: string;
-  error_type: string;
+  error_type: "wrong_option" | "missing_concept";
+  /** Hatanın görüldüğü deneme sayısı. */
   count: number;
+  /** Hatayı yapan farklı öğrenci sayısı. */
+  students: number;
   fixing_source_ids: string[];
 }
 
@@ -304,7 +340,17 @@ export interface ReviewDecision {
   target_type: "message" | "practice_item";
   target_id: number;
   decision: "approve" | "correct";
+  /** "correct" kararında zorunlu. */
   correction?: string | null;
+}
+
+export interface ReviewOut {
+  id: number;
+  target_type: "message" | "practice_item";
+  target_id: number;
+  decision: "approve" | "correct";
+  correction: string | null;
+  created_at: string;
 }
 
 export type CourseLevel = "undergraduate" | "graduate";

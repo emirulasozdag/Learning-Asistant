@@ -24,6 +24,7 @@ import type {
   PracticeRequest,
   RegisterRequest,
   ReviewDecision,
+  ReviewOut,
   Rubric,
   RubricIn,
   SourceDetail,
@@ -289,7 +290,7 @@ export const api = {
     request<MistakeSummary[]>(`/instructor/courses/${courseId}/mistakes`),
 
   submitReview: (body: ReviewDecision) =>
-    request<void>("/instructor/reviews", { method: "POST", body: JSON.stringify(body) }),
+    request<ReviewOut>("/instructor/reviews", { method: "POST", body: JSON.stringify(body) }),
 
   rubrics: (courseId: number) => request<Rubric[]>(`/instructor/courses/${courseId}/rubrics`),
 
