@@ -1,7 +1,7 @@
 """instructor reviews and withdrawn practice questions (#20)
 
 Revision ID: c8e5a1f7d3b9
-Revises: b3d8e1f4a2c7
+Revises: d6e2a9c4b1f8
 Create Date: 2026-11-17 23:30:00
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = "c8e5a1f7d3b9"
-down_revision: Union[str, Sequence[str], None] = "b3d8e1f4a2c7"
+down_revision: Union[str, Sequence[str], None] = "d6e2a9c4b1f8"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
