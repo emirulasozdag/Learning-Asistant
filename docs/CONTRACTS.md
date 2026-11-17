@@ -161,6 +161,48 @@ Hata davranışı: kontrolden geçen bir item üretilemezse `422 {code: "no_vali
 - `PracticeItem.course_id`, `difficulty` zorunlu (`topic` boş olabilir) — aynı şekilde üretici #16'dır.
 - Frontend: `mock/practice.ts` PR #68'de silindi; #17 `types.ts` tiplerini kullanır.
 
+### 2.1 Öğrenme kaydı, sık hatalar, eğitmen kararı (#20, koda geçti)
+
+Hepsi saklı pratik denemelerinden (`practice_attempts`) hesaplanır; örnek veri yoktur. ADR-4: kayda ve
+analitiğe yalnızca araştırma kaydı açıkken yapılan denemeler (`research_logged`) girer.
+
+```
+GET /courses/{id}/learning-record         (dersin her üyesi; yalnızca kendi kaydı)
+LearningRecord {
+  course_id: int,
+  logging_enabled: bool,                  # araştırma kaydı şu an açık mı
+  attempts: [AttemptSummary {item_id, attempt_id, type, concept, score, max_score,
+                             missing_concepts: list[str], attempted_at, withdrawn: bool}],   # en yeni önce, ≤200
+  concepts: [ConceptProgress {concept, attempts, last_score_ratio, best_score_ratio,           # oranlar 0..1
+                              open_gaps: list[str], source: Citation | null}]                  # eksiği olan önce
+}
+
+GET /instructor/courses/{id}/mistakes     (instructor | ta)
+[MistakeSummary {concept, error_type: "wrong_option" | "missing_concept",
+                 count, students, fixing_source_ids: list[str]}]        # en az 3 farklı öğrenci; ≤20
+
+POST /instructor/reviews                  (hedefin dersinde instructor)
+ReviewDecision {target_type: "message" | "practice_item", target_id, decision: "approve" | "correct",
+                correction: str | null}  # "correct" için zorunlu, ≤4000
+→ ReviewOut {id, target_type, target_id, decision, correction, created_at}
+```
+
+- Sık hata kaynağı değerlendiricinin `missing_concepts` çıktısıdır: MCQ'da yanlış şık sorunun kavramını,
+  açık uçluda her eksik kavramı sayar. Kavramlar büyük/küçük harf ve boşluk farkı yok sayılarak birleşir.
+  Deneme anında **ve** şu an araştırma kaydı açık, derste `student` olanlar sayılır.
+- `practice_item` + `correct` → soru `status="withdrawn"` (yeni durum; öğrenciye sunulmaz, cevap ucu 404),
+  rubrik onayı kalkar. `approve` → soru `released`, rubrik `approved=True` (onaylayan ve zaman yazılır).
+  Otomatik kontrolün reddettiği (`rejected`) sorular inceleme hedefi değildir (404).
+- `message` hedefi yalnızca araştırma kaydını açmış bir öğrencinin sohbetindeki **asistan** mesajı olabilir;
+  değilse `404 message_not_found`. Hedefin kimliği `CourseActivity.*_questions[].answer_message_id` ile gelir.
+- Yetki: hedef yoksa ya da kullanıcı hedefin dersine üye değilse aynı 404; üye ama eğitmen değilse (öğrenci, TA)
+  `403 insufficient_role`. Her karar ayrı satırdır (`instructor_reviews`), son karar geçerlidir.
+- `DELETE /me/data` pratik denemelerini de siler (öğrenme kaydı boşalır); kullanıcının ürettirdiği sorular dersin
+  malıdır, kalır.
+- **Koddan farklar.** `MistakeSummary.error_type` serbest metinden sabit değerlere daraldı ve `students` eklendi;
+  `LearningRecord.attempts[]` alanları genişledi; `submitReview` artık `ReviewOut` döner. Önceki tüketici yoktu
+  (uçlar `501` dönüyordu); `frontend/src/api/types.ts` güncellendi, ekranlar #22'de.
+
 ---
 
 ## 3. Kullanıcı ve ders bağlamı
@@ -179,8 +221,9 @@ sütunu #12'ye kadar geçerlidir.
   yalnızca üye olunan dersler, `CourseSummary.role` zorunlu. Oturum: httpOnly `la_session` çerezi (SameSite=Lax),
   sunucuda yalnızca belirteç özeti; durum değiştiren istekte `Origin` başlığı izinli kökenlerden biri olmalı (CSRF).
 - Yetki: §3 kuralları bütün ders kapsamlı endpoint'lerde uygulanır; 501 iskeletleri de önce yetki denetler.
-  Yükleme, doküman silme, ders düzenleme, katılım kodu, rubrik girişi: `instructor`. Etkinlik, sık hatalar,
-  rubrik listesi: `instructor | ta`. Okuma ve soru: dersin her üyesi.
+  Yükleme, doküman silme, ders düzenleme, katılım kodu, rubrik girişi, cevap/soru onayı ve düzeltmesi (#20):
+  `instructor`. Etkinlik, sık hatalar, rubrik listesi: `instructor | ta`. Okuma, soru ve kendi öğrenme kaydı:
+  dersin her üyesi.
 - `Consent`: `consented_at == null` ⇔ aydınlatma metni kabul edilmedi (`policy_version` boş metin). `PUT /me/consent`
   yalnızca sunucunun güncel sürümünü (`PRIVACY_POLICY_VERSION`) kabul eder, değilse `422 validation_error`.
   Güncel sürüm kabul edilmeden `/ask`, `/ask/stream`, `/practice` → `403 consent_required`.

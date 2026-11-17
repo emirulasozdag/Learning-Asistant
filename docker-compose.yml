@@ -30,6 +30,19 @@ services:
       LLM_BASE_URL: ${LLM_BASE_URL:-https://openrouter.ai/api/v1}
       LLM_CHECKER_MODEL: ${LLM_CHECKER_MODEL:-}
       LLM_CHECKER_THINKING_LEVEL: ${LLM_CHECKER_THINKING_LEVEL:-low}
+      # Öğrenci cevaplarının değerlendirmesi: hosted | local (ADR-5, ADR-8). local için yerel model.
+      LLM_STUDENT_WORK_ROUTE: ${LLM_STUDENT_WORK_ROUTE:-hosted}
+      LLM_LOCAL_BASE_URL: ${LLM_LOCAL_BASE_URL:-}
+      LLM_LOCAL_MODEL: ${LLM_LOCAL_MODEL:-}
+      # İddia kontrolü (#10, ADR-8): required = judge yoksa LLM cevabı yerine alıntı gösterilir;
+      # off yalnızca yerel geliştirme içindir. Judge üreticiden farklı model ailesinden olmalı.
+      CLAIM_CHECK: ${CLAIM_CHECK:-required}
+      JUDGE_PROVIDER: ${JUDGE_PROVIDER:-}
+      JUDGE_MODEL: ${JUDGE_MODEL:-}
+      JUDGE_API_KEY: ${JUDGE_API_KEY:-}
+      JUDGE_BASE_URL: ${JUDGE_BASE_URL:-https://openrouter.ai/api/v1}
+      # Yükleme dışındaki isteklerin gövde sınırı (bayt).
+      MAX_REQUEST_BYTES: ${MAX_REQUEST_BYTES:-2097152}
       TUTOR_GENERAL_KNOWLEDGE: ${TUTOR_GENERAL_KNOWLEDGE:-false}
       TUTOR_RERANK_CANDIDATES: ${TUTOR_RERANK_CANDIDATES:-20}
       TUTOR_RERANK_KEEP: ${TUTOR_RERANK_KEEP:-6}

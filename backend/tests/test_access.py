@@ -430,16 +430,12 @@ def test_ta_sees_activity_but_cannot_write_rubrics(client_for, world) -> None:
 
 def test_skeleton_routes_return_501_for_authorised_members(client_for, world) -> None:
     course_id = world.course.id
-    student, instructor = client_for(world.student), client_for(world.instructor)
+    instructor = client_for(world.instructor)
 
-    assert student.get(f"/courses/{course_id}/learning-record").status_code == 501
-    assert instructor.get(f"/instructor/courses/{course_id}/mistakes").status_code == 501
     assert instructor.get(f"/instructor/courses/{course_id}/rubrics").status_code == 501
     assert (
         instructor.post(f"/instructor/courses/{course_id}/rubrics", json=RUBRIC).status_code == 501
     )
-    review = {"target_type": "message", "target_id": 1, "decision": "approve"}
-    assert instructor.post("/instructor/reviews", json=review).status_code == 501
 
 
 # --- 8. Yükleme beyanı ---
