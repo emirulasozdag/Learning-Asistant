@@ -40,10 +40,11 @@ test("dar ekran menüsü: ürün adı görünür, Escape kapatır @dar-ekran", a
 
 test("izlence yüklenemezse tekrar denenir; her sayfada tek h1 var", async ({ page }) => {
   const algorithms = course("A");
+  // "Tekrar dene"ye basılana kadar her istek başarısız: geliştirme modunda React isteği iki kez
+  // atıp ilkini iptal eder; tek seferlik bir hata o iptal edilen isteğe gidebilir.
   let fail = true;
   await page.route(`**/api/courses/${algorithms.id}/outline`, async (route) => {
     if (fail) {
-      fail = false;
       await route.fulfill({ status: 500, body: "" });
       return;
     }
@@ -52,6 +53,7 @@ test("izlence yüklenemezse tekrar denenir; her sayfada tek h1 var", async ({ pa
 
   await page.goto(`/student/courses/${algorithms.id}/syllabus`);
   await expect(page.getByText("İzlence yüklenemedi")).toBeVisible();
+  fail = false;
   await page.getByRole("button", { name: "Tekrar dene" }).click();
   await expect(page.getByText("İzlence yüklenemedi")).toHaveCount(0);
 

@@ -30,7 +30,9 @@ export type ErrorCode =
   | "not_implemented"
   | "validation_error"
   // İptal edilecek süren bir işlem yok (doküman hazır ya da başarısız).
-  | "document_not_processing";
+  | "document_not_processing"
+  // Bu dokümana slayt karesi için video eklenemez; `detail` nedeni söyler (#27).
+  | "frames_unavailable";
 
 /** Hata zarfı: `detail` kullanıcıya gösterilebilir metin, `code` programın kullandığı sabit. */
 export interface ApiErrorBody {
@@ -562,6 +564,9 @@ export interface DocumentOut {
   /** Video: "vtt" (yüklenen altyazı) | "asr" (yerel transkripsiyon); asr için model kimliği. */
   transcript_source: "vtt" | "asr" | null;
   transcript_model: string | null;
+  /** Video: çıkarılmış slayt karesi sayısı ve kare işi sürüyor mu (#27). */
+  frame_count?: number;
+  frames_processing?: boolean;
   /** Yalnızca yükleme cevabında: hattın adım adım özeti. */
   report: IngestionReport | null;
 }

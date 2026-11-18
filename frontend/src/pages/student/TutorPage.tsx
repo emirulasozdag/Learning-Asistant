@@ -39,6 +39,8 @@ import { answerOf, entryState } from "../../features/tutor/turns";
 import TurnExtras from "../../features/tutor/TutorTurnView";
 import type { Segment, TutorTurn } from "../../features/tutor/types";
 import { useIsDesktop } from "../../features/tutor/useIsDesktop";
+import FrameAtMoment from "../../features/video/FrameAtMoment";
+import { useFrames } from "../../features/video/frames";
 import LecturePlayer, { type PlayerHandle } from "../../features/video/LecturePlayer";
 import VideoMomentNote from "../../features/video/VideoMomentNote";
 import { describeTotals, documentExtent, materialLabel, materialTotals } from "../../labels";
@@ -115,6 +117,9 @@ function TutorSession({ course }: { course: Course }) {
   const startParam = Math.max(0, Number(searchParams.get("t")) || 0);
   const videoDoc = playableVideo(materials, videoParam);
   const [videoTime, setVideoTime] = useState(startParam);
+  // Her sorunun hangi videonun hangi anında sorulduğu: cevabın üstünde o andaki kare (#27).
+  const [askedAt, setAskedAt] = useState<Record<string, { documentId: number; seconds: number }>>({});
+  const frames = useFrames(videoDoc?.id ?? null);
   // Oynatıcı boyutu: soru yokken büyük; ilk sorudan sonra küçük (öğrenci değiştirebilir).
   const [playerSize, setPlayerSize] = useState<"auto" | "large" | "small">("auto");
 
@@ -219,6 +224,7 @@ function TutorSession({ course }: { course: Course }) {
       const video = videoDoc
         ? { document_id: videoDoc.id, time_s: Math.floor(playerRef.current?.currentTime() ?? 0) }
         : null;
+      if (video) setAskedAt((map) => ({ ...map, [id]: { documentId: video.document_id, seconds: video.time_s } }));
       await tutorService.turn(
         courseId,
         text,
@@ -302,6 +308,8 @@ function TutorSession({ course }: { course: Course }) {
           sourceOverride: !structured && desktop ? (activeAnswer?.response?.citations[0]?.source_id ?? null) : null,
         };
   const response = activeAnswer?.response;
+  const activeAskedAt = activeTurn ? askedAt[activeTurn.id] : undefined;
+  const pausedAt = videoDoc && activeAskedAt?.documentId === videoDoc.id ? activeAskedAt.seconds : null;
   const selectedClaim = structured?.claims.find((claim) => claim.number === current.claim) ?? null;
   const claimSource = selectedClaim
     ? response?.citations[(selectedClaim.citations[0] ?? 0) - 1]?.source_id
@@ -491,6 +499,15 @@ function TutorSession({ course }: { course: Course }) {
               />
             ) : (
               <div className="flex flex-col gap-6">
+                {pausedAt != null && videoDoc && (
+                  <FrameAtMoment
+                    frames={frames}
+                    seconds={pausedAt}
+                    heading="Durdurduğun anda ekranda"
+                    onSeek={(seconds) => playAt(videoDoc.id, seconds)}
+                    className="max-w-md self-start"
+                  />
+                )}
                 {response?.video_moment && (
                   <VideoMomentNote
                     moment={response.video_moment}

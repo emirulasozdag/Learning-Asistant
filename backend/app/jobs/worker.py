@@ -15,11 +15,12 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.embeddings.base import Embedder
-from app.ingestion.media import transcription_job
+from app.ingestion.media import frames_job, transcription_job
 from app.ingestion.transcribe import Transcriber, TranscriptionError, get_transcriber
 from app.ingestion.types import IngestionError
 from app.jobs.queue import (
     CANCELLED_MESSAGE,
+    FRAMES,
     TRANSCRIPTION,
     ClaimedJob,
     JobCancelled,
@@ -114,11 +115,14 @@ def _run(
     embedder: Embedder | None,
 ) -> str:
     try:
-        if job.kind != TRANSCRIPTION:
+        if job.kind == FRAMES:
+            frames_job(session_factory, job, should_stop, embedder)
+        elif job.kind == TRANSCRIPTION:
+            transcription_job(
+                session_factory, job, transcriber or get_transcriber(), should_stop, embedder
+            )
+        else:
             raise IngestionError(f"Bilinmeyen iş türü: {job.kind}")
-        transcription_job(
-            session_factory, job, transcriber or get_transcriber(), should_stop, embedder
-        )
         return "succeeded"
     except JobSuperseded:
         with session_factory() as db:

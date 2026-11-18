@@ -23,6 +23,9 @@ from app.ingestion.documents import document_files, remove_paths
 logger = logging.getLogger(__name__)
 
 TRANSCRIPTION = "transcription"
+# Altyazısı olan videoya sonradan eklenen medya: yalnızca kareler çıkarılır (#27). Doküman hazırdır
+# ve hazır kalır: bu işin hatası ya da iptali dokümanı ve transkriptini bozmaz.
+FRAMES = "frames"
 ACTIVE_STATUSES = ("queued", "running")
 INTERRUPTED_MESSAGE = "İşlem yarıda kaldı; dosyayı yeniden yükleyin."
 CANCELLED_MESSAGE = "İşlem eğitmen tarafından iptal edildi."
@@ -114,7 +117,7 @@ def settle(db: Session, job: ClaimedJob, status: str, message: str) -> None:
     row.status = status
     row.error = message
     row.finished_at = func.now()
-    files = _fail_document(db, row.document_id, message)
+    files = _after_failure(db, row, message)
     db.commit()
     _remove(files)
 
@@ -166,7 +169,7 @@ def request_cancel(db: Session, document: Document) -> bool:
         job.status = "cancelled"
         job.error = CANCELLED_MESSAGE
         job.finished_at = func.now()
-        files = _fail_document(db, document.id, CANCELLED_MESSAGE)
+        files = _after_failure(db, job, CANCELLED_MESSAGE)
     else:
         job.cancel_requested = True
     db.commit()
@@ -196,7 +199,7 @@ def recover_stale(db: Session) -> tuple[int, int]:
             job.status = "cancelled" if job.cancel_requested else "failed"
             job.error = message
             job.finished_at = func.now()
-            files += _fail_document(db, job.document_id, message)
+            files += _after_failure(db, job, message)
             failed += 1
         else:
             job.status = "queued"
@@ -219,6 +222,27 @@ def recover_stale(db: Session) -> tuple[int, int]:
     if requeued or failed:
         logger.warning("Yarıda kalan işler: %d yeniden kuyrukta, %d başarısız", requeued, failed)
     return requeued, failed
+
+
+def active_job(db: Session, document_id: int) -> ProcessingJob | None:
+    """Dokümanın kuyruktaki ya da çalışan işi (varsa)."""
+    return db.scalars(
+        select(ProcessingJob).where(
+            ProcessingJob.document_id == document_id,
+            ProcessingJob.status.in_(ACTIVE_STATUSES),
+        )
+    ).first()
+
+
+def _after_failure(db: Session, job: ProcessingJob, message: str) -> list[Path]:
+    """Başarısız / iptal edilen işin sonucu; commit'ten sonra silinecek dosyalar.
+
+    Transkripsiyonda doküman `failed` olur. Kare işinde (`FRAMES`) doküman hazır kalır; yalnızca
+    işin girdi medyası silinir (#27).
+    """
+    if job.kind == FRAMES:
+        return [Path(job.input_path)]
+    return _fail_document(db, job.document_id, message)
 
 
 def _fail_document(db: Session, document_id: int, message: str) -> list[Path]:

@@ -15,11 +15,11 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import BinaryIO
 
-from sqlalchemy import func
+from sqlalchemy import delete, func
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.db.models import Course, Document
+from app.db.models import Course, Document, VideoFrame
 from app.embeddings.base import Embedder
 from app.embeddings.provider import get_embedder
 from app.ingestion.chunking import chunk_timed_segments
@@ -36,6 +36,7 @@ from app.ingestion.pipeline import add_chunks
 from app.ingestion.transcribe import Transcriber, TranscriptionError
 from app.ingestion.types import ChunkDraft, IngestionError, RawSegment
 from app.jobs.queue import (
+    FRAMES,
     TRANSCRIPTION,
     ClaimedJob,
     JobCancelled,
@@ -106,6 +107,117 @@ def create_media_document(
         raise
     db.refresh(document)
     return document, path
+
+
+FRAMES_DISABLED_MESSAGE = (
+    "Bu sunucuda slayt karesi çıkarma kapalı (FRAME_EXTRACTION=ocr değil); video dosyası eklenemez."
+)
+# Kareler görüntüden çıkar: ses dosyasında kare yoktur.
+VIDEO_EXTENSIONS = frozenset({".mp4", ".webm", ".mkv", ".mov"})
+
+
+def add_frame_media(db: Session, document: Document, filename: str, source: BinaryIO) -> Path:
+    """Altyazısı olan (hazır) videoya medya dosyası ekler ve kare işini kuyruğa alır (#27).
+
+    Transkript yeniden çıkarılmaz; medyadan yalnızca slayt kareleri alınır. Doküman hazır kalır.
+    Kapalıysa, video değilse, boyut aşılırsa ya da dosya boşsa `IngestionError`; dosya kalmaz.
+    """
+    if settings.frame_extraction != "ocr":
+        raise IngestionError(FRAMES_DISABLED_MESSAGE)
+    extension = Path(filename).suffix.lower()
+    if extension not in VIDEO_EXTENSIONS:
+        raise IngestionError(
+            "Slayt kareleri için video dosyası gerekir (.mp4, .webm, .mkv ya da .mov)."
+        )
+    # Dokümanın kendi dosyasından (altyazı) ayrı ad; silinirken `document_files` yine bulur.
+    path = settings.upload_dir / str(document.course_id) / f"{document.id}.frames{extension}"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        size = _copy_limited(source, path, settings.max_media_bytes)
+        if size == 0:
+            raise IngestionError("Dosya boş.")
+        enqueue(db, FRAMES, document, path)
+        db.commit()
+    except Exception:
+        db.rollback()
+        path.unlink(missing_ok=True)
+        raise
+    return path
+
+
+def frames_job(
+    session_factory: Callable[[], Session],
+    job: ClaimedJob,
+    should_stop: Callable[[], bool],
+    embedder: Embedder | None = None,
+) -> None:
+    """Kare işi (#27): medyadan slayt karelerini çıkarır, OCR ile okur, eskilerinin yerine yazar.
+
+    Transkripte, parçalara ve dokümanın durumuna dokunmaz. Uzun adımlar açık işlem olmadan
+    çalışır (`transcription_job` ile aynı kural). Hiç kare çıkmazsa (video çözülemedi, Tesseract
+    yok) mevcut kareler korunur ve iş başarısız biter; doküman hazır kalır (`queue.FRAMES`).
+    """
+    with session_factory() as db:
+        document = db.get(Document, job.document_id)
+        if document is None:
+            raise JobSuperseded(job.id)
+        course_id = document.course_id
+        duration_s = document.duration_s
+        language = db.get(Course, course_id).language  # type: ignore[union-attr]
+
+    embedder = embedder or get_embedder()
+    staging = frame_dir(course_id, job.document_id, staging=True)
+    remove_paths([staging])
+    try:
+        frames = read_lecture_frames(
+            job.input_path, staging, language, duration_s, embedder, should_stop
+        )
+        if should_stop():
+            raise JobCancelled(job.id)
+        if not frames:
+            raise IngestionError("Videodan slayt karesi çıkarılamadı.")
+        _save_frames(session_factory, job, frames, staging, embedder)
+    finally:
+        remove_paths([staging])
+    job.input_path.unlink(missing_ok=True)
+
+
+def _save_frames(
+    session_factory: Callable[[], Session],
+    job: ClaimedJob,
+    frames: list[FrameDraft],
+    staging: Path,
+    embedder: Embedder,
+) -> None:
+    """Kareleri tek kısa işlemle yazar: eskiler silinir, yeniler eklenir."""
+    with session_factory() as db:
+        row = locked_job(db, job)
+        if row.cancel_requested:
+            raise JobCancelled(job.id)
+        document = db.get(Document, job.document_id)
+        course = db.get(Course, document.course_id) if document else None
+        if document is None or course is None:
+            raise JobSuperseded(job.id)
+        images = frame_dir(course.id, document.id)
+        previous = images.with_name(f"{document.id}.previous")
+        row.status = "succeeded"
+        row.error = None
+        row.finished_at = func.now()
+        db.execute(delete(VideoFrame).where(VideoFrame.document_id == document.id))
+        # Eski görüntüler commit başarılı olana kadar kenarda bekler; hata olursa geri gelir.
+        remove_paths([previous])
+        if images.exists():
+            images.rename(previous)
+        try:
+            staging.rename(images)
+            add_frames(db, course, document, frames, images, embedder)
+            db.commit()
+        except Exception:
+            remove_paths([images])
+            if previous.exists():
+                previous.rename(images)
+            raise
+        remove_paths([previous])
 
 
 def _copy_limited(source: BinaryIO, path: Path, limit: int) -> int:

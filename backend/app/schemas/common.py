@@ -40,6 +40,9 @@ ErrorCode = Literal[
     "validation_error",
     # #21: iptal edilecek süren bir işlem yok (doküman hazır ya da başarısız).
     "document_not_processing",
+    # #27: bu dokümana slayt karesi için video eklenemez (video değil, hazır değil, iş sürüyor ya
+    # da kare çıkarma kapalı); `detail` nedeni söyler.
+    "frames_unavailable",
 ]
 
 

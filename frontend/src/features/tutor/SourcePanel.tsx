@@ -8,6 +8,7 @@ import { buttonClasses } from "../../ui/buttonStyles";
 import EmptyState from "../../ui/EmptyState";
 import IconButton from "../../ui/IconButton";
 import Skeleton from "../../ui/Skeleton";
+import SourceFrames from "../video/SourceFrames";
 import PageImage from "./PageImage";
 import SourceAlternatives from "./SourceAlternatives";
 import { useSourceDetail } from "./useSourceDetail";
@@ -136,6 +137,9 @@ export default function SourcePanel({
               </span>
             </p>
           </Sheet>
+        )}
+        {current && isVideo && (
+          <SourceFrames frames={current.frames ?? []} onPlayAt={current.media_url ? onPlayAt : undefined} />
         )}
         {current && isVideo && onSelectSource && (
           <SourceAlternatives alternatives={current.alternatives} onSelect={onSelectSource} />

@@ -3,7 +3,7 @@ from typing import Annotated, BinaryIO
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.api.deps import DbSession, get_course_for
 from app.api.errors import ApiError
@@ -18,10 +18,10 @@ from app.ingestion.documents import (
     to_document_out,
     validate_upload_fields,
 )
-from app.ingestion.media import create_media_document, is_media
+from app.ingestion.media import add_frame_media, create_media_document, is_media
 from app.ingestion.pipeline import MAX_UPLOAD_BYTES, IngestionError, ingest_document
 from app.ingestion.rendering import page_image_path, remove_cached_pages
-from app.jobs.queue import request_cancel
+from app.jobs.queue import active_job, request_cancel
 from app.schemas.common import Role
 from app.schemas.materials import ChunkPreview, DocumentOut, MaterialType
 from app.schemas.sources import FrameRef
@@ -131,6 +131,43 @@ def document_frames(document_id: int, user: AuthUser, db: DbSession) -> list[Fra
     return [to_frame_ref(frame) for frame in frames]
 
 
+@router.post("/documents/{document_id}/frames", response_model=DocumentOut)
+def add_frames_from_video(
+    document_id: int,
+    user: AuthUser,
+    db: DbSession,
+    file: Annotated[UploadFile, File()],
+) -> DocumentOut:
+    """Altyazısıyla yüklenmiş videoya video dosyasını ekler; slayt kareleri çıkarılır (#27).
+
+    Transkript yeniden çıkarılmaz ve doküman hazır kalır; kareler kuyruktaki iş bitince görünür
+    (`frames_processing`). Yeniden eklemek önceki karelerin yerini alır. Video olmayan ya da
+    hazır olmayan dokümanda, süren iş varken ve kare çıkarma kapalıyken 409 `frames_unavailable`.
+    """
+    document = _get_document(db, user, document_id, "instructor")
+    if document.material_type != MaterialType.VIDEO.value or document.status != "ready":
+        raise ApiError(
+            status.HTTP_409_CONFLICT,
+            "Slayt kareleri yalnızca hazır bir ders videosuna eklenebilir.",
+            "frames_unavailable",
+        )
+    if active_job(db, document.id) is not None:
+        raise ApiError(
+            status.HTTP_409_CONFLICT,
+            "Bu video için süren bir işlem var; bitince tekrar dene.",
+            "frames_unavailable",
+        )
+    try:
+        add_frame_media(db, document, file.filename or "video", file.file)
+    except IngestionError as exc:
+        raise ApiError(status.HTTP_409_CONFLICT, str(exc), "frames_unavailable") from exc
+    db.refresh(document)
+    frames = db.scalar(
+        select(func.count(VideoFrame.id)).where(VideoFrame.document_id == document.id)
+    )
+    return to_document_out(document, len(document.chunks), frames or 0, frames_processing=True)
+
+
 @router.get("/documents/{document_id}/frames/{frame_id}.png")
 def document_frame_image(
     document_id: int, frame_id: int, user: AuthUser, db: DbSession
@@ -169,20 +206,21 @@ def delete_document(document_id: int, user: AuthUser, db: DbSession) -> None:
 
 @router.post("/documents/{document_id}/cancel", response_model=DocumentOut)
 def cancel_processing(document_id: int, user: AuthUser, db: DbSession) -> DocumentOut:
-    """Süren işlemi (transkripsiyon) iptal eder (yalnızca eğitmen).
+    """Süren işlemi (transkripsiyon ya da kare çıkarma, #27) iptal eder (yalnızca eğitmen).
 
-    Kuyruktaki iş hemen iptal olur ve doküman `failed` döner. Çalışan iş durması için
-    işaretlenir; doküman birkaç saniye içinde `failed` olur. İşlenmeyen dokümanda 409.
+    Transkripsiyonda kuyruktaki iş hemen iptal olur ve doküman `failed` döner; çalışan iş durması
+    için işaretlenir, doküman birkaç saniye içinde `failed` olur. Kare işinin iptali dokümanı
+    bozmaz: hazır kalır, önceki kareler korunur. Süren iş yoksa 409.
     """
     document = _get_document(db, user, document_id, "instructor")
-    if document.status != "processing" or not request_cancel(db, document):
+    if not request_cancel(db, document):
         raise ApiError(
             status.HTTP_409_CONFLICT,
             "Bu doküman şu anda işlenmiyor.",
             "document_not_processing",
         )
     db.refresh(document)
-    return to_document_out(document, 0)
+    return to_document_out(document, len(document.chunks))
 
 
 @router.get("/documents/{document_id}/pages/{page}.png")

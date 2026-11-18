@@ -11,6 +11,7 @@ import type {
   DemoInfo,
   ConsentUpdate,
   DocumentOut,
+  FrameRef,
   JoinCode,
   LearningRecord,
   LoginRequest,
@@ -280,6 +281,17 @@ export const api = {
 
   documentChunks: (documentId: number) =>
     request<ChunkPreview[]>(`/documents/${documentId}/chunks`),
+
+  /** Videodan çıkarılan kareler, zamana göre (#24); kare çıkarılmadıysa boş liste. */
+  documentFrames: (documentId: number, signal?: AbortSignal) =>
+    request<FrameRef[]>(`/documents/${documentId}/frames`, { signal }),
+
+  /** Altyazılı videoya video dosyası ekler; transkript değişmez, slayt kareleri çıkarılır (#27). */
+  addFrameVideo: (documentId: number, file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return request<DocumentOut>(`/documents/${documentId}/frames`, { method: "POST", body: form });
+  },
 
   cancelDocument: (documentId: number) =>
     request<DocumentOut>(`/documents/${documentId}/cancel`, { method: "POST" }),

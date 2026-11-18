@@ -4,11 +4,11 @@ import shutil
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from sqlalchemy import func, select
+from sqlalchemy import exists, func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.db.models import Chunk, Document
+from app.db.models import Chunk, Document, ProcessingJob, VideoFrame
 from app.ingestion.types import IngestionError
 from app.schemas.materials import ChunkPreview, DocumentOut, MaterialType
 
@@ -83,14 +83,35 @@ def list_documents(db: Session, course_id: int, approved_only: bool = False) -> 
     chunk_count = (
         select(func.count(Chunk.id)).where(Chunk.document_id == Document.id).scalar_subquery()
     )
-    query = select(Document, chunk_count).where(Document.course_id == course_id)
+    frame_count = (
+        select(func.count(VideoFrame.id))
+        .where(VideoFrame.document_id == Document.id)
+        .scalar_subquery()
+    )
+    frames_processing = (
+        exists()
+        .where(
+            ProcessingJob.document_id == Document.id,
+            ProcessingJob.kind == "frames",
+            ProcessingJob.status.in_(("queued", "running")),
+        )
+        .correlate(Document)
+    )
+    query = select(Document, chunk_count, frame_count, frames_processing).where(
+        Document.course_id == course_id
+    )
     if approved_only:
         query = query.where(Document.approved_at.is_not(None), Document.status == "ready")
     rows = db.execute(query.order_by(Document.created_at.desc(), Document.id.desc()))
-    return [to_document_out(document, count) for document, count in rows]
+    return [
+        to_document_out(document, count, frames, processing)
+        for document, count, frames, processing in rows
+    ]
 
 
-def to_document_out(document: Document, chunk_count: int) -> DocumentOut:
+def to_document_out(
+    document: Document, chunk_count: int, frame_count: int = 0, frames_processing: bool = False
+) -> DocumentOut:
     return DocumentOut(
         id=document.id,
         course_id=document.course_id,
@@ -107,6 +128,8 @@ def to_document_out(document: Document, chunk_count: int) -> DocumentOut:
         error=document.error,
         transcript_source=document.transcript_source,
         transcript_model=document.transcript_model,
+        frame_count=frame_count,
+        frames_processing=bool(frames_processing),
     )
 
 

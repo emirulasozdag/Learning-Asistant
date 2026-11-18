@@ -81,6 +81,13 @@ def _fast_embeddings(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture(autouse=True)
+def _frame_extraction_off(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Kare çıkarma yalnızca onu sınayan testlerde açılır (`frames_on`); yerel .env'deki
+    FRAME_EXTRACTION=ocr test konteynerine sızıp transkripsiyon testlerini değiştirmez (#27)."""
+    monkeypatch.setattr(settings, "frame_extraction", "off")
+
+
+@pytest.fixture(autouse=True)
 def _claim_check_off(monkeypatch: pytest.MonkeyPatch) -> None:
     """İddia kontrolü (#10) yalnızca onu sınayan testlerde açılır (`test_claims.py`); diğer
     testler sahte üreticiyle alıntı doğrulamasını sınar. Yerel .env'deki judge ayarı da sızmaz."""

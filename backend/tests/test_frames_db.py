@@ -412,3 +412,166 @@ def test_a_slide_that_needs_the_previous_one_comes_with_it_as_context(
     assert [hit.frame.ordinal for hit in hits] == [1]
     previous = hits[0].neighbors[0]
     assert previous.ordinal == 0 and "mid = (lo + hi) // 2" in (previous.text or "")
+
+
+# --- altyazılı videoya video dosyası ekleyerek kareler (#27) ----------------------------------
+
+
+def subtitled_video(db: Session, course: Course) -> Document:
+    """Altyazısıyla (VTT) yüklenmiş, hazır ders videosu: kare yok."""
+    from tests.test_video import add_video
+
+    document = add_video(db, course)
+    db.commit()
+    return document
+
+
+def attach(client: TestClient, document: Document, name: str = "ders.mp4", content: bytes = b""):
+    body = content or b"\x00\x00\x00\x18ftypmp42" + b"\x00" * 64
+    return client.post(f"/documents/{document.id}/frames", files={"file": (name, body)})
+
+
+def test_video_file_added_to_a_subtitled_video_gives_frames_and_keeps_the_transcript(
+    client: TestClient, db: Session, course: Course, run_jobs, frames_on
+) -> None:
+    document = subtitled_video(db, course)
+    chunks_before = db.scalars(
+        select(Chunk.text).where(Chunk.document_id == document.id).order_by(Chunk.id)
+    ).all()
+
+    response = attach(client, document)
+
+    assert response.status_code == 200, response.text
+    assert response.json()["frames_processing"] is True and response.json()["status"] == "ready"
+    assert run_jobs() == 1
+    frames = frames_of(db, document)
+    assert [f.status for f in frames] == [result.status for _, _, result in SLIDES]
+    document = refreshed(db, document.id)
+    assert (document.status, document.transcript_source, document.filename) == (
+        "ready",
+        "vtt",
+        "ders.vtt",
+    )
+    chunks_after = db.scalars(
+        select(Chunk.text).where(Chunk.document_id == document.id).order_by(Chunk.id)
+    ).all()
+    assert chunks_after == chunks_before  # transkript yeniden çıkarılmadı
+    # Medya silindi; altyazı dosyası ve kare görüntüleri kaldı.
+    assert {p.suffix for p in course_files(course) if p.is_file()} == {".vtt"}
+    listed = client.get(f"/courses/{course.id}/materials").json()[0]
+    assert (listed["frame_count"], listed["frames_processing"]) == (len(SLIDES), False)
+    assert len(client.get(f"/documents/{document.id}/frames").json()) == len(SLIDES)
+
+
+def test_adding_the_video_again_replaces_the_frames(
+    client: TestClient, db: Session, course: Course, run_jobs, frames_on
+) -> None:
+    document = subtitled_video(db, course)
+    attach(client, document)
+    run_jobs()
+    first = {f.id for f in frames_of(db, document)}
+
+    attach(client, document)
+    run_jobs()
+
+    frames = frames_of(db, document)
+    assert len(frames) == len(SLIDES) and not first & {f.id for f in frames}
+    assert all(Path(f.image_path).is_file() for f in frames)
+    assert not frame_dir(course.id, document.id).with_name(f"{document.id}.previous").exists()
+
+
+@pytest.mark.parametrize(
+    "failure", [FrameExtractionError("Video kareleri çıkarılamadı."), JobCancelled("iptal")]
+)
+def test_failed_or_cancelled_frame_job_leaves_the_video_ready(
+    client: TestClient,
+    db: Session,
+    course: Course,
+    run_jobs,
+    frames_on,
+    monkeypatch: pytest.MonkeyPatch,
+    failure: Exception,
+) -> None:
+    document = subtitled_video(db, course)
+
+    def broken(*args, **kwargs):
+        raise failure
+
+    monkeypatch.setattr(lecture_frames, "extract_frames", broken)
+    attach(client, document)
+    run_jobs()
+
+    document = refreshed(db, document.id)
+    assert (document.status, document.error, document.filename) == ("ready", None, "ders.vtt")
+    assert db.scalar(select(ProcessingJob.status)) in {"failed", "cancelled"}
+    assert db.scalars(select(Chunk).where(Chunk.document_id == document.id)).first() is not None
+    assert Path(document.file_path).is_file()
+    assert {p.suffix for p in course_files(course) if p.is_file()} == {".vtt"}
+
+
+def test_cancelling_a_queued_frame_job_keeps_the_video(
+    client: TestClient, db: Session, course: Course, frames_on
+) -> None:
+    document = subtitled_video(db, course)
+    attach(client, document)
+
+    response = client.post(f"/documents/{document.id}/cancel")
+
+    assert response.status_code == 200, response.text
+    document = refreshed(db, document.id)
+    assert document.status == "ready" and Path(document.file_path).is_file()
+    assert db.scalar(select(ProcessingJob.status)) == "cancelled"
+    assert {p.suffix for p in course_files(course) if p.is_file()} == {".vtt"}
+
+
+def test_frames_cannot_be_added_when_off_busy_audio_or_not_a_video(
+    client: TestClient,
+    db: Session,
+    course: Course,
+    sample_pdf: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    document = subtitled_video(db, course)
+
+    monkeypatch.setattr(settings, "frame_extraction", "off")
+    off = attach(client, document)
+    monkeypatch.setattr(settings, "frame_extraction", "ocr")
+    audio = attach(client, document, name="ders.mp3")
+    first = attach(client, document)
+    busy = attach(client, document)
+    pdf = upload(client, course.id, sample_pdf).json()
+    not_video = client.post(
+        f"/documents/{pdf['id']}/frames", files={"file": ("ders.mp4", b"\x00" * 64)}
+    )
+
+    for response in (off, audio, busy, not_video):
+        assert response.status_code == 409, response.text
+        assert response.json()["code"] == "frames_unavailable"
+    assert "kapalı" in off.json()["detail"]
+    assert first.status_code == 200
+    assert db.scalar(select(ProcessingJob.kind)) == "frames"
+
+
+def test_only_the_instructor_can_add_a_video_for_frames(
+    client_for, db: Session, course: Course, frames_on
+) -> None:
+    document = subtitled_video(db, course)
+    student = make_user(db, "ogrenci@example.com")
+    enroll(db, student, course, "student")
+    outsider = make_user(db, "dis@example.com")
+
+    assert attach(client_for(student), document).status_code == 403
+    assert attach(client_for(outsider), document).status_code == 404
+    assert db.scalars(select(ProcessingJob)).all() == []
+
+
+def test_frame_video_larger_than_a_json_body_is_accepted(
+    client: TestClient, db: Session, course: Course, frames_on, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Gerçek ders videosu (~100 MB) JSON sınırını aşar; kare yüklemesi medya sınırını alır (#27).
+    monkeypatch.setattr(settings, "max_request_bytes", 1024)
+    document = subtitled_video(db, course)
+
+    response = attach(client, document, content=b"\x00" * (64 * 1024))
+
+    assert response.status_code == 200, response.text

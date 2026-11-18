@@ -14,7 +14,8 @@ from app.core.config import settings
 
 # Çok parçalı formun dosya dışındaki alanları ve sınırlayıcıları için pay.
 MULTIPART_OVERHEAD_BYTES = 1024 * 1024
-_UPLOAD_PATH = re.compile(r"^/courses/\d+/materials/?$")
+# Materyal yüklemesi ve altyazılı videoya kareler için video eklemesi (#27) büyük dosya taşır.
+_UPLOAD_PATH = re.compile(r"^/(courses/\d+/materials|documents/\d+/frames)/?$")
 
 
 class RequestTooLarge(Exception):
@@ -22,7 +23,8 @@ class RequestTooLarge(Exception):
 
 
 def request_limit(method: str, path: str) -> int:
-    """Materyal yüklemesi medya sınırını (en büyük dosya), diğer istekler JSON sınırını alır."""
+    """Materyal ve kare videosu yüklemesi medya sınırını (en büyük dosya), diğer istekler JSON
+    sınırını alır."""
     if method == "POST" and _UPLOAD_PATH.match(path):
         return settings.max_media_bytes + MULTIPART_OVERHEAD_BYTES
     return settings.max_request_bytes
