@@ -204,6 +204,25 @@ ReviewDecision {target_type: "message" | "practice_item", target_id, decision: "
   `403 insufficient_role`. Her karar ayrı satırdır (`instructor_reviews`), son karar geçerlidir.
 - `DELETE /me/data` pratik denemelerini de siler (öğrenme kaydı boşalır); kullanıcının ürettirdiği sorular dersin
   malıdır, kalır.
+- **Rubrik girişi (#15, FR-13).** `GET /instructor/courses/{id}/rubrics` (instructor | ta; son değişen önce, ≤100;
+  reddedilmiş soruların rubrikleri yok) ve `POST …/rubrics` (instructor) → `Rubric {id, course_id, concept,
+  reference_answer, criteria[{description, points}], practice_item_id, source_ids, origin: "generated" |
+  "instructor", approved}`. Soruya bağlı giriş o sorunun rubriğinin yerine geçer (aynı satır, `origin=instructor`,
+  onaylı); açık uçlu cevaplar bundan sonra bununla değerlendirilir. Cevaptan sonra gösterilen ve
+  `PracticeItemReview`'daki referans cevap rubriğinkidir; sorunun `answer_key`'i üreticinin çıktısı olarak değişmez
+  (üretim kalitesinin kanıtı). Rubriğin değiştirilen hâli (üretilen ilk hâl ya da eğitmenin önceki düzeltmesi)
+  `practice_rubric_revisions`'a yazılır (`origin`, `approved`, `replaced_by`, `replaced_at`); API'de dönmez. Rubriğin `concept`'i öğrenme kaydı ve sık hatalarda o sorunun kavramıdır; eğitmen
+  değiştirirse eski denemeler de yeni adla gruplanır. Soru durumunu değiştirmez (geri çekilmiş soru `approve` ile
+  yayımlanır). `source_ids` boşsa sorunun parçası; tekilleştirilir, olağan biçimde ("012" → "12") saklanır.
+  Sınırlar: `concept` ≤300, `reference_answer` ≤4000, 1–10 ölçüt (`description` ≤500, `0 < points ≤ 100`), ≤20
+  kaynak (her biri ≤32). Hatalar: soru bu derste yok ya da `rejected` → `404 practice_item_not_found`; çoktan
+  seçmeli soru → `422 validation_error`; kaynak dersin onaylı, hazır materyalinde değil → `422 source_not_found`.
+  Kavram rubrikleri (`practice_item_id` yok) saklanır; değerlendirmede henüz kullanılmaz (bunu üstlenen bir
+  issue yok; #20 soruya bağlı rubrikle değerlendirir).
+- **Sınırlar (#15).** `AnswerSubmission.answer_text` ≤4000 (arayüzde `MAX_ANSWER_CHARS`); `PracticeRequest.topic`
+  ≤300, `source_id` ≤32. Gövde ve yoldaki satır kimlikleri (`practice_item_id`, `follow_up_of_attempt_id`,
+  `ReviewDecision.target_id`, `/practice/{id}/answer`) 1…2³¹−1 aralığında olmalı (`422`); kaynak kimliği yalnızca ASCII rakam ve bu aralıkta
+  geçerlidir (`/sources/{id}` dışındaysa `404`). Önceden aralık dışı kimlikler veritabanında 500 veriyordu.
 - **Koddan farklar.** `MistakeSummary.error_type` serbest metinden sabit değerlere daraldı ve `students` eklendi;
   `LearningRecord.attempts[]` alanları genişledi; `submitReview` artık `ReviewOut` döner. Önceki tüketici yoktu
   (uçlar `501` dönüyordu); `frontend/src/api/types.ts` güncellendi.

@@ -385,6 +385,34 @@ class PracticeRubric(Base):
     question: Mapped[PracticeQuestion | None] = relationship(back_populates="rubric")
 
 
+class PracticeRubricRevision(Base):
+    """Bir rubriğin değiştirilmeden önceki hâli (#15).
+
+    Eğitmen bir rubriğin yerine yenisini girdiğinde eski içerik buraya yazılır: üretilen
+    rubriğin ilk hâli (`origin="generated"`) ve eğitmenin önceki düzeltmeleri kaybolmaz. Üretim
+    kalitesi ve eğitmen düzeltmeleri bu kayıtlarla karşılaştırılır; öğrenciye gösterilmez.
+    """
+
+    __tablename__ = "practice_rubric_revisions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    rubric_id: Mapped[int] = mapped_column(
+        ForeignKey("practice_rubrics.id", ondelete="CASCADE"), index=True
+    )
+    concept: Mapped[str] = mapped_column(String(300))
+    reference_answer: Mapped[str] = mapped_column(Text)
+    criteria: Mapped[list] = mapped_column(JSONB)
+    source_ids: Mapped[list] = mapped_column(JSONB)
+    # O hâlin kaynağı ve onay durumu: "generated" | "instructor".
+    origin: Mapped[str] = mapped_column(String(16))
+    approved: Mapped[bool] = mapped_column(Boolean)
+    # Bu hâli değiştiren eğitmen; hesabı silinirse kayıt kalır, kişi boşalır.
+    replaced_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    replaced_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
 class PracticeAttempt(Base):
     """Öğrencinin bir soruya cevabı ve aldığı formatif geri bildirim (resmî not değildir).
 

@@ -8,7 +8,8 @@ from app.schemas.common import Citation
 class AnswerSubmission(BaseModel):
     """Öğrencinin cevabı: tam biri dolu olur (short_answer/code_tracing → metin, mcq → seçenek)."""
 
-    answer_text: str | None = Field(default=None, min_length=1)
+    # Üst sınır: değerlendiriciye giden istem ve saklanan deneme büyümesin (#15).
+    answer_text: str | None = Field(default=None, min_length=1, max_length=4000)
     # `PracticeItem.options` içindeki sıra (0'dan başlar).
     selected_option: int | None = Field(default=None, ge=0)
 

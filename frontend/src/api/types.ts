@@ -245,6 +245,9 @@ export interface PracticeItem {
 }
 
 /** Tam biri dolu olur: short_answer/code_tracing → `answer_text`, mcq → `selected_option`. */
+/** `AnswerSubmission.answer_text` üst sınırı (backend `schemas/evaluation.py` ile aynı). */
+export const MAX_ANSWER_CHARS = 4000;
+
 export interface AnswerSubmission {
   answer_text?: string | null;
   /** `PracticeItem.options` içindeki sıra (0'dan başlar). */
@@ -644,5 +647,7 @@ export interface RubricIn {
 export interface Rubric extends RubricIn {
   id: number;
   course_id: number;
+  /** "generated": soruyla birlikte üretildi; "instructor": eğitmen girdi (girilince onaylıdır). */
+  origin: "generated" | "instructor";
   approved: boolean;
 }

@@ -33,6 +33,7 @@ from app.schemas.common import Citation
 from app.schemas.evaluation import AnswerFeedback, AnswerSubmission, CriterionScore
 from app.schemas.materials import MaterialType
 from app.schemas.practice import Difficulty, PracticeItem, PracticeType
+from app.sources.lookup import chunk_id
 from app.verification.practice_checks import (
     CheckResult,
     failures,
@@ -270,13 +271,14 @@ def _previous_prompts(db: Session, user: User, chunk_id: int, limit: int = 5) ->
 
 
 def _approved_chunk(db: Session, course: Course, source_id: str) -> Chunk | None:
-    if not source_id.isdigit():
+    value = chunk_id(source_id)
+    if value is None:
         return None
     return db.scalar(
         select(Chunk)
         .join(Document, Chunk.document_id == Document.id)
         .where(
-            Chunk.id == int(source_id),
+            Chunk.id == value,
             Chunk.course_id == course.id,
             Document.approved_at.is_not(None),
         )
@@ -355,6 +357,15 @@ def to_item(question: PracticeQuestion) -> PracticeItem:
         options=question.options,
         source=citation(question.chunk),
     )
+
+
+def reference_answer(question: PracticeQuestion) -> str | None:
+    """Açık uçlu sorunun geçerli referans cevabı: rubriğinki (eğitmen girdiyse onunki).
+
+    `answer_key` üreticinin çıktısı olarak değişmeden kalır (üretim kalitesinin kanıtı)."""
+    if question.rubric is not None:
+        return question.rubric.reference_answer
+    return question.answer_key.get("reference_answer")
 
 
 def citation(chunk: Chunk) -> Citation:
@@ -461,6 +472,6 @@ def _feedback(attempt: PracticeAttempt, question: PracticeQuestion, grade: Grade
         explanation=grade.explanation,
         citations=[citation(question.chunk)],
         correct_option=int(question.answer_key["correct_option"]) if mcq else None,
-        reference_answer=None if mcq else question.answer_key.get("reference_answer"),
+        reference_answer=None if mcq else reference_answer(question),
         criteria=[CriterionScore(**vars(c)) for c in grade.criteria],
     )

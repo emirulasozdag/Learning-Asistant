@@ -4,7 +4,7 @@ from typing import Literal, Self
 from pydantic import BaseModel, Field, model_validator
 
 from app.schemas.ask import AskOutcome
-from app.schemas.common import Citation
+from app.schemas.common import Citation, DbId
 from app.schemas.practice import Difficulty, PracticeType
 
 # Eğitmen düzeltmesinin en uzun hali (karakter).
@@ -32,7 +32,7 @@ class ReviewDecision(BaseModel):
     """Eğitmenin bir asistan cevabını veya pratik sorusunu onaylaması / düzeltmesi."""
 
     target_type: Literal["message", "practice_item"]
-    target_id: int
+    target_id: DbId
     decision: Literal["approve", "correct"]
     # "correct" kararında zorunlu: neyin yanlış olduğu ve doğrusu.
     correction: str | None = Field(default=None, max_length=MAX_CORRECTION)
