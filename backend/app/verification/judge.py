@@ -20,6 +20,19 @@ from app.verification.citations import ClaimUnit
 JUDGE_PROMPT_VERSION = "claim-judge-v1"
 
 Decision = Literal["supported", "unsupported"]
+# İddianın sonucu. Görsel iddialarda (#26, `verification/visual.py`) ayrıca: unverifiable (görüntü
+# judge'a gidemedi; türetilmiş metinle karar verilmez) ve ambiguous (görüntüde ne kastedildiği
+# belli değil). Desteklenmeyen dışındakiler de cevaptan çıkarılır.
+ClaimResult = Literal["supported", "unsupported", "unverifiable", "ambiguous"]
+ClaimReason = Literal[
+    "unsupported_fact",
+    "source_mismatch",
+    "ambiguous_scene",
+    "images_not_supported",
+    "image_unavailable",
+    "no_visual_observation",
+    "not_checked",
+]
 
 
 class AtomicFact(BaseModel):
@@ -52,11 +65,12 @@ class ClaimLabel:
     claim_id: str
     claim: str
     cited_source_ids: list[str]
-    label: Decision
+    label: ClaimResult
     judge_model: str
     # unsupported_fact: bir atomik bilgi desteklenmiyor; source_mismatch: judge desteği
-    # iddianın alıntılamadığı bir kaynakta gösterdi; None: destekleniyor.
-    reason: Literal["unsupported_fact", "source_mismatch"] | None = None
+    # iddianın alıntılamadığı bir kaynakta gösterdi; None: destekleniyor. Görsel nedenler:
+    # `verification/visual.py`.
+    reason: ClaimReason | None = None
     facts: list[dict] = field(default_factory=list)
     rationale: str = ""
 

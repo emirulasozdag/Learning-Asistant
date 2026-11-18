@@ -563,6 +563,98 @@ davranış değişmedi (`FRAME_EXTRACTION=off` iken transkripsiyon işi önceki 
 #27 **[ekleme]**: `POST /documents/{id}/frames`, iş türü `frames` (`jobs/queue.FRAMES`, `ingestion/media.frames_job`),
 `DocumentOut.frame_count/frames_processing`, hata kodu `frames_unavailable`; iptal uç noktası kare işini de iptal eder.
 
+### 4.2 Görsel kanıtla cevap ve iddia kontrolü (#26)
+
+**Durum:** üretici, judge ve sağlayıcı tarafı koda geçti (#26): `generation/visual.py` (tipler, bağdaştırıcı),
+`verification/visual.py` (görsel judge), `llm/base.py` (`VisionClient`). İstek ve iz bağlantısı #25'i bekler:
+`qa/service.py` henüz `visual` vermez, bu yüzden çalışma zamanında `/ask` ve AI Tutor davranışı değişmedi.
+
+**Sözleşme.**
+
+```
+FrameImage     { data: bytes, mime_type: "image/png" | "image/jpeg" }
+VisualEvidence { frame_id: int, course_id: int,
+                 document_id: int,                  # video varlığı (material_type = "video")
+                 document_title: str,
+                 t_start: float, t_end: float, t_frame: float,   # saniye, videonun başından (§4.1)
+                 status: FrameStatus,
+                 derived_text: str | null, derived_by: str,      # OCR metni ve aracı; kanıt değildir
+                 confidence: float | null,
+                 transcript: str,                   # kare ekrandayken konuşulan (≤ 1500 karakter)
+                 image: FrameImage | null }         # orijinal görüntü; okunamadıysa null
+  source_id = "frame:<frame_id>"                    # chunk kimlikleriyle karışmaz
+FrameLocator   { document_id: int, frame_id?: int, time_s?: float }   # frame_id ile time_s'ten tam olarak biri
+VisualContext  { frames: VisualEvidence[] (≤ 4), focus: VideoPosition | null }   # focus: durdurulan an
+
+FrameEvidenceSource.load(locators: FrameLocator[]) -> VisualEvidence[]   # bağdaştırıcı arayüzü
+StoredFrameSource(db, course)                       # #24'ün video_frames kayıtlarından
+  .load(locators)                                   # yetkisiz / bulunamayan referans atlanır
+  .moment(VideoPosition, before_s=90, after_s=20) -> VisualContext   # #102 penceresi, ekrandaki kare önce
+
+stream_answer(..., visual: VisualContext | None = None)
+check_claims(..., frames: {etiket: VisualEvidence} | None = None)
+VisionClient { accepts_images: bool,
+               complete_json_with_images(system, parts: (TextPart | ImagePart)[], schema) -> schema }
+supports_images(client) -> bool;  ImageInputUnsupported(LLMError)
+```
+
+**Kurallar.**
+- **Erişim.** `StoredFrameSource` yalnızca isteğin dersindeki onaylı (`approved_at`) ve `ready` video dokümanının
+  karelerini döndürür; başka ders, onaysız ya da başka dokümanın kare kimliği sessizce atlanır (hata kodunu isteği
+  doğrulayan katman, #25, verir). Görüntü yalnızca dokümanın kare klasöründen okunur (§4.1 uç noktasıyla aynı kural);
+  en çok 8 MB, PNG/JPEG. `stream_answer` başka derse ait kareyi ayrıca almaz.
+- **Etiket ve alıntı.** Kareler parçalardan sonraki etiketleri alır (`S{n+1}`…) ve aynı alıntı doğrulamasından geçer.
+  Kareye dayanan alıntı `Citation {source_id: "frame:<id>", document_title, page: null, t_start, t_end}` olur
+  (karenin ekranda kaldığı aralık). LLM'siz alıntı ve alakasızlık kapısı yalnızca metin parçalarına bakar.
+- **Üretici.** Sistem istemine kare kuralları eklenir; istemde her kare için etiket, video, zaman, durum, görüntünün
+  olup olmadığı, türetilmiş metin (aracıyla) ve konuşma; `focus` varsa o anda ekrandaki karenin etiketi ya da `yok`
+  gider. Görüntü üreticiye gitmez (akış yalnızca metin). Kare verildiğinde taslak (`delta`) hiç akıtılmaz,
+  `CLAIM_CHECK=off` iken de: görüntüyle kontrol edilmemiş kare iddiası öğrenciye hiçbir parçada ulaşmaz.
+- **Kontrol.** Bir kareyi alıntılayan iddia birimi metin judge'ına gitmez. Görsel judge'a (istem sürümü
+  `visual-claim-judge-v1`) metin kaynakları ve karenin **yalnızca görüntüsü** gider; türetilmiş metin ve konuşma
+  gitmez, böylece "supported" kararı görüntüde görünen şeye dayanır. Kodda ek kurallar: her iddiaya tam bir karar;
+  desteğin kaynağı iddianın kendi kaynaklarından biri; kareyle desteklenen bilgi için görüntüde ne görüldüğü
+  (`observed`) boş olamaz. Karışık alıntıda ([S1][S3], S3 kare) kare alıntısı yalnızca judge onu görüntüden
+  doğruladıysa kalır; destek yalnızca metinden geldiyse iddia metin kaynağıyla kalır, kare etiketi cevaptan silinir
+  ve kayda `dropped_frame_citations` olarak yazılır.
+- **Sonuçlar** (`meta.claim_check.records[].label` / `reason`): `supported`; `unsupported` (`unsupported_fact`,
+  `source_mismatch`); `ambiguous` (`ambiguous_scene`: görüntüde ne kastedildiği belli değil); `unverifiable`
+  (`images_not_supported`: judge görüntü almıyor ya da model reddetti; `image_unavailable`: görüntü okunamadı;
+  `no_visual_observation`; `not_checked`: `CLAIM_CHECK=off`). `supported` dışındakiler cevaptan çıkarılır;
+  kapsama yetmezse cevap reddedilir. Hiçbir durumda görsel iddia türetilmiş metinle kabul edilmez.
+- **Sayımlar.** `ClaimCheck.unsupported` yalnızca `unsupported` sayar (hallucination oranı, §5); `unverifiable` ve
+  `ambiguous` çıkarılır, `unsupported_removed`e girer, `claims`ta sayılır. Görsel birim varsa
+  `ClaimCheck.prompt_version = "claim-judge-v1+visual-claim-judge-v1"`. Görsel kayıt metin kaydının alanlarına ek
+  olarak `frames` (her kare için `source_id, frame_id, document_id, t_start, t_end, t_frame, status, derived_by,
+  image_sent`), `dropped_frame_citations` ve `prompt_version` taşır; atomik bilgilerde `observed` vardır. Kayıtlardaki `claim_id` cevaptaki
+  sıradır (C1, C2…).
+- **Netleştirme.** Model sahneyi belirsiz bulursa cevabına `NETLEŞTİR:` ile başlar: `declined = true`,
+  `outcome = "insufficient_evidence"`, `decline_reason` = modelin netleştirme sorusu; judge çağrılmaz, taslak akmaz.
+  Judge kareli iddiaları `ambiguous` bulur ve kalan cevap kapsamaya yetmezse aynı biçimde sabit bir netleştirme sorusu
+  döner (`answer.CLARIFY`). Kare verilmeyen cevapta `NETLEŞTİR:` özel değildir.
+- **Sağlayıcılar ve rota.** Görüntü kabul edenler: Gemini, Anthropic, OpenRouter (model görüntü almıyorsa uç noktanın
+  4xx yanıtı `ImageInputUnsupported` olur) ve yapılandırılmış yerel model; `ReleasingClient` (#88) aynı yeteneği
+  taşır. Diğer istemciler görüntü almaz; kareli iddialar `unverifiable` olur. Kare görüntüsü onaylı ders materyalidir:
+  yük `DataClass.COURSE_EVIDENCE`, judge'ın metin yüküyle aynı rota (ADR-5 A, ADR-8); kimlik ve öğrenci verisi
+  gitmez. ADR-10 OCR'ı yerel tutar ve hosted görsel modeli ayrı bir öneriye bırakır: #25 bağlantısı açılmadan önce
+  eğitmen beyanının (ADR-3) video görüntülerini kapsadığı ekip kararıyla kaydedilmelidir.
+- **Yalnızca metin.** `visual` verilmezse ya da kare yoksa üretici istemi, judge isteği, kayıt alanları ve sayımlar
+  önceki gibidir (`tests/test_visual_grounding.py` regresyon testleri; mevcut testler değişmeden geçer).
+
+**#25 / #27 için devir.**
+1. İstek ve izler (#25): kare referansları `FrameLocator` karşılığı alanlarla taşınır, API'de doğrulanır; servis
+   `StoredFrameSource(db, course).load(...)` ya da durdurulan an için `.moment(VideoPosition)` ile `VisualContext`
+   kurar ve `qa/service.answer_stream` içinde `stream_answer(..., visual=…)`a verir. Kareli iddia kayıtları mesaj
+   meta'sına mevcut `meta.claim_check` ile girer (migration gerekmez).
+2. `GET /sources/{source_id}` bugün `frame:<id>` kimliğine `404` döner; #25 bu kimliği kareye (`FrameRef`) çözmeli
+   ya da #27 alıntıdaki kareyi `GET /documents/{id}/frames` üzerinden açmalıdır.
+3. Öneri **[ekleme]**: `AskOutcome += "needs_clarification"` (#25, `schemas/ask.py`). Gelene kadar netleştirme
+   `insufficient_evidence` + `decline_reason` ile döner.
+
+**Koddan farklar.** Hepsi **[ekleme]**: yeni tipler ve modüller, `stream_answer(visual=)`, `check_claims(frames=)`,
+`CheckedText.removed/ambiguous` (iç API), sağlayıcılarda `complete_json_with_images` ve `accepts_images`,
+`ClaimLabel.label/reason` için genişletilmiş değer kümeleri (metin kayıtlarının değerleri aynı kaldı).
+
 ### 4.3 Görsel medya bağlamı, işler ve saklama (#25, ADR-11)
 
 **Durum:** koda geçti (#25). İstekteki video bağlamı doğrulanır, cevaba (`video_context`) ve mesaj kaydına

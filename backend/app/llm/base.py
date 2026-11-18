@@ -20,6 +20,29 @@ class ChatMessage(TypedDict):
     content: str
 
 
+class ImageInputUnsupported(LLMError):
+    """Sağlayıcı ya da model görüntü girdisi kabul etmiyor (#26). Görsel iddia kontrol
+    edilemez sayılır; görüntü yerine türetilmiş metinle karar verilmez."""
+
+
+@dataclass(frozen=True)
+class TextPart:
+    """Çok kipli isteğin metin parçası."""
+
+    text: str
+
+
+@dataclass(frozen=True)
+class ImagePart:
+    """Çok kipli isteğin görüntü parçası: dosyanın baytları ve türü (ör. "image/png")."""
+
+    data: bytes
+    mime_type: str
+
+
+ContentPart = TextPart | ImagePart
+
+
 @dataclass(frozen=True)
 class LLMUsage:
     """Tek bir model çağrısının token kullanımı. `output_tokens` düşünme token'larını içerir
@@ -50,6 +73,31 @@ class LLMClient(Protocol):
         ...
 
     def complete_json[T: BaseModel](self, system: str, prompt: str, schema: type[T]) -> T: ...
+
+
+@runtime_checkable
+class VisionClient(Protocol):
+    """Görüntü girdisiyle şemaya uyan JSON üretebilen istemci (#26).
+
+    `accepts_images` False ise (ör. yerel model yapılandırılmamış) görüntü gönderilmez.
+    Model görüntüyü reddederse çağrı `ImageInputUnsupported` fırlatır.
+    """
+
+    name: str
+    model: str
+    accepts_images: bool
+
+    def complete_json_with_images[T: BaseModel](
+        self, system: str, parts: list[ContentPart], schema: type[T]
+    ) -> T: ...
+
+
+def supports_images(client: object) -> bool:
+    """İstemci görüntü girdisi kabul ediyor mu? Yöntemi olmayan ya da `accepts_images`
+    False olan istemciye görüntü gönderilmez; görsel iddialar kontrol edilemez sayılır."""
+    return bool(getattr(client, "accepts_images", False)) and callable(
+        getattr(client, "complete_json_with_images", None)
+    )
 
 
 @dataclass(frozen=True)

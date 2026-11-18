@@ -5,6 +5,7 @@ Aracı (OpenRouter) yok: ders materyali ve sorular yalnızca Google'a gider (ADR
 
 - Metin: `generate_content_stream`; yalnızca düşünce olmayan metin parçaları akar.
 - JSON: `response_json_schema` ile şemaya bağlı çıktı, ardından Pydantic doğrulaması.
+  Görüntülü JSON (`complete_json_with_images`, #26): aynı şema kuralı, görüntü satır içi bayt.
 - Araç döngüsü: function calling, mod ANY (model her adımda bir araç çağırmak zorunda).
   Modelin döndürdüğü içerik geçmişe olduğu gibi eklenir; Gemini 3+'ın düşünme imzaları
   (thought signature) böylece korunur, aynı turdaki sonraki adım bunları ister.
@@ -20,7 +21,16 @@ from google import genai
 from google.genai import errors, types
 from pydantic import BaseModel, ValidationError
 
-from app.llm.base import ChatMessage, LLMError, LLMRefusal, LLMUsage, ToolCall, ToolSpec
+from app.llm.base import (
+    ChatMessage,
+    ContentPart,
+    ImagePart,
+    LLMError,
+    LLMRefusal,
+    LLMUsage,
+    ToolCall,
+    ToolSpec,
+)
 from app.llm.catalog import thinking_level_for
 
 logger = logging.getLogger(__name__)
@@ -38,6 +48,8 @@ _RETRY = types.HttpRetryOptions(attempts=3, http_status_codes=[429, 500, 502, 50
 
 class GeminiLLMClient:
     name = "gemini"
+    # Gemini modelleri görüntü girdisi kabul eder (#26).
+    accepts_images = True
 
     def __init__(
         self,
@@ -85,12 +97,22 @@ class GeminiLLMClient:
         _check_finish(finish)
 
     def complete_json[T: BaseModel](self, system: str, prompt: str, schema: type[T]) -> T:
+        return self._json(system, _contents([{"role": "user", "content": prompt}]), schema)
+
+    def complete_json_with_images[T: BaseModel](
+        self, system: str, parts: list[ContentPart], schema: type[T]
+    ) -> T:
+        """Görüntülü istek (#26): metin ve görüntü parçaları tek kullanıcı mesajında, sırasıyla."""
+        content = types.Content(role="user", parts=[_part(part) for part in parts])
+        return self._json(system, [content], schema)
+
+    def _json[T: BaseModel](self, system: str, contents: list[types.Content], schema: type[T]) -> T:
         config = self._config(
             system,
             response_mime_type="application/json",
             response_json_schema=schema.model_json_schema(),
         )
-        response = self._generate(_contents([{"role": "user", "content": prompt}]), config)
+        response = self._generate(contents, config)
         candidate = response.candidates[0]
         _check_finish(candidate.finish_reason)
         try:
@@ -228,6 +250,12 @@ def _contents(messages: list[ChatMessage]) -> list[types.Content]:
         )
         for m in messages
     ]
+
+
+def _part(part: ContentPart) -> types.Part:
+    if isinstance(part, ImagePart):
+        return types.Part.from_bytes(data=part.data, mime_type=part.mime_type)
+    return types.Part(text=part.text)
 
 
 def _text(candidate: types.Candidate) -> str:

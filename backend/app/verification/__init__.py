@@ -5,5 +5,6 @@ her iddiayı getirilen pasajlara göre supported / unsupported etiketleme
 (farklı model ailesinden judge), hallucination oranını loglama.
 
 Durum: kaynak ID doğrulaması (`citations.py`) ve iddia kontrolü (`claims.py`, `judge.py`, #10)
-çalışıyor; hallucination oranı `hallucination.py`. Karar: DECISIONS.md ADR-8.
+çalışıyor; hallucination oranı `hallucination.py`. Kareye dayanan iddialar karenin görüntüsüyle
+kontrol edilir (`visual.py`, #26). Karar: DECISIONS.md ADR-8.
 """
