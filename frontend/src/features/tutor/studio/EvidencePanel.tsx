@@ -27,6 +27,7 @@ export default function EvidencePanel({
   anchorRef,
   onClose,
   onSelectSource,
+  onPlayAt,
 }: {
   sourceId: string;
   course: Course;
@@ -37,6 +38,8 @@ export default function EvidencePanel({
   onClose: () => void;
   /** Video alıntısının doküman karşılığı seçilince aynı panelde açılır. */
   onSelectSource: (sourceId: string) => void;
+  /** Video alıntısında oynatıcıyı o saniyeye götürür (oynatma adresi varsa). */
+  onPlayAt?: (documentId: number, seconds: number) => void;
 }) {
   const { source, failure, retry } = useSourceDetail(sourceId);
   const [copied, setCopied] = useState(false);
@@ -115,6 +118,17 @@ export default function EvidencePanel({
                 <PlayCircle size={16} aria-hidden className="text-accent" />
                 {source.t_start != null ? formatTimeRange(source.t_start, source.t_end) : "Ders videosu"}
               </p>
+              {onPlayAt && source.media_url && source.t_start != null && (
+                <Button
+                  size="sm"
+                  variant="primary"
+                  icon={PlayCircle}
+                  className="self-start"
+                  onClick={() => onPlayAt(source.document_id, source.t_start!)}
+                >
+                  Videoda bu ana git
+                </Button>
+              )}
               <blockquote className="border-l-2 border-marker pl-3 font-mono text-sm leading-relaxed whitespace-pre-wrap text-ink">
                 <span key={source.source_id} ref={anchorRef} className="marker-sweep">
                   {source.text}
@@ -159,7 +173,7 @@ export default function EvidencePanel({
               ? "İşaretli satırlar cevapta kullanılan bölümü gösterir. Cevapla karşılaştırıp kontrol et."
               : "Cevapta kullanılan bölüm burada. Cevapla karşılaştırıp kontrol et."}
           </span>
-          {source.media_url && (
+          {source.media_url && !(isVideo && onPlayAt) && (
             <a href={source.media_url} target="_blank" rel="noreferrer" className="link inline-flex items-center gap-1">
               <ExternalLink size={12} aria-hidden />
               {isPdf ? "Dosyada aç" : isVideo ? "Videoda aç" : "İndir"}

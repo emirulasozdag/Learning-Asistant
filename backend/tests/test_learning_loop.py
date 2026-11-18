@@ -339,3 +339,25 @@ def test_activity_items_carry_the_answer_message_id(db, client_for, setup) -> No
     activity = client_for(s.instructor).get(f"/instructor/courses/{s.course.id}/activity").json()
 
     assert {q["answer_message_id"] for q in activity["recent_questions"]} == {a.id for a in answers}
+
+
+def test_instructor_lists_practice_items_with_key_and_latest_review(db, client_for, setup) -> None:
+    s = setup
+    released = mcq_question(db, s, "ikili arama adımı")
+    mcq_question(db, s, "ikili arama adımı", status="rejected")  # öğrenciye hiç gitmedi
+    instructor = client_for(s.instructor)
+    review(instructor, "practice_item", released.id, "correct", "B şıkkı da savunulabilir.")
+
+    response = instructor.get(f"/instructor/courses/{s.course.id}/practice-items")
+
+    assert response.status_code == 200, response.text
+    items = response.json()
+    assert [item["id"] for item in items] == [released.id]
+    item = items[0]
+    assert item["status"] == "withdrawn" and item["correct_option"] == 0
+    assert item["source"]["source_id"] == str(s.chunk_id)
+    assert item["latest_review"]["decision"] == "correct"
+    assert item["latest_review"]["correction"] == "B şıkkı da savunulabilir."
+    path = f"/instructor/courses/{s.course.id}/practice-items"
+    assert client_for(s.ta).get(path).status_code == 200
+    assert client_for(s.students[0]).get(path).status_code == 403

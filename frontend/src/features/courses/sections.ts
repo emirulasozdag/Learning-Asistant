@@ -6,6 +6,7 @@ import {
   FileText,
   FolderOpen,
   LayoutList,
+  ListChecks,
   MessageSquareText,
   NotebookText,
   PencilLine,
@@ -79,10 +80,12 @@ export function toolSections(role: "student" | "instructor", base: string): Sect
         { to: base, label: "Genel bakış", icon: LayoutList, end: true },
         { to: `${base}/materials`, label: "Materyal yönetimi", icon: FolderOpen },
         { to: `${base}/activity`, label: "Etkinlik ve analitik", icon: BarChart3 },
+        { to: `${base}/review`, label: "İnceleme ve sık hatalar", icon: ListChecks },
       ]
     : [
         { to: base, label: "Genel bakış", icon: LayoutList, end: true },
         { to: `${base}/tutor`, label: "AI Tutor", icon: MessageSquareText },
+        { to: `${base}/learning`, label: "Öğrenme kaydım", icon: BarChart3 },
       ];
 }
 

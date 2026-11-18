@@ -4,6 +4,8 @@ from typing import Literal, Self
 from pydantic import BaseModel, Field, model_validator
 
 from app.schemas.ask import AskOutcome
+from app.schemas.common import Citation
+from app.schemas.practice import Difficulty, PracticeType
 
 # Eğitmen düzeltmesinin en uzun hali (karakter).
 MAX_CORRECTION = 4000
@@ -42,6 +44,35 @@ class ReviewDecision(BaseModel):
         if self.decision == "correct" and self.correction is None:
             raise ValueError("Düzeltme kararında düzeltme metni yazılmalı")
         return self
+
+
+class LatestReview(BaseModel):
+    decision: Literal["approve", "correct"]
+    correction: str | None = None
+    created_at: datetime
+
+
+class PracticeItemReview(BaseModel):
+    """Eğitmenin incelediği pratik sorusu (#22): cevap anahtarı ve açıklama dahil.
+
+    Öğrenci kimliği ve deneme bilgisi içermez; soru dersin malıdır.
+    """
+
+    id: int
+    type: PracticeType
+    topic: str | None = None
+    difficulty: Difficulty
+    prompt: str
+    options: list[str] | None = None
+    correct_option: int | None = None
+    reference_answer: str | None = None
+    explanation: str
+    # "released": öğrencilere sunuluyor; "withdrawn": eğitmen düzeltti, sunulmuyor.
+    status: Literal["released", "withdrawn"]
+    rubric_approved: bool = False
+    source: Citation
+    created_at: datetime
+    latest_review: LatestReview | None = None
 
 
 class ReviewOut(BaseModel):

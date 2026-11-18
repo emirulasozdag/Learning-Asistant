@@ -44,11 +44,17 @@ export default function AppHeader({ onOpenMenu }: { onOpenMenu: () => void }) {
       </nav>
 
       <div className="ml-auto flex items-center gap-3 md:ml-6 md:border-l md:border-line md:pl-6">
-        <div className="hidden text-right sm:block">
-          <p className="text-sm leading-tight font-semibold text-ink">{user.name}</p>
-          <p className="text-xs text-graphite">{ROLE_LABELS[user.role]}</p>
-        </div>
-        <Avatar name={user.name} className="bg-accent text-on-accent" />
+        <Link
+          to={`${homePath(user.role)}/account`}
+          className="flex items-center gap-3 rounded-control px-1 py-1 hover:bg-subtle"
+          aria-label={`Hesabım: ${user.name}`}
+        >
+          <span className="hidden text-right sm:block">
+            <span className="block text-sm leading-tight font-semibold text-ink">{user.name}</span>
+            <span className="block text-xs text-graphite">{ROLE_LABELS[user.role]}</span>
+          </span>
+          <Avatar name={user.name} className="bg-accent text-on-accent" />
+        </Link>
         <IconButton icon={LogOut} label="Çıkış yap" onClick={() => void logout()} />
       </div>
     </header>

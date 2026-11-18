@@ -1,4 +1,4 @@
-import { ExternalLink, FileText, X } from "lucide-react";
+import { ExternalLink, FileText, PlayCircle, X } from "lucide-react";
 
 import Sheet from "../../components/Sheet";
 import { materialLabel } from "../../labels";
@@ -21,12 +21,15 @@ export default function SourcePanel({
   sourceId,
   onClose,
   onSelectSource,
+  onPlayAt,
   modal = false,
 }: {
   sourceId: string;
   onClose: () => void;
   /** Video alıntısının doküman karşılığı seçilince aynı panelde açılır. */
   onSelectSource?: (sourceId: string) => void;
+  /** Video alıntısında oynatıcıyı o saniyeye götürür. */
+  onPlayAt?: (documentId: number, seconds: number) => void;
   modal?: boolean;
 }) {
   const { source: current, failure, retry } = useSourceDetail(sourceId);
@@ -61,7 +64,16 @@ export default function SourcePanel({
             </div>
           )}
         </div>
-        {current?.media_url && (
+        {current && isVideo && onPlayAt && current.media_url && current.t_start != null ? (
+          <Button
+            size="sm"
+            variant="ghost"
+            icon={PlayCircle}
+            onClick={() => onPlayAt(current.document_id, current.t_start!)}
+          >
+            Videoda bu ana git
+          </Button>
+        ) : current?.media_url && (
           <a
             href={current.media_url}
             target="_blank"

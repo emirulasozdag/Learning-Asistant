@@ -21,6 +21,7 @@ import type {
   Me,
   MistakeSummary,
   PracticeItem,
+  PracticeItemReview,
   PracticeRequest,
   RegisterRequest,
   ReviewDecision,
@@ -241,6 +242,12 @@ export const api = {
   updateConsent: (body: ConsentUpdate) =>
     request<Consent>("/me/consent", { method: "PUT", body: JSON.stringify(body) }),
 
+  /** Sohbetleri ve pratik cevaplarını siler; hesap kalır (ADR-4). */
+  deleteMyData: () => request<void>("/me/data", { method: "DELETE" }),
+
+  /** Hesabı ve bütün kişisel veriyi siler; oturum kapanır. */
+  deleteAccount: () => request<void>("/me", { method: "DELETE" }),
+
   courses: () => request<CourseSummary[]>("/courses"),
 
   joinCourse: (code: string) =>
@@ -280,14 +287,17 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
-  learningRecord: (courseId: number) =>
-    request<LearningRecord>(`/courses/${courseId}/learning-record`),
+  learningRecord: (courseId: number, signal?: AbortSignal) =>
+    request<LearningRecord>(`/courses/${courseId}/learning-record`, { signal }),
 
   courseActivity: (courseId: number, signal?: AbortSignal) =>
     request<CourseActivity>(`/instructor/courses/${courseId}/activity`, { signal }),
 
-  frequentMistakes: (courseId: number) =>
-    request<MistakeSummary[]>(`/instructor/courses/${courseId}/mistakes`),
+  frequentMistakes: (courseId: number, signal?: AbortSignal) =>
+    request<MistakeSummary[]>(`/instructor/courses/${courseId}/mistakes`, { signal }),
+
+  practiceItems: (courseId: number, signal?: AbortSignal) =>
+    request<PracticeItemReview[]>(`/instructor/courses/${courseId}/practice-items`, { signal }),
 
   submitReview: (body: ReviewDecision) =>
     request<ReviewOut>("/instructor/reviews", { method: "POST", body: JSON.stringify(body) }),

@@ -12,9 +12,10 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.db.models import (
+    Chunk,
     Conversation,
     Enrollment,
     InstructorReview,
@@ -22,7 +23,12 @@ from app.db.models import (
     PracticeQuestion,
     User,
 )
-from app.schemas.instructor import ReviewDecision, ReviewOut
+from app.practice.service import citation
+from app.schemas.instructor import LatestReview, PracticeItemReview, ReviewDecision, ReviewOut
+from app.schemas.practice import PracticeType
+
+# Eğitmenin inceleme listesinde gösterilen en fazla soru (en yeniler).
+MAX_PRACTICE_ITEMS = 50
 
 # Eğitmenin inceleyebileceği pratik soruları: otomatik kontrolün reddettikleri öğrenciye hiç
 # gitmediği için inceleme hedefi değildir.
@@ -102,3 +108,59 @@ def apply_review(
         correction=review.correction,
         created_at=review.created_at,
     )
+
+
+def list_practice_items(db: Session, course_id: int) -> list[PracticeItemReview]:
+    """Dersin öğrencilere sunulmuş (ya da eğitmenin geri çektiği) son pratik soruları."""
+    questions = db.scalars(
+        select(PracticeQuestion)
+        .where(
+            PracticeQuestion.course_id == course_id,
+            PracticeQuestion.status.in_(REVIEWABLE_STATUSES),
+        )
+        .options(
+            joinedload(PracticeQuestion.rubric),
+            joinedload(PracticeQuestion.chunk).joinedload(Chunk.document),
+        )
+        .order_by(PracticeQuestion.created_at.desc(), PracticeQuestion.id.desc())
+        .limit(MAX_PRACTICE_ITEMS)
+    ).all()
+    latest: dict[int, InstructorReview] = {}
+    if questions:
+        reviews = db.scalars(
+            select(InstructorReview)
+            .where(InstructorReview.question_id.in_([q.id for q in questions]))
+            .order_by(InstructorReview.id)
+        ).all()
+        latest = {review.question_id: review for review in reviews if review.question_id}
+    items = []
+    for question in questions:
+        mcq = question.type == PracticeType.MCQ
+        review = latest.get(question.id)
+        items.append(
+            PracticeItemReview(
+                id=question.id,
+                type=PracticeType(question.type),
+                topic=question.topic,
+                difficulty=question.difficulty,  # type: ignore[arg-type]
+                prompt=question.prompt,
+                options=question.options,
+                correct_option=int(question.answer_key["correct_option"]) if mcq else None,
+                reference_answer=None if mcq else question.answer_key.get("reference_answer"),
+                explanation=question.explanation,
+                status=question.status,  # type: ignore[arg-type]
+                rubric_approved=bool(question.rubric and question.rubric.approved),
+                source=citation(question.chunk),
+                created_at=question.created_at,
+                latest_review=(
+                    LatestReview(
+                        decision=review.decision,  # type: ignore[arg-type]
+                        correction=review.correction,
+                        created_at=review.created_at,
+                    )
+                    if review
+                    else None
+                ),
+            )
+        )
+    return items

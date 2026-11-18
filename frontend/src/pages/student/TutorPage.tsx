@@ -7,6 +7,8 @@ import {
   MessageSquareText,
   ServerOff,
   SquarePen,
+  Video,
+  X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router";
@@ -34,8 +36,10 @@ import { answerOf, entryState } from "../../features/tutor/turns";
 import TurnExtras from "../../features/tutor/TutorTurnView";
 import type { Segment, TutorTurn } from "../../features/tutor/types";
 import { useIsDesktop } from "../../features/tutor/useIsDesktop";
+import LecturePlayer, { type PlayerHandle } from "../../features/video/LecturePlayer";
 import { describeTotals, documentExtent, materialLabel, materialTotals } from "../../labels";
 import { courseService, type Course } from "../../services/courseService";
+import { formatTime } from "../../text";
 import { tutorService, type QuickAction } from "../../services/tutorService";
 import Button from "../../ui/Button";
 import EmptyState from "../../ui/EmptyState";
@@ -98,6 +102,12 @@ function TutorSession({ course }: { course: Course }) {
   // Ana sayfadaki soru kutusundan gelen soru (?q=): materyal hazır olunca bir kez sorulur.
   const [searchParams, setSearchParams] = useSearchParams();
   const pendingQuestion = useRef(searchParams.get("q"));
+  // İzlenen ders videosu (?video=<doküman>&t=<saniye>): sorular durdurulan anla birlikte gider.
+  const playerRef = useRef<PlayerHandle>(null);
+  const videoParam = Number(searchParams.get("video")) || null;
+  const startParam = Math.max(0, Number(searchParams.get("t")) || 0);
+  const videoDoc = playableVideo(materials, videoParam);
+  const [videoTime, setVideoTime] = useState(startParam);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -114,6 +124,13 @@ function TutorSession({ course }: { course: Course }) {
 
   // Sayfadan ya da dersten ayrılırken süren soruyu iptal et.
   useEffect(() => () => abortRef.current?.abort(), []);
+
+  // Durdurulan anı her saniye okur: composer'ın altındaki "videonun 12:34 anı" notu için.
+  useEffect(() => {
+    if (!videoDoc) return;
+    const timer = window.setInterval(() => setVideoTime(playerRef.current?.currentTime() ?? 0), 1000);
+    return () => window.clearInterval(timer);
+  }, [videoDoc]);
 
   const activeTurn = turns.find((turn) => turn.id === activeId) ?? turns[turns.length - 1] ?? null;
   const activeIndex = activeTurn ? turns.indexOf(activeTurn) : -1;
@@ -188,7 +205,17 @@ function TutorSession({ course }: { course: Course }) {
     const controller = new AbortController();
     abortRef.current = controller;
     try {
-      await tutorService.turn(courseId, text, conversationId, (event) => applyEvent(id, event), controller.signal);
+      const video = videoDoc
+        ? { document_id: videoDoc.id, time_s: Math.floor(playerRef.current?.currentTime() ?? 0) }
+        : null;
+      await tutorService.turn(
+        courseId,
+        text,
+        conversationId,
+        (event) => applyEvent(id, event),
+        controller.signal,
+        video,
+      );
       updateTurn(id, (t) => {
         if (t.done || t.failure) return t;
         return controller.signal.aborted ? { ...t, stopped: true } : { ...t, failure: { kind: "unavailable" } };
@@ -208,7 +235,13 @@ function TutorSession({ course }: { course: Course }) {
     const text = pendingQuestion.current;
     if (!text || !materials || materials.length === 0) return;
     pendingQuestion.current = null;
-    setSearchParams({}, { replace: true });
+    setSearchParams(
+      (params) => {
+        params.delete("q");
+        return params;
+      },
+      { replace: true },
+    );
     void ask(text);
     // `ask` her çizimde yeniden oluşur; soru yalnızca materyal ilk yüklendiğinde sorulmalı.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -317,6 +350,29 @@ function TutorSession({ course }: { course: Course }) {
     });
   }
 
+  /** Video alıntısından: aynı videoysa o saniyeye atlar, başka videoysa onu o anda açar. */
+  function playAt(documentId: number, seconds: number) {
+    if (videoDoc?.id === documentId) {
+      playerRef.current?.seek(seconds);
+      setVideoTime(seconds);
+    } else if (playableVideo(materials, documentId)) {
+      setSearchParams((params) => {
+        params.set("video", String(documentId));
+        params.set("t", String(Math.floor(seconds)));
+        return params;
+      });
+    }
+    workspaceRef.current?.querySelector("[data-lecture-player]")?.scrollIntoView({ block: "nearest" });
+  }
+
+  function closeVideo() {
+    setSearchParams((params) => {
+      params.delete("video");
+      params.delete("t");
+      return params;
+    });
+  }
+
   const noMaterials = materials !== null && materials.length === 0;
   // Dar ekranda kaynak tam ekran açılır; yalnızca öğrenci açıkça istediğinde.
   const mobileSource = !desktop && current.sourceOverride;
@@ -326,6 +382,27 @@ function TutorSession({ course }: { course: Course }) {
     <div className="flex h-full min-h-0 flex-col">
       <div ref={workspaceRef} className="relative flex min-h-0 flex-1 gap-8 px-4 sm:px-6">
         <section className="flex min-w-0 flex-1 flex-col">
+          {videoDoc && (
+            <div data-lecture-player className="mx-auto mb-3 w-full max-w-3xl shrink-0">
+              <div className="mb-2 flex items-center gap-2">
+                <Video size={16} aria-hidden className="shrink-0 text-accent" />
+                <p className="min-w-0 flex-1 truncate text-sm font-medium text-ink">{videoDoc.title}</p>
+                <IconButton icon={X} label="Videoyu kapat" size="sm" onClick={closeVideo} />
+              </div>
+              <div className="max-h-[38vh] overflow-hidden rounded-panel [&>*]:max-h-[38vh]">
+                <LecturePlayer
+                  // Başka video seçilince oynatıcı baştan kurulur.
+                  key={videoDoc.id}
+                  ref={playerRef}
+                  mediaUrl={videoDoc.media_url!}
+                  title={videoDoc.title}
+                  start={startParam}
+                  captionsUrl={videoDoc.file_url}
+                  captionsLang={course.language}
+                />
+              </div>
+            </div>
+          )}
           {turns.length > 0 && (
             <div className="flex shrink-0 items-center gap-2 pb-2">
               <span className="font-mono text-xs text-graphite">
@@ -445,6 +522,7 @@ function TutorSession({ course }: { course: Course }) {
               anchorRef={setAnchorElement}
               onClose={closeSource}
               onSelectSource={switchSource}
+              onPlayAt={playAt}
             />
           </div>
         )}
@@ -484,11 +562,25 @@ function TutorSession({ course }: { course: Course }) {
                 ? "Takip sorusu sor"
                 : "Bu ders hakkında bir soru sor ya da \"beni test et\" de"
           }
-          hint="Cevaplar ders materyalindeki bölümlere dayandırılır; önemli konularda kaynağı açıp kontrol et."
+          hint={
+            videoDoc
+              ? `Soruların videonun ${formatTime(videoTime)} anıyla birlikte gider; önce o ana yakın bölümler aranır.`
+              : "Cevaplar ders materyalindeki bölümlere dayandırılır; önemli konularda kaynağı açıp kontrol et."
+          }
         />
       </div>
 
-      {mobileSource && <SourceViewer sourceId={mobileSource} onClose={closeSource} onSelectSource={switchSource} />}
+      {mobileSource && (
+        <SourceViewer
+          sourceId={mobileSource}
+          onClose={closeSource}
+          onSelectSource={switchSource}
+          onPlayAt={(documentId, seconds) => {
+            closeSource();
+            playAt(documentId, seconds);
+          }}
+        />
+      )}
 
       {/* Ekran okuyucu için durum duyurusu: yalnızca durum değişince güncellenir. */}
       <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
@@ -674,4 +766,13 @@ function withSegment(turn: TutorTurn, index: number, change: (segment: Segment) 
   while (segments.length <= index) segments.push({ tool: turn.tool ?? "", streamText: "" });
   segments[index] = change(segments[index]);
   return { ...turn, segments };
+}
+
+/** Oynatılabilir ders videosu: hazır, video türünde ve eğitmenin verdiği bir oynatma adresi olan. */
+function playableVideo(materials: DocumentOut[] | null, id: number | null): DocumentOut | undefined {
+  if (id == null) return undefined;
+  return materials?.find(
+    (document) =>
+      document.id === id && document.material_type === "video" && document.status === "ready" && Boolean(document.media_url),
+  );
 }
