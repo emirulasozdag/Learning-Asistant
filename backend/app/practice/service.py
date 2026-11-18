@@ -27,7 +27,7 @@ from app.generation.grade import Grade, GradingError, grade_choice, grade_open_a
 from app.generation.question import LANGUAGE_NAMES, GeneratedQuestion, Language, generate_question
 from app.llm.base import LLMClient, LLMError
 from app.retrieval.hybrid import retrieve
-from app.retrieval.rerank import rerank, rerank_scored
+from app.retrieval.rerank import rerank_scored
 from app.retrieval.types import RetrievedPassage
 from app.schemas.common import Citation
 from app.schemas.evaluation import AnswerFeedback, AnswerSubmission, CriterionScore
@@ -216,9 +216,10 @@ def _candidate_passages(
     # kodu; ikili arama ağacı değil).
     wants_code = question_type == PracticeType.CODE_TRACING
     need = (
-        f"Şu konunun kodunu ya da sözde kodunu içeren bölüm: {query}"
+        f"Şu konunun kodunu ya da sözde kodunu içeren ve konuyu öğreten bölüm: {query}"
         if wants_code
-        else f"Şu konuyu öğreten bölüm: {query}"
+        else f"Şu konunun temel kavramlarını öğreten bölüm (bir sınav ya da ödev probleminin "
+        f"konuya özel bir uygulaması değil): {query}"
     )
 
     preferred = _usable(
@@ -242,8 +243,41 @@ def _candidate_passages(
         usable = [p for p in usable if _has_code(p.text)]
     if reranker is not None:
         # Konuyu öğreten parça öne gelsin ("binary search" → ikili ağaç değil, ikili arama).
-        usable = rerank(need, usable, reranker, MAX_CANDIDATES)
+        # Hepsi 0 puan alırsa aramanın sırası kalır (kapı zaten "ilgili" demiştir).
+        usable = _teaching_first(db, rerank_scored(need, usable, reranker)) or usable
     return usable[:MAX_CANDIDATES]
+
+
+# Konuyu anlatan materyal. Sınav ve problem setleri de kaynak olur, ama aynı ilgideyken soru
+# konunun temelinden sorulsun diye anlatımın arkasına düşer: sınav problemi çoğu zaman konunun
+# özel bir uygulamasıdır ("Sorting" → "k-even-mixed dizi" problemi).
+TEACHING_TYPES = {
+    MaterialType.NOTES.value,
+    MaterialType.SLIDES.value,
+    MaterialType.TEXTBOOK.value,
+    MaterialType.TRANSCRIPT.value,
+    MaterialType.VIDEO.value,
+}
+
+
+def _teaching_first(
+    db: Session, scored: list[tuple[RetrievedPassage, int]]
+) -> list[RetrievedPassage]:
+    """İlgili (puanı > 0) parçalar: önce ilgi puanı, eşitse anlatım materyali, sonra arama
+    sırası. Hiçbiri ilgili değilse boş."""
+    ids = {passage.document_id for passage, _ in scored}
+    types = dict(
+        db.execute(select(Document.id, Document.material_type).where(Document.id.in_(ids))).all()
+    )
+    ranked = sorted(
+        (
+            (-score, types.get(passage.document_id) not in TEACHING_TYPES, index, passage)
+            for index, (passage, score) in enumerate(scored)
+            if score > 0
+        ),
+        key=lambda item: item[:3],
+    )
+    return [passage for *_, passage in ranked]
 
 
 _CODE_LINE = re.compile(

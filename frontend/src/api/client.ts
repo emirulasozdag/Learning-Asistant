@@ -243,8 +243,8 @@ export const api = {
   source: (sourceId: string, signal?: AbortSignal) =>
     request<SourceDetail>(`/sources/${encodeURIComponent(sourceId)}`, { signal }),
 
-  generatePractice: (body: PracticeRequest) =>
-    request<PracticeItem>("/practice", { method: "POST", body: JSON.stringify(body) }),
+  generatePractice: (body: PracticeRequest, signal?: AbortSignal) =>
+    request<PracticeItem>("/practice", { method: "POST", body: JSON.stringify(body), signal }),
 
   submitAnswer: (itemId: number, body: AnswerSubmission) =>
     request<AnswerFeedback>(`/practice/${itemId}/answer`, {

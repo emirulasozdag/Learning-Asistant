@@ -22,6 +22,7 @@ import TutorIndex from "./pages/student/TutorIndex";
 import TutorPage from "./pages/student/TutorPage";
 import VideoStudyPage from "./pages/student/VideoStudyPage";
 import LearningRecordPage from "./pages/student/LearningRecordPage";
+import PracticePage from "./pages/student/PracticePage";
 import AccountPage from "./pages/account/AccountPage";
 import { NotFound, RootRedirect } from "./pages/system";
 
@@ -37,6 +38,7 @@ import { NotFound, RootRedirect } from "./pages/system";
  *   /student/courses/:id                     ders genel bakış
  *   /student/courses/:id/materials           ders materyalleri
  *   /student/courses/:id/tutor               AI Tutor (ders çerçevesinde; ?video=<id>&t=<s> ders videosu)
+ *   /student/courses/:id/practice            pratik: konu, tür ve zorluk seçip kontrol edilmiş soru çöz
  *   /student/courses/:id/learning            öğrenme kaydım
  *   /student/courses/:id/watch/:documentId   video çalışma ekranı (video + transkript + soru-cevap)
  *   /student/account, /instructor/account    hesabım: araştırma kaydı, verilerimi/hesabımı sil
@@ -110,6 +112,7 @@ export const router = createBrowserRouter([
           { path: "materials", element: <CourseMaterialsPage /> },
           // AI Tutor da ders çerçevesinin içinde açılır; sekmeler arasında düzen değişmez (#103).
           { path: "tutor", element: <TutorPage /> },
+          { path: "practice", element: <PracticePage /> },
           { path: "learning", element: <LearningRecordPage /> },
           ...contentRoutes,
         ],
