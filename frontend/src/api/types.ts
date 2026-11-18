@@ -237,6 +237,9 @@ export type PracticeType = "mcq" | "short_answer" | "code_tracing";
 
 export type Difficulty = "easy" | "medium" | "hard";
 
+/** `PracticeRequest.topic` üst sınırı (backend `schemas/practice.py` ile aynı). */
+export const MAX_TOPIC_CHARS = 300;
+
 export interface PracticeRequest {
   course_id: number;
   type: PracticeType;

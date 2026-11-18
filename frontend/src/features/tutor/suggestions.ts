@@ -15,6 +15,18 @@ const TOPIC_TYPES: MaterialType[] = ["notes", "slides", "textbook", "transcript"
  * sonuna yayılarak seçilir; ikisi "anlat", ikisi "beni test et".
  */
 export function courseSuggestions(documents: DocumentOut[], count = 4): Suggestion[] {
+  return courseTopics(documents, count).map((topic, index) =>
+    index % 2 === 0
+      ? { kind: "explain", text: `${topic} konusunu kısaca anlatır mısın?` }
+      : { kind: "quiz", text: `${topic} konusunda beni test et` },
+  );
+}
+
+/**
+ * Dersin materyal başlıklarından konu adları ("Lecture 13: Dijkstra's Algorithm" → "Dijkstra's
+ * Algorithm"); dersin başından sonuna yayılarak en fazla `count` tane. Uydurma konu yoktur.
+ */
+export function courseTopics(documents: DocumentOut[], count: number): string[] {
   const type = TOPIC_TYPES.find((candidate) => documents.some((d) => d.material_type === candidate));
   if (!type) return [];
   const topics = [
@@ -24,12 +36,7 @@ export function courseSuggestions(documents: DocumentOut[], count = 4): Suggesti
         .filter((topic): topic is string => topic !== null),
     ),
   ];
-  const picked = spread(topics, count);
-  return picked.map((topic, index) =>
-    index % 2 === 0
-      ? { kind: "explain", text: `${topic} konusunu kısaca anlatır mısın?` }
-      : { kind: "quiz", text: `${topic} konusunda beni test et` },
-  );
+  return spread(topics, count);
 }
 
 // Konu taşımayan başlıklar: "Recitation 5", "Lecture 3", "Hafta 2", "Giriş".

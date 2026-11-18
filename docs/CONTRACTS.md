@@ -97,7 +97,7 @@ tiplerden başlar.
 | `PracticeItem` | `id, type, prompt, options?, source: Citation` | aynı |
 | `AnswerSubmission` | `answer_text, selected_option` (tam biri dolu; PR B'den önce: `answer: str`) | `AnswerSubmission` tipi; `api.submitAnswer(itemId, body: AnswerSubmission)` |
 | `AnswerFeedback` | `attempt_id, item_id, score, max_score, understood, missing_concepts, explanation, citations, follow_up_item_id` | aynı |
-| Pratik arayüzü | — | yok: `PracticePage` ve `mock/practice.ts` PR #68'de silindi; `/student/practice` artık `/student`'a yönleniyor ([router.tsx](../frontend/src/router.tsx)) |
+| Pratik arayüzü | — | `/student/courses/{id}/practice` (#17, [PracticePage.tsx](../frontend/src/pages/student/PracticePage.tsx), [features/practice/](../frontend/src/features/practice/)): kurulum (konu, tür, zorluk) → oturum (tek soru odakta, ilerleme, kısayollar: 1–4/A–D seç, Enter gönder, N sonraki) → özet (puan, eksik/kavranan kavramlar, kavramdan yeni soru). Gerçek `POST /practice` ve `/answer` çağrılır; oturum sekme kapanana kadar `sessionStorage`'da kalır. Konu önerileri dersin materyal başlıklarından ve öğrenme kaydındaki eksik kavramlardan gelir. Cevap girişi ve geri bildirim AI Tutor'un pratik kartıyla ortak bileşenlerdir. `/student/practice` hâlâ `/student`'a yönlenir |
 
 **Uygulandı (ai-foundation, ADR-7):** `POST /practice` ve `POST /practice/{id}/answer` çalışır; AI Tutor'da
 `generate_practice` aracıyla sohbetin içinde de soru gelir (§9). Kontrolden geçen soru yoksa `422 no_valid_item`;

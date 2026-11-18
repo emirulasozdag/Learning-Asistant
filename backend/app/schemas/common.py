@@ -23,6 +23,8 @@ ErrorCode = Literal[
     "ingestion_failed",
     "course_exists",
     "no_valid_item",
+    # Yapay zekâ servisi yanıt vermedi (yoğunluk, kota, model yok); geçicidir (#105).
+    "ai_unavailable",
     # Pratik sorusu yok, kontrolden geçmemiş ya da kullanıcı dersin üyesi değil.
     "practice_item_not_found",
     # #20: incelenecek asistan cevabı yok ya da eğitmen onu göremez.

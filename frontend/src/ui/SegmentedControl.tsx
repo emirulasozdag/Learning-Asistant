@@ -17,6 +17,8 @@ interface SegmentedControlProps<T extends string> {
   onChange: (value: T) => void;
   /** "cards": açıklamalı büyük seçenekler (ör. rol seçimi); "inline": kompakt. */
   variant?: "inline" | "cards";
+  /** Yalnızca "cards": sütun sayısı (dar ekranda tek sütun). */
+  columns?: 2 | 3;
 }
 
 /** Birbirini dışlayan seçenekler; klavye ile ok tuşlarıyla gezilebilir (radio grubu). */
@@ -27,6 +29,7 @@ export default function SegmentedControl<T extends string>({
   value,
   onChange,
   variant = "inline",
+  columns = 2,
 }: SegmentedControlProps<T>) {
   const cards = variant === "cards";
   return (
@@ -35,7 +38,7 @@ export default function SegmentedControl<T extends string>({
       <div
         className={cx(
           cards
-            ? "grid grid-cols-2 gap-2"
+            ? cx("grid gap-2", columns === 3 ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-2")
             : "inline-flex rounded-control border border-line bg-subtle p-0.5",
         )}
       >
