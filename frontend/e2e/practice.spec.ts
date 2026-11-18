@@ -228,3 +228,151 @@ test("kontrolden geçen soru üretilemezse dürüstçe söylenir", async ({ page
   await expect(page.getByRole("paragraph").filter({ hasText: notice.text })).toBeVisible();
   await expect(page.getByRole("region", { name: "Pratik sorusu" })).toHaveCount(0);
 });
+
+// --- Pratik sayfası (#17) ---
+
+async function openPracticePage(page: Page, courseId: number) {
+  await page.goto(`/student/courses/${courseId}/practice`);
+  await expect(page.getByRole("heading", { name: "Ne çalışmak istiyorsun?" })).toBeVisible();
+}
+
+function topicBox(page: Page) {
+  return page.getByRole("textbox", { name: "Konu", exact: true });
+}
+
+test("pratik sayfası: konu boşsa söyler; yapay zekâ yoksa gerçek API'nin cevabıyla dürüstçe söyler", async ({
+  page,
+}) => {
+  // Test sistemi LLM'siz: gerçek `POST /practice` 503 `ai_unavailable` döner (taklit yok).
+  const algorithms = course("A");
+  await openPracticePage(page, algorithms.id);
+
+  await page.getByRole("button", { name: "Pratiğe başla" }).click();
+  await expect(page.getByText("Hangi konuda soru istediğini yaz")).toBeVisible();
+  await expect(topicBox(page)).toBeFocused();
+
+  await topicBox(page).fill("ikili arama");
+  await topicBox(page).press("Enter");
+
+  const alert = page.getByRole("alert");
+  await expect(alert).toContainText("yapay zekâ şu an kullanılamıyor");
+  // Sorun konuda değil: konuyu değiştirme önerisi yok, tekrar deneme var.
+  await expect(alert).not.toContainText("farklı kelimelerle");
+  await expect(alert.getByRole("button", { name: "Tekrar dene" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Soru 1" })).toHaveCount(0);
+
+  await alert.getByRole("button", { name: "Konuyu ya da türü değiştir" }).click();
+  await expect(topicBox(page)).toHaveValue("ikili arama");
+});
+
+function answerBody(itemId: number, ok: boolean, documentTitle: string) {
+  return {
+    attempt_id: itemId,
+    item_id: itemId,
+    score: ok ? 1 : 0,
+    max_score: 1,
+    understood: ok ? ["ikili arama adımı"] : [],
+    missing_concepts: ok ? [] : ["sıralı dizi şartı"],
+    explanation: ok ? "Doğru cevap: A) Yarıyı atar." : "Doğru cevap: A) Yarıyı atar. Dizi sıralı olmalıdır.",
+    citations: [citation(documentTitle)],
+    follow_up_item_id: null,
+    correct_option: 0,
+    reference_answer: null,
+    criteria: [],
+  };
+}
+
+test("pratik oturumu: seçilen ayarlarla soru gelir, klavyeyle çözülür, kaynakla karşılaştırılır, özetle biter", async ({
+  page,
+}) => {
+  const algorithms = course("A");
+  const first = { ...practiceItem(9101, algorithms.id, algorithms.documentTitle, "İkili arama her adımda ne yapar?"), difficulty: "hard" };
+  const second = { ...practiceItem(9102, algorithms.id, algorithms.documentTitle, "İkili arama hangi dizide çalışır?"), difficulty: "hard" };
+  await mockSource(page, algorithms.documentTitle);
+  const requests: unknown[] = [];
+  await page.route("**/api/practice", async (route) => {
+    requests.push(route.request().postDataJSON());
+    const body = requests.length === 1 ? first : second;
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
+  });
+  const answers: unknown[] = [];
+  await page.route("**/api/practice/*/answer", async (route) => {
+    answers.push(route.request().postDataJSON());
+    const id = Number(route.request().url().split("/").at(-2));
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(answerBody(id, id === 9101, algorithms.documentTitle)),
+    });
+  });
+  await openPracticePage(page, algorithms.id);
+
+  // Seçenek görünür etikete tıklanarak seçilir (radyo düğmesi görsel olarak gizli).
+  await page.locator("label", { hasText: /^Zor$/ }).click();
+  await expect(page.getByRole("radio", { name: "Zor" })).toBeChecked();
+  await topicBox(page).fill("ikili arama");
+  await page.getByRole("button", { name: "Pratiğe başla" }).click();
+
+  // Yeni soru gelince odak soru başlığında; anahtar cevaptan önce hiçbir yerde yok.
+  await expect(page.getByRole("heading", { name: "Soru 1" })).toBeFocused();
+  expect(requests).toEqual([{ course_id: algorithms.id, type: "mcq", difficulty: "hard", topic: "ikili arama" }]);
+  await expect(page.getByText("Doğru cevap")).toHaveCount(0);
+
+  // Kısayollar: "1" ilk şıkkı seçer, Enter gönderir.
+  await page.keyboard.press("1");
+  await expect(page.getByRole("radio").first()).toBeChecked();
+  await page.keyboard.press("Enter");
+  await expect(page.getByText("1 / 1 puan")).toBeVisible();
+  expect(answers).toEqual([{ selected_option: 0 }]);
+  await expect(page.getByRole("status").filter({ hasText: "1 / 1 puan" })).toBeFocused();
+
+  const source = page.getByRole("button", { name: new RegExp(algorithms.documentTitle) });
+  await source.click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByText("Ikili arama her adimda araligin yarisini atar.")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(source).toBeFocused();
+
+  // "N" aynı ayarlarla sıradaki soruyu getirir; önceki soru listede kalır.
+  await page.keyboard.press("n");
+  await expect(page.getByRole("heading", { name: "Soru 2" })).toBeFocused();
+  expect(requests[1]).toEqual(requests[0]);
+  await page.keyboard.press("b");
+  await page.keyboard.press("Enter");
+  await expect(page.getByText("0 / 1 puan")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Eksiklerim üzerine soru" })).toBeVisible();
+
+  // Sayfa yenilenince oturum kaybolmaz.
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Soru 2" })).toBeVisible();
+  await expect(page.getByText("2 cevap · 1 doğru")).toBeVisible();
+
+  await page.getByRole("button", { name: "Oturumu bitir" }).first().click();
+  await expect(page.getByRole("heading", { name: "Oturum özeti" })).toBeFocused();
+  await expect(page.getByText("%50")).toBeVisible();
+  await expect(page.getByText("sıralı dizi şartı")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Bu kavramla çalış" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Yeni oturum" }).click();
+  await expect(page.getByRole("heading", { name: "Ne çalışmak istiyorsun?" })).toBeVisible();
+  await expect(page.getByText("Süren bir oturumun var")).toHaveCount(0);
+});
+
+test("@dar-ekran pratik sayfası dar ekranda taşmadan kullanılır", async ({ page }) => {
+  const algorithms = course("A");
+  await page.route("**/api/practice", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(practiceItem(9103, algorithms.id, algorithms.documentTitle, "İkili arama her adımda ne yapar?")),
+    }),
+  );
+  await openPracticePage(page, algorithms.id);
+  await topicBox(page).fill("ikili arama");
+  await page.getByRole("button", { name: "Pratiğe başla" }).click();
+
+  await expect(page.getByRole("heading", { name: "Soru 1" })).toBeVisible();
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBe(0);
+});

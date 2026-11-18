@@ -10,6 +10,7 @@ import {
   MessageSquareText,
   NotebookText,
   PencilLine,
+  Sparkles,
   Video,
   type LucideIcon,
 } from "lucide-react";
@@ -85,6 +86,7 @@ export function toolSections(role: "student" | "instructor", base: string): Sect
     : [
         { to: base, label: "Genel bakış", icon: LayoutList, end: true },
         { to: `${base}/tutor`, label: "AI Tutor", icon: MessageSquareText },
+        { to: `${base}/practice`, label: "Pratik", icon: Sparkles },
         { to: `${base}/learning`, label: "Öğrenme kaydım", icon: BarChart3 },
       ];
 }

@@ -44,13 +44,13 @@ export default function LearningRecordPage() {
     return () => controller.abort();
   }, [course.id, attempt]);
 
-  const tutorPath = `/student/courses/${course.id}/tutor`;
+  const practicePath = `/student/courses/${course.id}/practice`;
 
   return (
     <div>
       <PageTitle
         title="Öğrenme kaydım"
-        description="AI Tutor'da çözdüğün pratik sorularından hesaplanır. Puanlar çalışman içindir, resmî not değildir."
+        description="Pratik sayfasında ve AI Tutor'da çözdüğün sorulardan hesaplanır. Puanlar çalışman içindir, resmî not değildir."
       />
       {failed ? (
         <EmptyState
@@ -81,12 +81,12 @@ export default function LearningRecordPage() {
               title="Henüz kayıtlı deneme yok"
               description={
                 record.logging_enabled
-                  ? "AI Tutor'da \"beni test et\" de ve soruları çöz; hangi kavramlarda iyi olduğun ve neleri tekrar etmen gerektiği burada görünür."
+                  ? "Pratik sayfasında ya da AI Tutor'da soru çöz; hangi kavramlarda iyi olduğun ve neleri tekrar etmen gerektiği burada görünür."
                   : "Öğrenme kaydı kapalıyken çözdüğün sorular buraya yazılmaz."
               }
               action={
-                <Link to={tutorPath} className={buttonClasses("primary")}>
-                  AI Tutor'u aç
+                <Link to={practicePath} className={buttonClasses("primary")}>
+                  Pratik yap
                 </Link>
               }
             />

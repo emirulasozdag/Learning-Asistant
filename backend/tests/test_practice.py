@@ -197,6 +197,18 @@ def test_one_busy_attempt_then_a_valid_question_is_released(
     assert db.scalars(select(PracticeQuestion.status)).all() == ["released"]
 
 
+def test_missing_model_is_ai_unavailable(
+    client: TestClient, db, course: Course, chunk_id: str, monkeypatch
+) -> None:
+    # Model yapılandırılmamışsa da sorun konuda değildir: 503, hiçbir şey saklanmaz.
+    monkeypatch.setattr(practice_api, "select_client", lambda role=LLMRole.GENERATOR, **_: None)
+
+    response = create(client, course, source_id=chunk_id)
+
+    assert response.status_code == 503 and response.json()["code"] == "ai_unavailable"
+    assert db.scalars(select(PracticeQuestion)).all() == []
+
+
 def test_topic_without_matching_material_is_no_valid_item(
     client: TestClient, course: Course, chunk_id: str, monkeypatch
 ) -> None:
@@ -482,6 +494,33 @@ def test_quiz_me_uses_the_sources_of_the_answer_just_read(
         "Soru bağımsız çözümle kontrol ediliyor…",
     ]
     assert [name for name, _ in reranker.calls] == ["RerankOutput"]
+
+
+def test_topic_questions_come_from_teaching_material_first(
+    client: TestClient, db, course: Course, tmp_path: Path
+) -> None:
+    """Aynı ilgideyken ders anlatımı sınavın önüne geçer ("Sorting" → sınavın "k-even-mixed"
+    problemi değil, sıralamayı anlatan ders notu); daha ilgili sınav parçası yine önde kalır."""
+    from app.practice.service import _teaching_first
+    from app.retrieval.types import RetrievedPassage
+
+    notes = upload(client, course.id, make_pdf(tmp_path / "notlar.pdf", LONG_PAGES)).json()
+    exam = upload(
+        client, course.id, make_pdf(tmp_path / "sinav.pdf", LONG_PAGES), material_type="past_exam"
+    ).json()
+
+    def passage(name: str, document: dict) -> RetrievedPassage:
+        return RetrievedPassage(name, document["id"], document["title"], "metin", 0.5)
+
+    exam_2, notes_2, notes_1 = passage("e2", exam), passage("n2", notes), passage("n1", notes)
+    exam_3, unrelated = passage("e3", exam), passage("x0", notes)
+
+    tie = _teaching_first(db, [(exam_2, 2), (notes_2, 2), (notes_1, 1), (unrelated, 0)])
+    stronger_exam = _teaching_first(db, [(exam_3, 3), (notes_2, 2)])
+
+    assert [p.source_id for p in tie] == ["n2", "e2", "n1"]  # 0 puan elenir
+    assert [p.source_id for p in stronger_exam] == ["e3", "n2"]
+    assert _teaching_first(db, [(unrelated, 0)]) == []  # çağıran aramanın sırasına döner
 
 
 def test_instructor_rubric_replaces_the_generated_one_for_grading(
