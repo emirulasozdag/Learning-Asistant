@@ -14,6 +14,8 @@ export type ErrorCode =
   | "ingestion_failed"
   | "course_exists"
   | "no_valid_item"
+  // Yapay zekâ servisi yanıt vermedi (yoğunluk, kota); kısa süre sonra tekrar denenebilir (#105).
+  | "ai_unavailable"
   // Pratik sorusu yok, kontrolden geçmemiş ya da kullanıcı dersin üyesi değil.
   | "practice_item_not_found"
   // İncelenecek asistan cevabı yok ya da eğitmen onu göremez (#20).
@@ -340,6 +342,8 @@ export interface QuestionItem {
   asked_at: string;
   /** Asistanın cevabı: eğitmen onayı/düzeltmesi için hedef (#20). */
   answer_message_id: number | null;
+  /** Eğitmenin bu cevap için son kararı (#105). */
+  latest_review?: LatestReview | null;
 }
 
 /** Sınıfın sık hatası (#20): anonim, en az üç öğrencide görülenler. */

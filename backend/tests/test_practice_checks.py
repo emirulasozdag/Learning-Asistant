@@ -164,11 +164,16 @@ def test_independent_solver_never_sees_the_key() -> None:
     [
         (MCQSolution(answerable=True, chosen_option=2, reason="x"), False),
         (MCQSolution(answerable=False, reason="kaynakta yok"), False),
-        (LLMError("kota"), False),
     ],
 )
-def test_mcq_disagreement_unanswerable_or_failed_check_rejects(answer, expected: bool) -> None:
+def test_mcq_disagreement_or_unanswerable_rejects(answer, expected: bool) -> None:
     assert solve(mcq(), PracticeType.MCQ, Solver(answer))[0] is expected
+
+
+def test_failed_check_is_a_provider_error_not_a_rejection() -> None:
+    # #105: kontrol modeli yanıt vermediyse soru kusurlu sayılmaz; hata çağırana gider.
+    with pytest.raises(LLMError):
+        solve(mcq(), PracticeType.MCQ, Solver(LLMError("kota")))
 
 
 def test_open_question_is_released_only_when_the_solution_agrees() -> None:

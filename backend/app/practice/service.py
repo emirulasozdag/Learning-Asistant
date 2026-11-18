@@ -61,6 +61,14 @@ class NoValidItem(Exception):
         self.reason = reason
 
 
+class AIUnavailable(NoValidItem):
+    """Yapay zekâ servisi yanıt vermedi (yoğunluk, kota, yapılandırma yok): soru ya da konu
+    kusurlu değildir; öğrenciye "biraz sonra tekrar dene" denir (API: 503, #105)."""
+
+
+AI_BUSY = "Yapay zekâ şu an yoğun; soru hazırlanamadı. Biraz sonra tekrar dene."
+
+
 class InvalidSubmission(ValueError):
     """Cevap türü soruyla uyuşmuyor (MCQ'ya metin, açık uçluya şık gibi)."""
 
@@ -115,7 +123,7 @@ def create_question_steps(
     kullanılır; yoksa kontrolcü kullanılır.
     """
     if generator is None or checker is None:
-        raise NoValidItem("Pratik sorusu üretmek için yapay zekâ şu an kullanılamıyor.")
+        raise AIUnavailable("Pratik sorusu üretmek için yapay zekâ şu an kullanılamıyor.")
     topic = context.topic
     if context.follow_up_of is not None:
         missing = context.follow_up_of.feedback.get("missing_concepts") or []
@@ -124,6 +132,8 @@ def create_question_steps(
     passages = _candidate_passages(db, course, context, topic, embedder, reranker, question_type)
 
     feedback: list[str] = []
+    # Sağlayıcı hatası (503, kota) reddedilen aday değildir: saklanmaz, üreticiye geri beslenmez.
+    provider_errors = 0
     for attempt in range(MAX_CANDIDATES):
         passage = passages[attempt % len(passages)]
         yield STAGE_RETRY if attempt else STAGE_WRITE
@@ -141,13 +151,20 @@ def create_question_steps(
             )
         except LLMError as exc:
             logger.warning("Pratik sorusu üretilemedi: %s", exc)
+            provider_errors += 1
             continue
         results = static_checks(generated, passage, question_type)
         if passed(results):
             yield STAGE_CHECK
-            results.append(
-                independent_solve(generated, passage, question_type, checker, comparer=reranker)
-            )
+            try:
+                solved = independent_solve(
+                    generated, passage, question_type, checker, comparer=reranker
+                )
+            except LLMError as exc:
+                logger.warning("Pratik sorusu kontrol edilemedi: %s", exc)
+                provider_errors += 1
+                continue
+            results.append(solved)
         question = _store(
             db,
             course,
@@ -165,6 +182,8 @@ def create_question_steps(
             return question
         feedback = failures(results)
         logger.info("Pratik adayı reddedildi (%d/%d): %s", attempt + 1, MAX_CANDIDATES, feedback)
+    if provider_errors:
+        raise AIUnavailable(AI_BUSY)
     raise NoValidItem(
         "Kontrollerden geçen bir soru üretilemedi. Konuyu biraz daha belirgin yazıp tekrar dene."
     )

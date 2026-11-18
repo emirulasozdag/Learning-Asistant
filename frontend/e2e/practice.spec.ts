@@ -111,13 +111,35 @@ test("cevap iddia iddia gösterilir: liste maddeleri ayrı iddia, kalın yazı v
   await expect(claims.locator(".katex").first()).toBeVisible();
   await expect(answer.getByText(/\*\*|\$/)).toHaveCount(0);
   await expect(answer.getByText("Materyalde ispatın ayrıntısı yok.")).toBeVisible();
-  await expect(answer.getByText("3/3 iddia kaynağa bağlı")).toBeVisible();
+  // İddia kontrolü yapılmadı: yalnızca kaynak bağlantısı söylenir, "doğrulandı" denmez (#105).
+  await expect(answer.getByText("3 cümle kaynağa bağlı")).toBeVisible();
+  await expect(answer.getByText("anlamı ayrıca denetlenmedi")).toBeVisible();
   await expect(answer.getByRole("button", { name: "Beni bu konuda test et" })).toBeVisible();
 
   await claims.getByRole("button").nth(1).click();
   await expect(
     page.getByRole("complementary", { name: "Kaynak" }).getByText(algorithms.documentTitle, { exact: true }).first(),
   ).toBeVisible();
+});
+
+test("iddia kontrolü yapıldıysa şerit bunu söyler; yapılmadıysa yeşil kalkan çıkmaz", async ({ page }) => {
+  const algorithms = course("A");
+  const checked = answerBlock(algorithms.documentTitle);
+  Object.assign(checked.response, {
+    claim_check: { status: "checked", judge_model: "judge", claims: 3, unsupported: 0, prompt_version: "v1" },
+  });
+  await mockSource(page, algorithms.documentTitle);
+  await mockTurn(page, [
+    ["block", { index: 0, block: checked }],
+    ["done", { conversation_id: 1, blocks: [checked], trace: {} }],
+  ]);
+  await openTutor(page, algorithms);
+
+  await ask(page, "İkili arama neden hızlı?");
+
+  const answer = page.getByRole("article").filter({ hasText: "İkili arama neden hızlı?" });
+  await expect(answer.getByText("3 iddia kaynakla karşılaştırıldı")).toBeVisible();
+  await expect(answer.getByText("anlamı ayrıca denetlenmedi")).toHaveCount(0);
 });
 
 test("pratik: şık seçilir, geri bildirim gelir, eksik kavram üzerine yeni soru eklenir", async ({ page }) => {

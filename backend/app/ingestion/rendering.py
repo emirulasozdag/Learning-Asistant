@@ -19,6 +19,12 @@ def is_pdf(document: Document) -> bool:
     return document.filename.lower().endswith(".pdf")
 
 
+def pdf_on_disk(document: Document) -> bool:
+    """PDF ve dosya diskte duruyor. Dosya silinmiş ya da taşınmışsa (yedekten dönüş, temizlik)
+    sayfa görüntüsü ve işaretler yoktur; 500 yerine kaynak metni yine gösterilir (#105)."""
+    return is_pdf(document) and Path(document.file_path).is_file()
+
+
 def page_image_path(document: Document, page: int) -> Path | None:
     """Sayfanın PNG'sini (önbellekten ya da yeni oluşturarak) döner; sayfa yoksa None."""
     if not is_pdf(document) or page < 1:
@@ -26,6 +32,8 @@ def page_image_path(document: Document, page: int) -> Path | None:
     target = settings.cache_dir / "pages" / str(document.id) / f"{page}.png"
     if target.is_file():
         return target
+    if not pdf_on_disk(document):
+        return None
     with pymupdf.open(document.file_path) as pdf:
         if page > pdf.page_count:
             return None
@@ -37,7 +45,7 @@ def page_image_path(document: Document, page: int) -> Path | None:
 
 def find_highlights(document: Document, page: int, text: str) -> list[Highlight]:
     """Parçanın satırlarını PDF sayfasında arar; bulunan dikdörtgenleri sayfaya oranla döner."""
-    if not is_pdf(document) or page < 1:
+    if not pdf_on_disk(document) or page < 1:
         return []
     highlights: list[Highlight] = []
     seen: set[tuple[int, int, int, int]] = set()

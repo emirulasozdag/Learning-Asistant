@@ -175,6 +175,9 @@ def test_search_is_isolated_per_course(
 def test_missing_source_and_document_return_404(client: TestClient, course: Course) -> None:
     assert client.get("/sources/123").status_code == 404
     assert client.get("/sources/abc").status_code == 404
+    # Rakam sayılan ama ASCII olmayan kimlikler 500 değil 404 olur (#105).
+    assert client.get("/sources/²").status_code == 404
+    assert client.get("/sources/١٢").status_code == 404
     assert client.get("/documents/123/chunks").status_code == 404
     assert client.get("/documents/123/file").status_code == 404
 
@@ -257,6 +260,44 @@ def test_pdf_source_has_page_image_and_highlights(
     assert image.headers["content-type"] == "image/png"
     assert image.content.startswith(b"\x89PNG")
     assert client.get(f"/documents/{document['id']}/pages/99.png").status_code == 404
+
+
+def test_pdf_missing_on_disk_still_opens_the_source_as_text(
+    db, client: TestClient, course: Course, sample_pdf: Path
+) -> None:
+    # #105: dosya diskten silinmiş ya da taşınmışsa kaynak 500 vermez; metin gösterilir.
+    document = upload(client, course.id, sample_pdf).json()
+    chunk = db.scalars(select(Chunk).where(Chunk.document_id == document["id"])).first()
+    Path(chunk.document.file_path).unlink()
+
+    source = client.get(f"/sources/{chunk.id}")
+    image = client.get(f"/documents/{document['id']}/pages/{chunk.page}.png")
+
+    assert source.status_code == 200, source.text
+    assert source.json()["page_image_url"] is None and source.json()["highlights"] == []
+    assert source.json()["text"] == chunk.text
+    assert image.status_code == 404
+
+
+def test_changing_course_language_reindexes_keyword_search(
+    db, client: TestClient, course: Course, sample_pdf: Path
+) -> None:
+    # #105: dil değişince parçalar yeni dilin kurallarıyla dizinlenir; eski dizin kalmaz.
+    upload(client, course.id, sample_pdf)
+
+    response = client.patch(f"/courses/{course.id}", json={"language": "en"})
+
+    assert response.status_code == 200, response.text
+    db.expire_all()
+    stale = db.scalar(
+        select(func.count())
+        .select_from(Chunk)
+        .where(
+            Chunk.course_id == course.id,
+            Chunk.search_vector != func.to_tsvector("english", Chunk.text),
+        )
+    )
+    assert stale == 0
 
 
 def test_pptx_source_has_no_page_image(

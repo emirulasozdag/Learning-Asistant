@@ -101,6 +101,7 @@ tiplerden başlar.
 
 **Uygulandı (ai-foundation, ADR-7):** `POST /practice` ve `POST /practice/{id}/answer` çalışır; AI Tutor'da
 `generate_practice` aracıyla sohbetin içinde de soru gelir (§9). Kontrolden geçen soru yoksa `422 no_valid_item`;
+yapay zekâ servisi yanıt vermezse (yoğunluk, kota) `503 ai_unavailable` (aday reddedilmiş sayılmaz, #105);
 soru yok, reddedilmiş ya da üye değilse `404 practice_item_not_found` **[ekleme]**; cevap türü uyuşmazsa `422`;
 açık uçlu cevap değerlendirilemezse `503` (deneme kaydedilmez). `AnswerFeedback`'e **[ekleme]**: `correct_option`,
 `reference_answer`, `criteria[{description, awarded, points, rationale}]` (yalnızca cevaptan sonra). Saklama:
@@ -148,6 +149,7 @@ AnswerFeedback {
 ```
 
 Hata davranışı: kontrolden geçen bir item üretilemezse `422 {code: "no_valid_item"}`; geçmeyen item hiçbir zaman döndürülmez (FR-12).
+Model sağlayıcısı yanıt vermezse `503 {code: "ai_unavailable"}` — konu ya da materyal hatası değildir (#105).
 `difficulty` Türkçe etiketi (`Kolay/Orta/Zor`) arayüzde üretilir.
 
 **Koddan farklar.**
@@ -608,7 +610,7 @@ Değişmezler (`AskResponse`):
   (doğrulamadan geçemedi), `refusal` (model reddetti); `outcome="answered"` iken `null`.
 
 Hata kodu listesi (başlangıç): `course_not_found`, `source_not_found`, `conversation_not_found`, `document_not_found`,
-`unsupported_file_type`, `file_too_large`, `ingestion_failed`, `course_exists`, `no_valid_item`, `invalid_video`,
+`unsupported_file_type`, `file_too_large`, `ingestion_failed`, `course_exists`, `no_valid_item`, `ai_unavailable`, `invalid_video`,
 `not_authenticated`, `insufficient_role`, `not_implemented`, `validation_error`.
 
 **Koddan farklar.**

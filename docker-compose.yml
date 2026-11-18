@@ -75,12 +75,14 @@ services:
     # Açılışta (hepsi tekrar çalıştırılabilir): şemayı güncelle, demo dersini (ve açıksa
     # geliştirme hesaplarını) oluştur,
     # embedding modelini hazırla (ilk seferde ~1 GB indirir), vektörü eksik ya da başka
-    # embedder'la üretilmiş parçaları yeniden üret.
+    # embedder'la üretilmiş parçaları yeniden üret. Yeniden üretim hata verirse (token bütçesi,
+    # model yok) API yine açılır; uyarı loga yazılır (#105).
     # Model indirildikten sonra internet gerekmez (HF_HUB_OFFLINE): sunumda bağlantı olmasa da açılır.
     command: >
       sh -c "alembic upgrade head && python -m app.scripts.seed_demo &&
              (python -m app.scripts.download_models || echo 'Model indirilemedi; önbellek kullanılacak') &&
-             export HF_HUB_OFFLINE=1 && python -m app.scripts.reembed &&
+             export HF_HUB_OFFLINE=1 &&
+             (python -m app.scripts.reembed || echo 'UYARI: reembed başarısız; eksik vektörler sonraki açılışta yeniden denenir') &&
              uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
     ports:
       - "${API_PORT:-8000}:8000"

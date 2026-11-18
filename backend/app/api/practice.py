@@ -51,6 +51,8 @@ def generate_practice(request: PracticeRequest, user: AuthUser, db: DbSession) -
             releasing(select_client(LLMRole.CHECKER), db.commit),
             reranker=releasing(select_client(LLMRole.RERANKER), db.commit),
         )
+    except service.AIUnavailable as exc:
+        raise ApiError(status.HTTP_503_SERVICE_UNAVAILABLE, exc.reason, "ai_unavailable") from exc
     except service.NoValidItem as exc:
         raise ApiError(status.HTTP_422_UNPROCESSABLE_CONTENT, exc.reason, "no_valid_item") from exc
     return service.to_item(question)

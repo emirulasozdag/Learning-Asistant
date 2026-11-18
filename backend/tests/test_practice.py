@@ -17,7 +17,7 @@ from app.api import tutor as tutor_api
 from app.db.models import Course, PracticeAttempt, PracticeQuestion
 from app.generation.grade import GradeOutput
 from app.generation.question import Criterion, GeneratedQuestion
-from app.llm.base import LLMUsage, ToolCall
+from app.llm.base import LLMError, LLMUsage, ToolCall
 from app.llm.gateway import LLMRole
 from app.verification.practice_checks import Agreement, MCQSolution, OpenSolution
 from tests.conftest import enroll, make_pdf, make_user
@@ -151,6 +151,50 @@ def test_no_valid_item_after_all_candidates_fail(
 
     assert response.status_code == 422 and response.json()["code"] == "no_valid_item"
     assert db.scalars(select(PracticeQuestion.status)).all() == ["rejected"] * 3
+
+
+def test_busy_generator_is_reported_as_unavailable_not_as_a_vague_topic(
+    client: TestClient, db, course: Course, chunk_id: str, monkeypatch
+) -> None:
+    # #105: Gemini 503 ya da kota; öğrenciye "konuyu belirgin yaz" denmez, hiçbir şey saklanmaz.
+    busy = LLMError("503 UNAVAILABLE")
+    use(monkeypatch, FakeJSON("gen", busy, busy, busy))
+
+    response = create(client, course, source_id=chunk_id)
+
+    assert response.status_code == 503 and response.json()["code"] == "ai_unavailable"
+    assert "yoğun" in response.json()["detail"]
+    assert db.scalars(select(PracticeQuestion)).all() == []
+
+
+def test_busy_checker_is_not_a_rejected_candidate_and_is_not_fed_back(
+    client: TestClient, db, course: Course, chunk_id: str, monkeypatch
+) -> None:
+    busy = LLMError("503 UNAVAILABLE")
+    generator = FakeJSON("gen", mcq(), mcq(), mcq())
+    use(monkeypatch, generator, FakeJSON("checker", busy, busy, busy))
+
+    response = create(client, course, source_id=chunk_id)
+
+    assert response.status_code == 503 and response.json()["code"] == "ai_unavailable"
+    assert db.scalars(select(PracticeQuestion)).all() == []
+    assert all("503" not in prompt for _, prompt in generator.calls)
+
+
+def test_one_busy_attempt_then_a_valid_question_is_released(
+    client: TestClient, db, course: Course, chunk_id: str, monkeypatch
+) -> None:
+    ok = MCQSolution(answerable=True, chosen_option=0, reason="S")
+    use(
+        monkeypatch,
+        FakeJSON("gen", LLMError("503"), mcq()),
+        FakeJSON("checker", ok),
+    )
+
+    response = create(client, course, source_id=chunk_id)
+
+    assert response.status_code == 200, response.text
+    assert db.scalars(select(PracticeQuestion.status)).all() == ["released"]
 
 
 def test_topic_without_matching_material_is_no_valid_item(
@@ -339,6 +383,31 @@ def test_tutor_practice_block_never_contains_the_key(
     serialized = json.dumps(body, ensure_ascii=False)
     assert "correct_option" not in serialized and "Kaynağa göre" not in serialized
     assert body["trace"]["steps"][0]["status"] == "created"
+
+
+def test_tutor_says_the_ai_is_busy_instead_of_blaming_the_topic(
+    client: TestClient, course: Course, chunk_id: str, monkeypatch
+) -> None:
+    busy = LLMError("503 UNAVAILABLE")
+    clients = {
+        LLMRole.GENERATOR: FakeJSON("gen", busy, busy, busy),
+        LLMRole.CHECKER: FakeJSON("checker"),
+        LLMRole.RERANKER: None,
+    }
+    orchestrator = FakeOrchestrator(
+        [ToolCall("generate_practice", {"topic": "ikili arama sirali dizi"}, "p1")]
+    )
+    monkeypatch.setattr(tutor_api, "select_orchestrator", lambda: orchestrator)
+    monkeypatch.setattr(tutor_api, "select_client", lambda role=LLMRole.GENERATOR: clients[role])
+
+    body = client.post(
+        "/tutor/turn", json={"course_id": course.id, "message": "Bana bir soru sor"}
+    ).json()
+
+    notice = body["blocks"][0]
+    assert notice["type"] == "notice" and notice["kind"] == "failure"
+    assert "yoğun" in notice["text"] and "belirgin" not in notice["text"]
+    assert body["trace"]["steps"][0]["status"] == "provider_failure"
 
 
 def test_graded_assignments_are_never_a_practice_source(

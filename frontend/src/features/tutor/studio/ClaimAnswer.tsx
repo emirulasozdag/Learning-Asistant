@@ -124,6 +124,7 @@ export default function ClaimAnswer({
         <VerificationStrip
           claims={all.length}
           removed={response.unsupported_removed}
+          check={response.claim_check}
           // Video alıntısı (zamanlı, sayfasız) "video" olarak ayrı sayılır (#102).
           videos={distinctDocuments(
             response.citations.filter((c) => c.page == null && c.t_start != null).map((c) => c.document_title),

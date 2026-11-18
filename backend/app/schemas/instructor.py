@@ -106,6 +106,8 @@ class QuestionItem(BaseModel):
     asked_at: datetime
     # Asistanın bu soruya cevabı: eğitmen onay/düzeltme için hedef olarak kullanır (#20).
     answer_message_id: int | None = None
+    # Eğitmenin bu cevap için son kararı; sayfa yenilenince de görünür (#105).
+    latest_review: LatestReview | None = None
 
 
 class CourseActivity(BaseModel):

@@ -1,12 +1,13 @@
 import secrets
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.db.models import Course, Enrollment, User
+from app.db.models import Chunk, Course, Enrollment, User, VideoFrame
+from app.db.text_search import ts_config
 from app.schemas.common import Role
 from app.schemas.courses import CourseCreate, CourseInfo, CourseSummary, CourseUpdate, JoinCode
 
@@ -62,13 +63,35 @@ def create_course(db: Session, data: CourseCreate, creator: User) -> CourseSumma
 
 
 def update_course(db: Session, course: Course, data: CourseUpdate, role: Role) -> CourseSummary:
-    """Yalnızca istekte gönderilen alanları değiştirir."""
+    """Yalnızca istekte gönderilen alanları değiştirir.
+
+    Dil değişince kelime araması dizinleri yeni dilin kurallarıyla yeniden hesaplanır (#105);
+    yoksa eski dille dizinlenmiş parçalar yeni dildeki sorguyla eşleşmez.
+    """
+    language = course.language
     for field, value in data.model_dump(exclude_unset=True).items():
         if field in {"name", "language"} and value is None:
             continue
         setattr(course, field, value)
+    if course.language != language:
+        reindex_text_search(db, course)
     db.commit()
     return to_summary(course, role)
+
+
+def reindex_text_search(db: Session, course: Course) -> None:
+    """Dersin parçalarının ve video karelerinin `search_vector`'ünü dersin diliyle yeniden yazar."""
+    config = ts_config(course.language)
+    db.execute(
+        update(Chunk)
+        .where(Chunk.course_id == course.id)
+        .values(search_vector=func.to_tsvector(config, Chunk.text))
+    )
+    db.execute(
+        update(VideoFrame)
+        .where(VideoFrame.course_id == course.id, VideoFrame.text.is_not(None))
+        .values(search_vector=func.to_tsvector(config, VideoFrame.text))
+    )
 
 
 def join_course(db: Session, code: str, user: User) -> CourseSummary:
