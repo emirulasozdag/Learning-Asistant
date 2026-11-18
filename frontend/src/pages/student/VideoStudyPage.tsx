@@ -2,7 +2,7 @@ import { ArrowLeft, ChevronDown, FileText, PlayCircle, ServerOff, SquarePen, Vid
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 
-import type { ChunkPreview, Citation, DocumentOut, VideoMoment } from "../../api/types";
+import type { ChunkPreview, Citation, DocumentOut, FrameRef, VideoMoment } from "../../api/types";
 import { useCourse } from "../../features/courses/context";
 import AnswerBlock from "../../features/tutor/AnswerBlock";
 import Composer from "../../features/tutor/Composer";
@@ -11,7 +11,10 @@ import TurnExtras from "../../features/tutor/TutorTurnView";
 import { answerOf } from "../../features/tutor/turns";
 import type { TutorTurn } from "../../features/tutor/types";
 import { useTutorTurns } from "../../features/tutor/useTutorTurns";
+import FrameAtMoment from "../../features/video/FrameAtMoment";
+import { useFrames } from "../../features/video/frames";
 import LecturePlayer, { type PlayerHandle } from "../../features/video/LecturePlayer";
+import SlideStrip from "../../features/video/SlideStrip";
 import { courseService } from "../../services/courseService";
 import { tutorService, type QuickAction } from "../../services/tutorService";
 import { formatTime, formatTimeRange } from "../../text";
@@ -116,6 +119,8 @@ function StudySession({
   const conversation = useTutorTurns(courseId, `video-${video.id}`);
   const { turns, busy } = conversation;
   const chunks = useChunks(video.id);
+  // Videodan çıkarılan kareler (#27): bir kez yüklenir; yoksa şerit ve kareler görünmez.
+  const frames = useFrames(video.id);
   const chatRef = useRef<HTMLDivElement>(null);
   // Transkript kapalı başlar (ekranı kalabalıklaştırmasın); cevap videoya dayanınca açılır.
   const [transcriptOpen, setTranscriptOpen] = useState(false);
@@ -213,8 +218,9 @@ function StudySession({
               captionsUrl={video.file_url}
             />
           </div>
-          <div className="order-2 shrink-0 lg:order-none">
+          <div className="order-2 flex min-w-0 shrink-0 flex-col gap-3 lg:order-none">
             <Timeline duration={video.duration_s} time={time} moment={moment} onSeek={seek} />
+            <SlideStrip frames={frames} time={time} onSeek={seek} />
           </div>
           <Transcript
             chunks={chunks}
@@ -252,6 +258,7 @@ function StudySession({
                     key={turn.id}
                     turn={turn}
                     askedAt={askedAt[turn.id]}
+                    frames={frames}
                     video={video}
                     isLatest={index === turns.length - 1}
                     onQuickAction={quickAction}
@@ -518,6 +525,7 @@ function overlapLength(before: string[], after: string[]): number {
 function StudyTurn({
   turn,
   askedAt,
+  frames,
   video,
   isLatest,
   onQuickAction,
@@ -529,6 +537,7 @@ function StudyTurn({
 }: {
   turn: TutorTurn;
   askedAt: number | undefined;
+  frames: FrameRef[] | null;
   video: DocumentOut;
   isLatest: boolean;
   onQuickAction: (action: QuickAction) => void;
@@ -549,6 +558,9 @@ function StudyTurn({
         {turn.question}
         {askedAt != null && <span className="ml-2 font-mono text-xs text-graphite">· {formatTime(askedAt)}</span>}
       </p>
+      {askedAt != null && (
+        <FrameAtMoment frames={frames} seconds={askedAt} heading="Durdurduğun anda ekranda" onSeek={onSeek} />
+      )}
       {response && (moment || fromVideo > 0 || fromDocs > 0) && (
         <p className="flex flex-wrap items-center gap-2 text-xs">
           {moment && (

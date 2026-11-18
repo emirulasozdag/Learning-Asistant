@@ -61,6 +61,9 @@ class DocumentOut(BaseModel):
     # Video: "vtt" (yüklenen altyazı) | "asr" (yerel transkripsiyon) ve asr için model kimliği.
     transcript_source: Literal["vtt", "asr"] | None = None
     transcript_model: str | None = None
+    # Video: çıkarılmış slayt karesi sayısı ve kare işi sürüyor mu (#27).
+    frame_count: int = 0
+    frames_processing: bool = False
     # Yalnızca yükleme cevabında dolu.
     report: IngestionReport | None = None
 

@@ -538,6 +538,12 @@ SourceDetail + { frames: FrameRef[] }   # yalnızca video parçasında: aralığ
 
 GET /documents/{id}/frames                → FrameRef[]   (zamana göre; dersin üyeleri)
 GET /documents/{id}/frames/{frame_id}.png → image/png    (Cache-Control: private, no-cache)
+POST /documents/{id}/frames  multipart file (.mp4 .webm .mkv .mov) → DocumentOut   (yalnızca eğitmen, #27)
+  # Altyazısıyla (VTT) yüklenmiş hazır videoya video dosyası eklenir; transkript yeniden çıkarılmaz,
+  # kuyruğa `frames` işi girer, kareler bitince önceki karelerin yerini alır. Doküman hazır kalır;
+  # işin hatası ya da iptali (POST /documents/{id}/cancel) dokümanı bozmaz.
+  # 409 frames_unavailable: video/hazır değil, süren iş var, ses dosyası ya da FRAME_EXTRACTION=off.
+DocumentOut + { frame_count: int, frames_processing: bool }   # #27
 
 VideoFrame (ORM, tablo video_frames) { id, document_id → documents (CASCADE), course_id → courses (CASCADE),
   ordinal: int, t_start: float, t_end: float, t_frame: float, image_path: str(500), status: str(16),
@@ -551,6 +557,8 @@ Settings.frame_extraction: "off" | "ocr"  (FRAME_EXTRACTION; docker-compose api 
 **Koddan farklar.** Hepsi **[ekleme]**: `video_frames` tablosu (migration `d6e2a9c4b1f8`), `FrameRef`,
 `SourceDetail.frames`, iki uç nokta, `FRAME_EXTRACTION` (PR #98). Uygulama PR'ı sözleşmeyi değiştirmedi; mevcut alan ve
 davranış değişmedi (`FRAME_EXTRACTION=off` iken transkripsiyon işi önceki gibidir).
+#27 **[ekleme]**: `POST /documents/{id}/frames`, iş türü `frames` (`jobs/queue.FRAMES`, `ingestion/media.frames_job`),
+`DocumentOut.frame_count/frames_processing`, hata kodu `frames_unavailable`; iptal uç noktası kare işini de iptal eder.
 
 ---
 

@@ -1,5 +1,5 @@
-import { ExternalLink, FileText } from "lucide-react";
-import { useEffect, useState } from "react";
+import { ExternalLink, FileText, Images, Square } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
 import type { ChunkPreview, DocumentOut, IngestionReport as Report } from "../../api/types";
 import Sheet from "../../components/Sheet";
@@ -7,6 +7,7 @@ import { documentExtent, documentIndexStatus, materialLabel } from "../../labels
 import { courseService } from "../../services/courseService";
 import { formatRelative } from "../../text";
 import { StatusBadge } from "../../ui/Badge";
+import Button from "../../ui/Button";
 import { buttonClasses } from "../../ui/buttonStyles";
 import { Drawer } from "../../ui/Dialog";
 import EmptyState from "../../ui/EmptyState";
@@ -17,10 +18,14 @@ interface DocumentDrawerProps {
   document: DocumentOut | null;
   report?: Report;
   onClose: () => void;
+  /** Kare için video eklenince güncel doküman (#27). */
+  onChanged?: (document: DocumentOut) => void;
+  /** Süren kare işini iptal (onay diyaloğu sayfada). */
+  onCancel?: (document: DocumentOut) => void;
 }
 
-/** Doküman ayrıntısı: yükleme raporu ve sistemin çıkardığı sayfa sayfa parçalar. */
-export default function DocumentDrawer({ document, report, onClose }: DocumentDrawerProps) {
+/** Doküman ayrıntısı: yükleme raporu, videoda slayt kareleri ve sistemin çıkardığı parçalar. */
+export default function DocumentDrawer({ document, report, onClose, onChanged, onCancel }: DocumentDrawerProps) {
   return (
     <Drawer
       open={document !== null}
@@ -37,12 +42,30 @@ export default function DocumentDrawer({ document, report, onClose }: DocumentDr
         )
       }
     >
-      {document && <DocumentDetail key={document.id} document={document} report={report} />}
+      {document && (
+        <DocumentDetail
+          key={document.id}
+          document={document}
+          report={report}
+          onChanged={onChanged}
+          onCancel={onCancel}
+        />
+      )}
     </Drawer>
   );
 }
 
-function DocumentDetail({ document, report }: { document: DocumentOut; report?: Report }) {
+function DocumentDetail({
+  document,
+  report,
+  onChanged,
+  onCancel,
+}: {
+  document: DocumentOut;
+  report?: Report;
+  onChanged?: (document: DocumentOut) => void;
+  onCancel?: (document: DocumentOut) => void;
+}) {
   const [chunks, setChunks] = useState<ChunkPreview[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -80,6 +103,10 @@ function DocumentDetail({ document, report }: { document: DocumentOut; report?: 
 
       {report && <IngestionReport report={report} />}
 
+      {document.material_type === "video" && document.status === "ready" && onChanged && (
+        <FrameVideoSection document={document} onChanged={onChanged} onCancel={onCancel} />
+      )}
+
       <section>
         <h3 className="mb-1 text-base font-medium text-ink">Sistemin çıkardığı parçalar</h3>
         <p className="mb-4 text-sm text-graphite">
@@ -102,6 +129,89 @@ function DocumentDetail({ document, report }: { document: DocumentOut; report?: 
         )}
       </section>
     </div>
+  );
+}
+
+/**
+ * Slayt kareleri (#27): altyazısıyla yüklenen videoda kare yoktur. Eğitmen video dosyasını
+ * ekleyince sistem transkripti değiştirmeden slayt karelerini çıkarır; öğrenci durdurduğu anda
+ * ekranda ne olduğunu görür. Kareler cevapta kanıt değildir (ADR-10).
+ */
+function FrameVideoSection({
+  document,
+  onChanged,
+  onCancel,
+}: {
+  document: DocumentOut;
+  onChanged: (document: DocumentOut) => void;
+  onCancel?: (document: DocumentOut) => void;
+}) {
+  const input = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const frames = document.frame_count ?? 0;
+
+  async function upload(file: File) {
+    setUploading(true);
+    setError(null);
+    try {
+      onChanged(await courseService.addFrameVideo(document.id, file));
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason));
+    } finally {
+      setUploading(false);
+      if (input.current) input.current.value = "";
+    }
+  }
+
+  return (
+    <section aria-labelledby="frame-video-title">
+      <h3 id="frame-video-title" className="mb-1 flex items-center gap-2 text-base font-medium text-ink">
+        <Images size={16} aria-hidden className="text-graphite" />
+        Slayt kareleri
+      </h3>
+      <p className="mb-3 text-sm text-graphite">
+        Öğrenci videoyu durdurduğunda o anda ekranda olan slaytı görür. Bunun için videonun dosyasını
+        ekle; transkript değişmez, yalnızca kareler çıkarılır. Kareler cevapta kanıt olarak kullanılmaz.
+      </p>
+      <div className="flex flex-wrap items-center gap-3">
+        {document.frames_processing ? (
+          <>
+            <p role="status" className="text-base text-ink-2">
+              Kareler hazırlanıyor… Liste kendiliğinden güncellenir.
+            </p>
+            {onCancel && (
+              <Button size="sm" variant="ghost" icon={Square} onClick={() => onCancel(document)}>
+                İptal et
+              </Button>
+            )}
+          </>
+        ) : (
+          <>
+            <p className="text-base text-ink-2">{frames > 0 ? `${frames} kare` : "Henüz kare yok"}</p>
+            <input
+              ref={input}
+              type="file"
+              accept=".mp4,.webm,.mkv,.mov,video/*"
+              className="sr-only"
+              aria-label="Video dosyası seç"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) void upload(file);
+              }}
+            />
+            <Button size="sm" loading={uploading} onClick={() => input.current?.click()}>
+              {frames > 0 ? "Video dosyasını yeniden ekle" : "Video dosyası ekle"}
+            </Button>
+          </>
+        )}
+      </div>
+      {error && (
+        <p role="alert" className="mt-2 text-sm text-danger">
+          {error}
+        </p>
+      )}
+    </section>
   );
 }
 

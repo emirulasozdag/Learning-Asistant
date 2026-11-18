@@ -230,7 +230,7 @@ class VideoFrame(Base):
 
 
 class ProcessingJob(Base):
-    """Uzun süren doküman işi (şimdilik yalnızca medya transkripsiyonu), ADR-9.
+    """Uzun süren doküman işi (medya transkripsiyonu; altyazılı videoya kare ekleme, #27), ADR-9.
 
     Durum: queued → running → succeeded | failed | cancelled. Çalışan iş `heartbeat_at`'i
     düzenli günceller; güncellemesi duran iş (süreç öldü) yeniden kuyruğa alınır ya da deneme

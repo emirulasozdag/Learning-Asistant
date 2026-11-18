@@ -270,6 +270,63 @@ test.describe("eğitmen", () => {
     await loginAsInstructor(page);
   });
 
+  test("materyaller: altyazılı videoya slayt kareleri için video dosyası eklenir (#27)", async ({ page }) => {
+    const algorithms = course("A");
+    const video = {
+      id: 9001,
+      course_id: algorithms.id,
+      title: "E2E altyazılı ders",
+      material_type: "video",
+      filename: "ders.vtt",
+      page_count: 0,
+      chunk_count: 4,
+      created_at: new Date().toISOString(),
+      file_url: "/api/documents/9001/file",
+      duration_s: 600,
+      media_url: "https://example.org/ders.mp4",
+      status: "ready",
+      error: null,
+      transcript_source: "vtt",
+      transcript_model: null,
+      frame_count: 0,
+      frames_processing: false,
+      report: null,
+    };
+    await page.route(`**/api/courses/${algorithms.id}/materials`, (route) =>
+      route.request().method() === "GET" ? route.fulfill(json([video])) : route.continue(),
+    );
+    await page.route("**/api/documents/9001/chunks", (route) => route.fulfill(json([])));
+    let refuse = true;
+    await page.route("**/api/documents/9001/frames", async (route) => {
+      if (route.request().method() !== "POST") return route.continue();
+      if (refuse) {
+        refuse = false;
+        await route.fulfill({
+          status: 409,
+          contentType: "application/json",
+          body: JSON.stringify({ detail: "Bu sunucuda slayt karesi çıkarma kapalı.", code: "frames_unavailable" }),
+        });
+        return;
+      }
+      await route.fulfill(json({ ...video, frames_processing: true }));
+    });
+
+    await page.goto(`/instructor/courses/${algorithms.id}/materials`);
+    // Satırın kendisi de tıklanabilir; başlık düğmesi yeterli.
+    await page.getByRole("button", { name: "E2E altyazılı ders", exact: true }).first().click();
+    const drawer = page.getByRole("dialog", { name: "E2E altyazılı ders" });
+    await expect(drawer.getByText("Henüz kare yok")).toBeVisible();
+    const picker = drawer.getByLabel("Video dosyası seç");
+    const file = { name: "ders.mp4", mimeType: "video/mp4", buffer: Buffer.from("video") };
+
+    // Sunucu reddederse nedeni açıkça söylenir; tekrar denenebilir.
+    await picker.setInputFiles(file);
+    await expect(drawer.getByRole("alert")).toContainText("kapalı");
+    await picker.setInputFiles(file);
+    await expect(drawer.getByText(/Kareler hazırlanıyor/)).toBeVisible();
+    await expect(drawer.getByRole("button", { name: "İptal et" })).toBeVisible();
+  });
+
   test("inceleme: sık hata yoksa nedeni söylenir; pratik sorusu cevap anahtarıyla görünür ve düzeltilir", async ({
     page,
   }) => {
@@ -411,8 +468,46 @@ test.describe("eğitmen", () => {
 
 const VIDEO_SOURCE = "e2e-video-kaynak";
 
+// 1×1 PNG: kare görüntüsü yerine.
+const PNG = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
+  "base64",
+);
+
+/** Videodan çıkarılmış kareler (#24, FrameRef biçimi): slaytlar 0:00, 1:00 ve 2:01'de değişir. */
+function videoFrames(videoId: number, count = 3) {
+  const starts = [0, 60, 121, ...Array.from({ length: Math.max(0, count - 3) }, (_, i) => 180 + i * 10)];
+  return starts.slice(0, count).map((start, index) => ({
+    frame_id: 900 + index,
+    document_id: videoId,
+    t_start: start,
+    t_end: starts[index + 1] ?? start + 60,
+    t_frame: start + 5,
+    image_url: `/api/documents/${videoId}/frames/${900 + index}.png`,
+    status: "readable",
+    text: `Slayt ${index + 1}`,
+    confidence: 0.9,
+    extractor: "e2e",
+  }));
+}
+
+/**
+ * Kare listesi ve görüntüleri (dev sistemde henüz kare yok). `brokenId`: o karenin görüntüsü ilk
+ * istekte açılmaz; "Tekrar dene" adresi değiştirdiği için (`deneme=`) sonra açılır.
+ */
+async function mockFrames(page: Page, videoId: number, frames: unknown[], brokenId?: number) {
+  await page.route(new RegExp(`/api/documents/${videoId}/frames$`), (route) => route.fulfill(json(frames)));
+  await page.route(new RegExp(`/api/documents/${videoId}/frames/\\d+\\.png`), (route) => {
+    const url = route.request().url();
+    if (brokenId != null && url.includes(`/${brokenId}.png`) && !url.includes("deneme=")) {
+      return route.fulfill({ status: 404, contentType: "application/json", body: '{"detail":"Kare görüntüsü yok"}' });
+    }
+    return route.fulfill({ status: 200, contentType: "image/png", body: PNG });
+  });
+}
+
 /** Tutor turu ve video alıntısı (sözleşmeyle aynı biçim); gönderilen turlar `turns` dizisine yazılır. */
-async function mockVideoAnswer(page: Page, videoId: number): Promise<{ video?: unknown }[]> {
+async function mockVideoAnswer(page: Page, videoId: number, sourceFrames: unknown[] = []): Promise<{ video?: unknown }[]> {
   const turns: { video?: unknown }[] = [];
   const citation = { source_id: VIDEO_SOURCE, document_title: "E2E ders videosu", page: null, t_start: 125, t_end: 180 };
   const block = {
@@ -464,7 +559,7 @@ async function mockVideoAnswer(page: Page, videoId: number): Promise<{ video?: u
         page_image_url: null,
         highlights: [],
         alternatives: [],
-        frames: [],
+        frames: sourceFrames,
       }),
     ),
   );
@@ -532,6 +627,27 @@ test.describe("ders videosu", () => {
     await page.getByRole("button", { name: "Videoyu kapat" }).click();
     await expect(page).toHaveURL(new RegExp(`/student/courses/${algorithms.id}/tutor$`));
     await expect(page.getByLabel("E2E ders videosu")).toHaveCount(0);
+  });
+
+  test("Tutor'da video: durdurulan andaki kare cevabın üstünde; kaynaktaki kare o slayta götürür", async ({ page }) => {
+    const algorithms = course("A");
+    const frames = videoFrames(videoId);
+    await mockVideoAnswer(page, videoId, [frames[2]]);
+    await mockFrames(page, videoId, frames);
+
+    await page.goto(`/student/courses/${algorithms.id}/tutor?video=${videoId}&t=30`);
+    await expect(page.getByText("Soruların videonun 0:30 anıyla birlikte gider")).toBeVisible();
+    await ask(page, "Burada neden yarıya iniyor?");
+    const paused = page.getByRole("figure", { name: "Durdurduğun anda ekranda" });
+    await expect(paused.getByRole("img", { name: "Videonun 0:05 anında ekrandaki görüntü" })).toBeVisible();
+    await expect(paused.getByText("Ekran görüntüsü · cevap konuşmaya (transkript) dayanır")).toBeVisible();
+
+    // Video alıntısının kanıt panelinde o kısımda ekranda olan kareler; tıklayınca video oraya gider.
+    await page.getByRole("list", { name: /Cevabın iddiaları/ }).getByRole("button").first().click();
+    const source = page.getByRole("complementary", { name: "Kaynak" });
+    await expect(source.getByRole("heading", { name: "Bu kısımda ekranda" })).toBeVisible();
+    await source.getByRole("button", { name: "Videoda 2:01 anına git" }).click();
+    await expect(page.getByText("Soruların videonun 2:01 anıyla birlikte gider")).toBeVisible();
   });
 
   test("oynatılamayan video kimliği oynatıcı açmaz; soru videosuz gider", async ({ page }) => {
@@ -640,6 +756,91 @@ test.describe("video çalışma ekranı", () => {
     await chat.getByRole("button", { name: "Videodan · 2:05–3:00" }).click();
     await expect(page.getByText("Sorun videonun 2:05 anıyla gider.")).toBeVisible();
     await expect(page).toHaveURL(new RegExp(`/watch/${videoId}$`));
+  });
+
+  test("kareler: durdurulan andaki kare cevapla gelir; slayt şeridi videoyu o slayta götürür", async ({ page }) => {
+    const algorithms = course("A");
+    const turns = await mockVideoAnswer(page, videoId);
+    await mockFrames(page, videoId, videoFrames(videoId), 902);
+    await page.goto(`/student/courses/${algorithms.id}/watch/${videoId}`);
+
+    // Şerit zaman çizgisinin altında: şu anki slayt işaretli; tıklayınca ya da Enter'la oraya gider.
+    const strip = page.getByRole("navigation", { name: "Slaytlar" });
+    await expect(strip.getByRole("button")).toHaveCount(3);
+    await expect(strip.getByRole("button", { name: "Slayt 1, 0:00" })).toHaveAttribute("aria-current", "true");
+    await strip.getByRole("button", { name: "Slayt 3, 2:01" }).click();
+    await expect(page.getByText("Sorun videonun 2:01 anıyla gider.")).toBeVisible();
+    await expect(strip.getByRole("button", { name: "Slayt 3, 2:01" })).toHaveAttribute("aria-current", "true");
+    await expect(strip.getByRole("button", { name: "Slayt 1, 0:00" })).not.toHaveAttribute("aria-current", "true");
+    await page.keyboard.press("ArrowLeft");
+    await expect(strip.getByRole("button", { name: "Slayt 2, 1:00" })).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(page.getByText("Sorun videonun 1:00 anıyla gider.")).toBeVisible();
+
+    // Soru 0:00'da: o andaki kare cevapla birlikte, ne olduğu yazılı (kanıt transkripttir).
+    await strip.getByRole("button", { name: "Slayt 1, 0:00" }).click();
+    await ask(page, "Burayı anlamadım");
+    await expect.poll(() => turns.length).toBe(1);
+    expect(turns[0].video).toEqual({ document_id: videoId, time_s: 0 });
+    const chat = page.getByRole("complementary", { name: "Videoya soru sor" });
+    const first = chat.getByRole("article", { name: "Burayı anlamadım" });
+    const frame = first.getByRole("figure", { name: "Durdurduğun anda ekranda" });
+    await expect(frame.getByRole("img", { name: "Videonun 0:05 anında ekrandaki görüntü" })).toBeVisible();
+    await expect(frame.getByText("Ekran görüntüsü · cevap konuşmaya (transkript) dayanır")).toBeVisible();
+    await expect(frame.getByText("Tam bu anda slayt değişiyor")).toHaveCount(0);
+
+    // Slayt değişimine 2 saniyeden yakın anda iki kare; açılamayan kare tekrar denenir.
+    await strip.getByRole("button", { name: "Slayt 3, 2:01" }).click();
+    await ask(page, "Peki bu?");
+    await expect.poll(() => turns.length).toBe(2);
+    expect(turns[1].video).toEqual({ document_id: videoId, time_s: 121 });
+    const second = chat.getByRole("article", { name: "Peki bu?" }).getByRole("figure", { name: "Durdurduğun anda ekranda" });
+    await expect(second.getByText("Tam bu anda slayt değişiyor")).toBeVisible();
+    await expect(second.getByRole("img", { name: "Videonun 1:05 anında ekrandaki görüntü" })).toBeVisible();
+    await expect(second.getByText("Kare açılamadı")).toBeVisible();
+    await second.getByRole("button", { name: "Tekrar dene" }).click();
+    const recovered = second.getByRole("img", { name: "Videonun 2:06 anında ekrandaki görüntü" });
+    await expect.poll(() => recovered.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
+
+    // Kareye tıklayınca büyür; "Videoda bu ana git" o slaytın başına götürür.
+    await second.getByRole("button", { name: "1:05 karesini büyüt" }).click();
+    const dialog = page.getByRole("dialog", { name: "Videonun 1:05 anında ekranda" });
+    await expect(dialog.getByRole("img")).toBeVisible();
+    await dialog.getByRole("button", { name: "Videoda bu ana git" }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect(page.getByText("Sorun videonun 1:00 anıyla gider.")).toBeVisible();
+  });
+
+  test("kare çıkarılmamış videoda slayt şeridi ve kare görünmez", async ({ page }) => {
+    const turns = await mockVideoAnswer(page, videoId);
+    await mockFrames(page, videoId, []);
+    await page.goto(`/student/courses/${course("A").id}/watch/${videoId}`);
+    await expect(page.getByRole("slider", { name: "Video zaman çizgisi" })).toBeVisible();
+    await ask(page, "Burayı anlamadım");
+    await expect.poll(() => turns.length).toBe(1);
+    await expect(page.getByRole("button", { name: "Videoya devam et" })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Slaytlar" })).toHaveCount(0);
+    await expect(page.getByRole("figure", { name: "Durdurduğun anda ekranda" })).toHaveCount(0);
+  });
+
+  test("slayt şeridi dar ekranda tek satır, sayfa yana taşmaz @dar-ekran", async ({ page }) => {
+    await mockFrames(page, videoId, videoFrames(videoId, 12));
+    await page.goto(`/student/courses/${course("A").id}/watch/${videoId}`);
+    const strip = page.getByRole("navigation", { name: "Slaytlar" });
+    await expect(strip.getByRole("button")).toHaveCount(12);
+    const layout = await strip.locator("ol").evaluate((list) => ({
+      rows: new Set([...list.children].map((item) => (item as HTMLElement).offsetTop)).size,
+      scrolls: list.scrollWidth > list.clientWidth,
+    }));
+    expect(layout).toEqual({ rows: 1, scrolls: true });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
+    const overflow = await page.evaluate(() => {
+      const main = document.querySelector("main");
+      return main ? main.scrollWidth - main.clientWidth : 0;
+    });
+    expect(overflow).toBeLessThanOrEqual(0);
+    await strip.getByRole("button", { name: "Slayt 3, 2:01" }).click();
+    await expect(page.getByText("Sorun videonun 2:01 anıyla gider.")).toBeVisible();
   });
 
   test("video çalışma ekranı dar ekranda sığar @dar-ekran", async ({ page }) => {

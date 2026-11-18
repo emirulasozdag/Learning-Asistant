@@ -52,9 +52,9 @@ export default function MaterialsPage() {
     return () => controller.abort();
   }, [courseId, attempt]);
 
-  // Transkripsiyon sürerken (status "processing") sayfa açık kaldığı sürece 5 sn'de bir yenile;
+  // Transkripsiyon ya da kare çıkarma (#27) sürerken sayfa açık kaldığı sürece 5 sn'de bir yenile;
   // hepsi bitince durur. Geçici ağ hatası listeyi bozmaz, bir sonraki turda yeniden denenir.
-  const hasProcessing = documents?.some((d) => d.status === "processing") ?? false;
+  const hasProcessing = documents?.some((d) => d.status === "processing" || d.frames_processing) ?? false;
   useEffect(() => {
     if (!hasProcessing) return;
     const controller = new AbortController();
@@ -64,7 +64,8 @@ export default function MaterialsPage() {
         .then((list) => {
           if (controller.signal.aborted) return;
           setDocuments(list);
-          if (!list.some((d) => d.status === "processing")) reloadDocuments();
+          setOpenDocument((open) => (open ? (list.find((d) => d.id === open.id) ?? open) : open));
+          if (!list.some((d) => d.status === "processing" || d.frames_processing)) reloadDocuments();
         })
         .catch(() => undefined);
     }, 5000);
@@ -300,6 +301,11 @@ export default function MaterialsPage() {
         document={openDocument}
         report={openDocument ? reports[openDocument.id] : undefined}
         onClose={() => setOpenDocument(null)}
+        onChanged={(updated) => {
+          setDocuments((list) => list?.map((d) => (d.id === updated.id ? updated : d)) ?? null);
+          setOpenDocument(updated);
+        }}
+        onCancel={setToCancel}
       />
 
       <Dialog
@@ -308,7 +314,9 @@ export default function MaterialsPage() {
         title="İşlem iptal edilsin mi?"
         description={
           toCancel
-            ? `“${toCancel.title}” için süren transkripsiyon durdurulacak ve doküman başarısız olarak işaretlenecek.`
+            ? toCancel.frames_processing
+              ? `“${toCancel.title}” için slayt karesi çıkarma durdurulacak. Video ve transkripti olduğu gibi kalır; önceki kareler korunur.`
+              : `“${toCancel.title}” için süren transkripsiyon durdurulacak ve doküman başarısız olarak işaretlenecek.`
             : undefined
         }
         footer={
@@ -322,7 +330,11 @@ export default function MaterialsPage() {
           </>
         }
       >
-        <p className="text-base text-graphite">Dokümanı daha sonra silip yeniden yükleyebilirsin.</p>
+        <p className="text-base text-graphite">
+          {toCancel?.frames_processing
+            ? "Video dosyasını daha sonra yeniden ekleyebilirsin."
+            : "Dokümanı daha sonra silip yeniden yükleyebilirsin."}
+        </p>
       </Dialog>
 
       <Dialog

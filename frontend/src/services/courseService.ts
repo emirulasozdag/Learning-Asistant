@@ -1,6 +1,6 @@
 /** Dersler ve materyaller: tamamı gerçek API. */
 import { api } from "../api/client";
-import type { CourseCreate, CourseOutline, CourseSummary, CourseUpdate, DocumentOut, MaterialType } from "../api/types";
+import type { CourseCreate, CourseOutline, CourseSummary, CourseUpdate, DocumentOut, FrameRef, MaterialType } from "../api/types";
 
 export type Course = CourseSummary;
 
@@ -48,12 +48,20 @@ export const courseService = {
     return api.deleteDocument(documentId);
   },
 
+  addFrameVideo(documentId: number, file: File): Promise<DocumentOut> {
+    return api.addFrameVideo(documentId, file);
+  },
   cancelMaterial(documentId: number): Promise<DocumentOut> {
     return api.cancelDocument(documentId);
   },
 
   chunks(documentId: number) {
     return api.documentChunks(documentId);
+  },
+
+  /** Ders videosunun kareleri (ekranda ne vardı; ADR-10: kanıt değil, yardımcı görüntü). */
+  frames(documentId: number, signal?: AbortSignal): Promise<FrameRef[]> {
+    return api.documentFrames(documentId, signal);
   },
 };
 

@@ -9,6 +9,7 @@ import Button from "../../../ui/Button";
 import EmptyState from "../../../ui/EmptyState";
 import IconButton from "../../../ui/IconButton";
 import Skeleton from "../../../ui/Skeleton";
+import SourceFrames from "../../video/SourceFrames";
 import PageImage from "../PageImage";
 import SourceAlternatives from "../SourceAlternatives";
 import { useSourceDetail } from "../useSourceDetail";
@@ -134,6 +135,7 @@ export default function EvidencePanel({
                   {source.text}
                 </span>
               </blockquote>
+              <SourceFrames frames={source.frames ?? []} onPlayAt={source.media_url ? onPlayAt : undefined} className="" />
             </div>
           ) : (
             <p className="font-mono text-sm leading-relaxed whitespace-pre-wrap text-ink">

@@ -124,6 +124,7 @@ export default function MaterialsTable({
             </TD>
             <TD className="hidden whitespace-nowrap text-graphite tabular-nums sm:table-cell">
               {documentExtent(document)}, {document.chunk_count} parça
+              {document.frames_processing ? ", kareler hazırlanıyor" : document.frame_count ? `, ${document.frame_count} kare` : ""}
             </TD>
             <TD className="hidden sm:table-cell">
               <StatusBadge status={documentIndexStatus(document)} />
