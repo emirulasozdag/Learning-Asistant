@@ -112,7 +112,7 @@ test("cevap iddia iddia gösterilir: liste maddeleri ayrı iddia, kalın yazı v
   await expect(answer.getByText(/\*\*|\$/)).toHaveCount(0);
   await expect(answer.getByText("Materyalde ispatın ayrıntısı yok.")).toBeVisible();
   await expect(answer.getByText("3/3 iddia kaynağa bağlı")).toBeVisible();
-  await expect(answer.getByRole("button", { name: "Bunu bana soru olarak sor" })).toBeVisible();
+  await expect(answer.getByRole("button", { name: "Beni bu konuda test et" })).toBeVisible();
 
   await claims.getByRole("button").nth(1).click();
   await expect(

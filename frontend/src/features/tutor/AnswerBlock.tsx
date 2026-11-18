@@ -256,7 +256,7 @@ function Body({ turn, isLatest, onQuickAction, onRetry, ...select }: AnswerBlock
             Örnek ver
           </Button>
           <Button size="sm" icon={ClipboardCheck} onClick={() => onQuickAction("quiz")}>
-            Beni test et
+            Beni bu konuda test et
           </Button>
         </div>
       )}

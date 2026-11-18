@@ -1,4 +1,4 @@
-import { FlaskConical, HelpCircle, PlayCircle, SearchX, WandSparkles } from "lucide-react";
+import { ClipboardCheck, FlaskConical, PlayCircle, SearchX, WandSparkles } from "lucide-react";
 
 import type { AskResponse, Citation } from "../../../api/types";
 import { citationLabel } from "../../../labels";
@@ -135,8 +135,8 @@ export default function ClaimAnswer({
         />
         {isLatest && (
           <div className="flex flex-wrap gap-2">
-            <Button size="sm" icon={HelpCircle} onClick={() => onQuickAction("quiz")}>
-              Bunu bana soru olarak sor
+            <Button size="sm" icon={ClipboardCheck} onClick={() => onQuickAction("quiz")}>
+              Beni bu konuda test et
             </Button>
             {video && (
               <Button size="sm" icon={PlayCircle} onClick={() => onSelectSource(video.source_id)}>

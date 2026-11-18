@@ -65,10 +65,10 @@ export function buildCommands(query: string, base: string, documents: DocumentOu
       hint: materialLabel(document.material_type),
       to: sectionPathFor(document, base),
     }));
-  if (found.length > 0) groups.push({ title: "Belgeler", commands: found });
+  if (found.length > 0) groups.push({ title: "Dokümanlar", commands: found });
 
   const places: Command[] = [
-    { kind: "navigate" as const, id: "overview", label: "Ders sayfası", hint: "Genel bakış", to: base },
+    { kind: "navigate" as const, id: "overview", label: "Genel bakış", hint: "Ders sayfası", to: base },
     {
       kind: "navigate" as const,
       id: "materials",

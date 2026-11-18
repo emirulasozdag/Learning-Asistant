@@ -13,17 +13,6 @@ export const MATERIAL_LABELS: Record<MaterialType, string> = {
   video: "Video",
 };
 
-/** Yükleme ekranında seçilebilen türler (video: altyazı dosyası; videonun kendisi henüz yüklenemez). */
-export const UPLOADABLE_TYPES: MaterialType[] = [
-  "notes",
-  "slides",
-  "textbook",
-  "past_exam",
-  "assignment",
-  "practice_problem",
-  "video",
-];
-
 /** Türlerin listelenme sırası (genel bakış, tüm materyaller). */
 export const TYPE_ORDER: MaterialType[] = [
   "notes",
@@ -64,17 +53,6 @@ export function citationLabel(citation: Citation): string {
   const title = citation.document_title ?? "Kaynak";
   if (citation.page) return `${title}, s. ${citation.page}`;
   return citation.t_start != null ? `${title}, ${formatTime(citation.t_start)}` : title;
-}
-
-const MINOR_WORDS = new Set(["ve", "ile", "and", "of", "the", "için"]);
-
-/** Ders adının baş harfleri: "Veri Yapıları ve Algoritmalar" → "VY". */
-export function courseInitials(name: string): string {
-  const words = name.split(/\s+/).filter((word) => word && !MINOR_WORDS.has(word.toLocaleLowerCase("tr")));
-  return words
-    .slice(0, 2)
-    .map((word) => word[0].toLocaleUpperCase("tr"))
-    .join("");
 }
 
 export const LEVEL_LABELS: Record<"undergraduate" | "graduate", string> = {

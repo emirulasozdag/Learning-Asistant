@@ -9,10 +9,6 @@ export const courseService = {
     return api.courses();
   },
 
-  async get(courseId: number): Promise<Course | null> {
-    return (await courseService.list()).find((course) => course.id === courseId) ?? null;
-  },
-
   async create(input: CourseCreate): Promise<Course> {
     return api.createCourse(input);
   },

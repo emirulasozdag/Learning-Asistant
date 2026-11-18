@@ -30,7 +30,7 @@ export default function ConsentPage() {
   return (
     <div className="flex min-h-dvh flex-col bg-canvas">
       <header className="flex h-[4.5rem] shrink-0 items-center border-b border-line bg-surface px-5 sm:px-8">
-        <Logo onDark />
+        <Logo />
       </header>
       <main className="mx-auto w-full max-w-2xl flex-1 px-5 py-10 sm:px-8">
         <section className="rounded-panel border border-line bg-surface px-6 py-8 sm:px-10">

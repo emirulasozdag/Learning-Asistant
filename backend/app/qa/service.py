@@ -291,13 +291,18 @@ def _with_moment(question: str, retrieval: RetrievalResult) -> str:
     span = f"{_clock(moment.t_start)}–{_clock(moment.t_end)}"
     note = (
         f'(Öğrenci "{moment.document_title}" videosunu {span} aralığında izlerken durdurdu; '
-        "ilk kaynaklar o anda anlatılan bölümdür."
+        f"{_first_labels(len(moment.source_ids))} o anda anlatılan bölümdür (zamanlarına bak)."
     )
     if retrieval.deictic:
         note += (
             ' Sorudaki "burası, bu kısım, bunu" gibi ifadeler bu bölümü kasteder; önce onu açıkla.'
         )
     return f"{question}\n\n{note})"
+
+
+def _first_labels(count: int) -> str:
+    """Sabitlenen bölüm kaynakların başındadır: S1, S1–S2, S1–S3."""
+    return "S1 kaynağı" if count <= 1 else f"S1–S{count} kaynakları"
 
 
 def _clock(seconds: float) -> str:

@@ -33,7 +33,7 @@ export interface MaterialSection {
 export const MATERIAL_SECTIONS: MaterialSection[] = [
   {
     path: "videos",
-    label: "Video dersler",
+    label: "Ders videoları",
     description: "Ders kayıtları ve transkriptleri.",
     icon: Video,
     types: ["video", "transcript"],
@@ -78,7 +78,7 @@ export function toolSections(role: "student" | "instructor", base: string): Sect
   return role === "instructor"
     ? [
         { to: base, label: "Genel bakış", icon: LayoutList, end: true },
-        { to: `${base}/materials`, label: "Materyal yönetimi", icon: FolderOpen },
+        { to: `${base}/materials`, label: "Materyaller", icon: FolderOpen },
         { to: `${base}/activity`, label: "Etkinlik ve analitik", icon: BarChart3 },
         { to: `${base}/review`, label: "İnceleme ve sık hatalar", icon: ListChecks },
       ]
@@ -101,3 +101,19 @@ export function contentSections(role: "student" | "instructor", base: string): S
   }
   return links;
 }
+
+/**
+ * Konum şeridinin (Topbar) bölüm adları: menüyle aynı etiketler, tek kaynak (#103).
+ * Adresin son parçası → etiket.
+ */
+export const SECTION_LABELS: Record<string, string> = {
+  tutor: "AI Tutor",
+  learning: "Öğrenme kaydım",
+  materials: "Materyaller",
+  activity: "Etkinlik ve analitik",
+  review: "İnceleme ve sık hatalar",
+  syllabus: "İzlence",
+  calendar: "Takvim",
+  account: "Hesabım",
+  ...Object.fromEntries(MATERIAL_SECTIONS.map((section) => [section.path, section.label])),
+};

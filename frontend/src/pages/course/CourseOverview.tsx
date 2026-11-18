@@ -66,6 +66,7 @@ export default function CourseOverview() {
 
       <section>
         <PageTitle
+          level={2}
           title="Bu dersin materyali"
           actions={
             <Link to={`${base}/materials`} className="link text-base">
@@ -162,6 +163,7 @@ function ActivitySummary({ courseId, base }: { courseId: number; base: string })
   return (
     <section>
       <PageTitle
+        level={2}
         title="Öğrenci etkinliği"
         actions={
           <Link to={`${base}/activity`} className="link text-base">

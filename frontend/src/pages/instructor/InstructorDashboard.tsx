@@ -135,6 +135,7 @@ export default function InstructorDashboard() {
       {gaps.length > 0 && (
         <section className="mt-12">
           <PageTitle
+            level={2}
             title="Materyalde bulunamayan son sorular"
             description="Öğrencilerin sorduğu ama ders materyalinde dayanağı olmayan konular. Bu konular için materyal eklemeyi düşünebilirsin."
           />

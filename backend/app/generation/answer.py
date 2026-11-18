@@ -239,11 +239,27 @@ def _decline(reason: str, passages: list[RetrievedPassage], outcome: AskOutcome)
 
 def _build_prompt(question: str, labels: dict[str, RetrievedPassage]) -> str:
     sources = "\n".join(
-        f'<kaynak etiket="{label}" doküman="{p.document_title}" sayfa="{p.page or "-"}">\n'
+        f'<kaynak etiket="{label}" doküman="{p.document_title}" {_location(p)}>\n'
         f"{p.text}\n</kaynak>"
         for label, p in labels.items()
     )
     return f"<kaynaklar>\n{sources}\n</kaynaklar>\n\nSoru: {question}"
+
+
+def _location(passage: RetrievedPassage) -> str:
+    """Kaynağın yeri: sayfa ya da video zamanı. Video parçasında zaman verilir ki model "öğrenci
+    videoyu 31:00'da durdurdu" bilgisini doğru kaynakla eşleştirebilsin (#102)."""
+    if passage.page is None and passage.t_start is not None:
+        end = passage.t_end if passage.t_end is not None else passage.t_start
+        return f'zaman="{_clock(passage.t_start)}–{_clock(end)}"'
+    return f'sayfa="{passage.page or "-"}"'
+
+
+def _clock(seconds: float) -> str:
+    total = int(seconds)
+    hours, rest = divmod(total, 3600)
+    minutes, secs = divmod(rest, 60)
+    return f"{hours}:{minutes:02}:{secs:02}" if hours else f"{minutes}:{secs:02}"
 
 
 def _excerpt(text: str) -> str:

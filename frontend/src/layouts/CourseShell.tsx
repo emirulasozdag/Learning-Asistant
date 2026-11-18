@@ -1,4 +1,4 @@
-import { BookOpen, Info, ServerOff } from "lucide-react";
+import { BookOpen, Info, Search, ServerOff } from "lucide-react";
 import { Fragment, useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useParams } from "react-router";
 
@@ -6,11 +6,15 @@ import type { CourseOutline, DocumentOut } from "../api/types";
 import { useAuth } from "../auth/useAuth";
 import { useCourse, useCourses } from "../features/courses/context";
 import type { CourseOutlet } from "../features/courses/courseOutlet";
+import ConversationList from "../features/studio/ConversationList";
+import StudioProvider from "../features/studio/StudioProvider";
+import { useStudio } from "../features/studio/useStudio";
 import { contentSections, toolSections } from "../features/courses/sections";
 import { LEVEL_LABELS, MATERIAL_LABELS, courseMetaParts, languageLabel, materialTotals } from "../labels";
 import { courseService, type Course } from "../services/courseService";
 import { formatRelative, formatTime } from "../text";
 import Button from "../ui/Button";
+import { buttonClasses } from "../ui/buttonStyles";
 import { cx } from "../ui/cx";
 import EmptyState from "../ui/EmptyState";
 import InfoPanel, { type InfoSection } from "../ui/InfoPanel";
@@ -72,6 +76,11 @@ export default function CourseShell() {
         icon={BookOpen}
         title="Ders bulunamadı"
         description="Bu ders silinmiş ya da adres hatalı olabilir. Derslerim sayfasından bir ders seç."
+        action={
+          <Link to="/" className={buttonClasses("primary")}>
+            Derslerime dön
+          </Link>
+        }
         className="py-24"
       />
     );
@@ -136,11 +145,12 @@ function CourseFrame({ course, role }: { course: Course; role: "student" | "inst
   const tutor = pathname.endsWith("/tutor");
   const outlet: CourseOutlet = { course, documents, documentsFailed, reloadDocuments, outline, outlineFailed };
 
-  return (
+  const frame = (
     <div className="flex h-full min-h-0 flex-col">
       <CourseBanner
         course={course}
         compact={tutor}
+        searchable={role === "student"}
         onShowInfo={!tutor && infoClosed ? () => toggleInfo(false) : undefined}
       />
       <div className="lg:hidden">
@@ -150,6 +160,7 @@ function CourseFrame({ course, role }: { course: Course; role: "student" | "inst
       <div className="flex min-h-0 flex-1">
         <aside className="hidden w-64 shrink-0 flex-col gap-8 overflow-y-auto border-r border-line bg-subtle/60 px-3 py-6 lg:flex">
           <SectionNav links={tools} label="Ders araçları" />
+          {tutor && <TutorConversation />}
           <div className="border-t border-line pt-6">
             <p className="px-3 text-sm font-bold tracking-wide text-ink uppercase">Ders içeriği</p>
             <div className="mt-2">
@@ -165,7 +176,9 @@ function CourseFrame({ course, role }: { course: Course; role: "student" | "inst
           </div>
         ) : (
           <div className="min-h-0 min-w-0 flex-1 overflow-y-auto">
-            <div className="mx-auto flex max-w-[78rem] flex-col gap-8 px-5 py-8 sm:px-8 xl:flex-row xl:items-start">
+            {/* Ders bilgisi paneli yalnızca çok geniş ekranda yanda durur; daha darda içeriğin altına
+                iner, böylece takvim ve materyal tabloları kesilmez (#106). */}
+            <div className="mx-auto flex max-w-[78rem] flex-col gap-8 px-5 py-8 sm:px-8 2xl:flex-row 2xl:items-start">
               <div className="min-w-0 flex-1">
                 <Outlet context={outlet} />
               </div>
@@ -174,7 +187,7 @@ function CourseFrame({ course, role }: { course: Course; role: "student" | "inst
                   course={course}
                   documents={documents}
                   onClose={() => toggleInfo(true)}
-                  className="xl:sticky xl:top-0 xl:w-80 xl:shrink-0"
+                  className="2xl:sticky 2xl:top-0 2xl:w-80 2xl:shrink-0"
                 />
               )}
             </div>
@@ -183,16 +196,36 @@ function CourseFrame({ course, role }: { course: Course; role: "student" | "inst
       </div>
     </div>
   );
+  return role === "student" ? (
+    <StudioProvider courseId={course.id} base={base} tutorPath={`${base}/tutor`}>
+      {frame}
+    </StudioProvider>
+  ) : (
+    frame
+  );
+}
+
+/** AI Tutor açıkken sol menüde "Bu sohbet": sorulan sorular, birine dokununca o soru açılır. */
+function TutorConversation() {
+  const { entries, activeId, select } = useStudio();
+  return (
+    <div className="border-t border-line px-1 pt-6">
+      <ConversationList entries={entries} activeId={activeId} onSelect={select} />
+    </div>
+  );
 }
 
 /** Dersin mavi şeridi: "BLM2512 | Güz 2026 | Lisans" ve büyük ders adı. */
 function CourseBanner({
   course,
   compact,
+  searchable,
   onShowInfo,
 }: {
   course: Course;
   compact: boolean;
+  /** Öğrenci: materyal araması (Ctrl/⌘+K) düğmesi. */
+  searchable: boolean;
   onShowInfo?: () => void;
 }) {
   const meta = courseMetaParts(course);
@@ -211,27 +244,30 @@ function CourseBanner({
           {compact ? (
             <p className="mt-0.5 truncate text-lg">{course.name}</p>
           ) : (
-            <h1 className="mt-3 text-[2.25rem] leading-[1.08] font-semibold tracking-tight text-balance text-ink sm:text-[2.75rem]">
+            // Sayfanın başlığı (h1) bölüm başlığıdır (Takvim, Ders notları…); ders adı şerittir (#106).
+            <p className="mt-3 text-[2.25rem] leading-[1.08] font-semibold tracking-tight text-balance text-ink sm:text-[2.75rem]">
               {course.name}
-            </h1>
+            </p>
           )}
         </div>
-        {onShowInfo && (
-          <button
-            type="button"
-            onClick={onShowInfo}
-            className="hidden shrink-0 items-center gap-2 rounded-control border border-line bg-surface px-3 py-1.5 text-sm font-semibold text-ink-2 shadow-card hover:border-line-strong hover:text-ink sm:flex"
-          >
-            <Info size={16} aria-hidden />
-            Ders bilgisi
-          </button>
-        )}
+        <div className="flex shrink-0 items-center gap-2">
+          {searchable && <SearchButton />}
+          {onShowInfo && (
+            <button
+              type="button"
+              onClick={onShowInfo}
+              className="hidden shrink-0 items-center gap-2 rounded-control border border-line bg-surface px-3 py-1.5 text-sm font-semibold text-ink-2 shadow-card hover:border-line-strong hover:text-ink sm:flex"
+            >
+              <Info size={16} aria-hidden />
+              Ders bilgisi
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
-/** Sol sütunun altında kullanıcının dersleri: aynı bölümde kalarak bir dersten diğerine geçiş. */
 /** Adresteki bölüm ("", "/tutor", "/materials"…): ders değiştirince aynı bölümde kalınır. */
 function currentSection(pathname: string, courseId: number): string {
   const marker = `/courses/${courseId}`;
@@ -239,6 +275,7 @@ function currentSection(pathname: string, courseId: number): string {
   return index === -1 ? "" : pathname.slice(index + marker.length).replace(/\/$/, "");
 }
 
+/** Sol sütunun altında kullanıcının dersleri: aynı bölümde kalarak bir dersten diğerine geçiş. */
 function OtherCourses({
   role,
   currentId,
@@ -340,5 +377,20 @@ function CourseInfo({
         </Link>
       </p>
     </div>
+  );
+}
+
+function SearchButton() {
+  const { openSearch } = useStudio();
+  return (
+    <button
+      type="button"
+      onClick={openSearch}
+      className="hidden shrink-0 items-center gap-2 rounded-control border border-line bg-surface px-3 py-1.5 text-sm text-graphite shadow-card hover:border-line-strong hover:text-ink sm:flex"
+    >
+      <Search size={16} aria-hidden />
+      Materyalde ara
+      <kbd className="rounded border border-line px-1 font-mono text-xs">Ctrl K</kbd>
+    </button>
   );
 }

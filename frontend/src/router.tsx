@@ -5,8 +5,7 @@ import AppShell from "./layouts/AppShell";
 import AuthLayout from "./layouts/AuthLayout";
 import { MATERIAL_SECTIONS } from "./features/courses/sections";
 import CourseShell from "./layouts/CourseShell";
-import StudioShell from "./layouts/StudioShell";
-import CoursesProvider from "./features/courses/CoursesProvider";
+
 import CalendarPage from "./pages/course/CalendarPage";
 import CourseOverview from "./pages/course/CourseOverview";
 import CourseSectionPage from "./pages/course/CourseSectionPage";
@@ -36,7 +35,7 @@ import { NotFound, RootRedirect } from "./pages/system";
  *   /student                                 öğrenci: derslerim
  *   /student/courses/:id                     ders genel bakış
  *   /student/courses/:id/materials           ders materyalleri
- *   /student/courses/:id/tutor               AI Tutor (tam ekran çalışma alanı; ?video=<id>&t=<s> ders videosu)
+ *   /student/courses/:id/tutor               AI Tutor (ders çerçevesinde; ?video=<id>&t=<s> ders videosu)
  *   /student/courses/:id/learning            öğrenme kaydım
  *   /student/account, /instructor/account    hesabım: araştırma kaydı, verilerimi/hesabımı sil
  * Her iki rolde ders içeriği (OCW düzeni):
@@ -88,18 +87,6 @@ export const router = createBrowserRouter([
     ],
   },
   {
-    // AI Tutor kendi çalışma alanında açılır: kurum, ders ve araçlar solda, üst bar yok.
-    path: "/student/courses/:courseId/tutor",
-    element: (
-      <RequireRole role="student">
-        <CoursesProvider>
-          <StudioShell />
-        </CoursesProvider>
-      </RequireRole>
-    ),
-    children: [{ index: true, element: <TutorPage /> }],
-  },
-  {
     path: "/student",
     element: (
       <RequireRole role="student">
@@ -117,6 +104,8 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <CourseOverview /> },
           { path: "materials", element: <CourseMaterialsPage /> },
+          // AI Tutor da ders çerçevesinin içinde açılır; sekmeler arasında düzen değişmez (#103).
+          { path: "tutor", element: <TutorPage /> },
           { path: "learning", element: <LearningRecordPage /> },
           ...contentRoutes,
         ],
