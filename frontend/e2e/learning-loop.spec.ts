@@ -582,6 +582,11 @@ test.describe("video çalışma ekranı", () => {
     const turns = await mockVideoAnswer(page, videoId);
 
     await page.goto(`/student/courses/${algorithms.id}/videos`);
+    // Video başlığı da altyazı dosyasını (VTT) değil çalışma ekranını açar.
+    await expect(page.getByRole("link", { name: "E2E ders videosu" })).toHaveAttribute(
+      "href",
+      `/student/courses/${algorithms.id}/watch/${videoId}`,
+    );
     await page.getByRole("link", { name: "İzle ve sor" }).click();
     await expect(page).toHaveURL(new RegExp(`/student/courses/${algorithms.id}/watch/${videoId}$`));
     await expect(page.getByLabel("E2E ders videosu")).toBeVisible();

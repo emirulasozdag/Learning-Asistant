@@ -91,6 +91,8 @@ function documentsByLabel(documents: DocumentOut[]): Map<string, DocumentOut> {
   const map = new Map<string, DocumentOut>();
   const ambiguous = new Set<string>();
   for (const document of documents) {
+    // Takvimdeki "Lecture 6" ders notunu açar; aynı adlı videonun altyazı dosyasını değil.
+    if (document.material_type === "video") continue;
     const key = label(document.title);
     if (map.has(key)) ambiguous.add(key);
     map.set(key, document);
