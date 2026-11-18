@@ -179,6 +179,8 @@ def test_expired_session_is_rejected(client: TestClient, db) -> None:
         ("POST", "/ask"),
         ("GET", "/sources/1"),
         ("GET", "/documents/1/file"),
+        ("GET", "/documents/1/frames"),
+        ("GET", "/documents/1/frames/1.png"),
         ("GET", "/courses/1/materials"),
     ],
 )
@@ -428,14 +430,12 @@ def test_ta_sees_activity_but_cannot_write_rubrics(client_for, world) -> None:
 
 def test_skeleton_routes_return_501_for_authorised_members(client_for, world) -> None:
     course_id = world.course.id
-    student, instructor = client_for(world.student), client_for(world.instructor)
+    instructor = client_for(world.instructor)
 
     assert instructor.get(f"/instructor/courses/{course_id}/rubrics").status_code == 501
     assert (
         instructor.post(f"/instructor/courses/{course_id}/rubrics", json=RUBRIC).status_code == 501
     )
-    assert student.get(f"/documents/{world.doc}/frames").status_code == 501
-    assert student.get(f"/documents/{world.doc}/frames/1.png").status_code == 501
 
 
 # --- 8. Yükleme beyanı ---

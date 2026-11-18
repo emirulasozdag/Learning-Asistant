@@ -15,7 +15,7 @@ import sys
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.db.models import Chunk, Course
+from app.db.models import Chunk, Course, VideoFrame
 from app.db.session import SessionLocal
 from app.embeddings.base import Embedder
 from app.embeddings.provider import get_embedder
@@ -50,6 +50,29 @@ def reembed(
     return len(chunks)
 
 
+def reembed_frames(
+    db: Session, embedder: Embedder, course_id: int | None = None, all_frames: bool = False
+) -> int:
+    """Metni olan video karelerinin (#24, ADR-10) uyumsuz vektörlerini yeniden üretir."""
+    query = select(VideoFrame).where(VideoFrame.text.is_not(None)).order_by(VideoFrame.id)
+    if course_id is not None:
+        query = query.where(VideoFrame.course_id == course_id)
+    if not all_frames:
+        query = query.where(
+            VideoFrame.embedding.is_(None)
+            | VideoFrame.embedding_model.is_distinct_from(embedder.identity)
+        )
+    frames = list(db.scalars(query))
+    for start in range(0, len(frames), BATCH):
+        batch = frames[start : start + BATCH]
+        vectors = embedder.embed_passages([frame.text or "" for frame in batch])
+        for frame, vector in zip(batch, vectors, strict=True):
+            frame.embedding = vector
+            frame.embedding_model = embedder.identity
+        db.commit()
+    return len(frames)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m app.scripts.reembed")
     parser.add_argument("--course", help="Yalnızca bu ders kodu")
@@ -77,6 +100,9 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         count = reembed(db, embedder, course_id, all_chunks=args.all)
         print(f"{count} parça vektörleştirildi ({embedder.identity}).")
+        frames = reembed_frames(db, embedder, course_id, all_frames=args.all)
+        if frames:
+            print(f"{frames} video karesi vektörleştirildi.")
         print(f"İndeks parmak izi: {inventory(db, course_id).fingerprint[:16]}")
     return 0
 

@@ -22,8 +22,6 @@ SKELETON_ENDPOINTS = [
         {"json": {"target_type": "message", "target_id": 1, "decision": "approve"}},
     ),
     ("get", "/instructor/courses/1/rubrics", {}),
-    ("get", "/documents/1/frames", {}),
-    ("get", "/documents/1/frames/1.png", {}),
     (
         "post",
         "/instructor/courses/1/rubrics",

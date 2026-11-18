@@ -24,11 +24,17 @@ from app.embeddings.base import Embedder
 from app.embeddings.provider import get_embedder
 from app.ingestion.chunking import chunk_timed_segments
 from app.ingestion.cleaning import normalize_timed_segments
-from app.ingestion.documents import validate_media_url, validate_upload_fields
+from app.ingestion.documents import (
+    frame_dir,
+    remove_paths,
+    validate_media_url,
+    validate_upload_fields,
+)
+from app.ingestion.lecture_frames import FrameDraft, add_frames, read_lecture_frames
 from app.ingestion.parsers.vtt_parser import write_vtt
 from app.ingestion.pipeline import add_chunks
 from app.ingestion.transcribe import Transcriber, TranscriptionError
-from app.ingestion.types import IngestionError
+from app.ingestion.types import ChunkDraft, IngestionError, RawSegment
 from app.jobs.queue import (
     TRANSCRIPTION,
     ClaimedJob,
@@ -120,18 +126,24 @@ def transcription_job(
     should_stop: Callable[[], bool],
     embedder: Embedder | None = None,
 ) -> None:
-    """Transkripsiyon işi: transkript → zamanlı parçalar → vektörler → doküman `ready`.
+    """Transkripsiyon işi: transkript → zamanlı parçalar → vektörler → (açıksa) kareler →
+    doküman `ready`.
 
-    Uzun adımlar (transkripsiyon, vektörleştirme) açık bir veritabanı işlemi olmadan çalışır;
-    önce gereken alanlar okunup oturum kapanır, sonuç sonda kısa bir işlemle yazılır.
-    Kalıcı hatada `TranscriptionError`/`IngestionError`, iptalde `JobCancelled`, doküman ya da
-    iş silindiyse `JobSuperseded` yükselir; dokümanın durumunu çalıştırıcı yazar.
+    Uzun adımlar (transkripsiyon, kare çıkarma, OCR, vektörleştirme) açık bir veritabanı işlemi
+    olmadan çalışır; önce gereken alanlar okunup oturum kapanır, sonuç sonda kısa bir işlemle
+    yazılır. Kalıcı hatada `TranscriptionError`/`IngestionError`, iptalde `JobCancelled`, doküman
+    ya da iş silindiyse `JobSuperseded` yükselir; dokümanın durumunu çalıştırıcı yazar.
+
+    Kareler (`FRAME_EXTRACTION=ocr`, ADR-10) medya silinmeden önce geçici klasöre çıkarılır;
+    sonuç yazılırken dokümanın kare klasörüne taşınır. Kare adımı yapılamazsa transkript yine
+    kaydedilir (`read_lecture_frames`).
     """
     with session_factory() as db:
         document = db.get(Document, job.document_id)
         if document is None:  # Doküman silindi (iş de onunla silinir).
             raise JobSuperseded(job.id)
-        language = db.get(Course, document.course_id).language  # type: ignore[union-attr]
+        course_id = document.course_id
+        language = db.get(Course, course_id).language  # type: ignore[union-attr]
 
     segments, duration_s, warnings = transcriber.transcribe(
         job.input_path, language, should_stop=should_stop
@@ -147,6 +159,46 @@ def transcription_job(
     if should_stop():
         raise JobCancelled(job.id)
 
+    staging = frame_dir(course_id, job.document_id, staging=True)
+    remove_paths([staging])  # Önceki denemeden kalmış olabilir.
+    try:
+        frames: list[FrameDraft] = []
+        if settings.frame_extraction == "ocr":
+            frames = read_lecture_frames(
+                job.input_path, staging, language, duration_s, embedder, should_stop
+            )
+            if should_stop():
+                raise JobCancelled(job.id)
+        _save_transcript(
+            session_factory,
+            job,
+            transcriber,
+            cleaned,
+            duration_s,
+            drafts,
+            vectors,
+            frames,
+            staging,
+            embedder,
+        )
+    finally:
+        remove_paths([staging])
+    job.input_path.unlink(missing_ok=True)
+
+
+def _save_transcript(
+    session_factory: Callable[[], Session],
+    job: ClaimedJob,
+    transcriber: Transcriber,
+    cleaned: list[RawSegment],
+    duration_s: float,
+    drafts: list[ChunkDraft],
+    vectors: list[list[float]],
+    frames: list[FrameDraft],
+    staging: Path,
+    embedder: Embedder,
+) -> None:
+    """Sonucu tek kısa işlemle yazar: transkript dosyası, parçalar, kareler, doküman `ready`."""
     with session_factory() as db:
         row = locked_job(db, job)
         if row.cancel_requested:
@@ -156,6 +208,7 @@ def transcription_job(
         if document is None or course is None:
             raise JobSuperseded(job.id)
         vtt_path = settings.upload_dir / str(course.id) / f"{document.id}.vtt"
+        images = frame_dir(course.id, document.id)
         document.file_path = str(vtt_path)
         document.filename = f"{document.title[:290]}.vtt"
         document.page_count = 0
@@ -170,8 +223,11 @@ def transcription_job(
         try:
             write_vtt(vtt_path, cleaned)
             add_chunks(db, course, document, drafts, vectors, embedder)
+            if frames:
+                remove_paths([images])
+                staging.rename(images)
+                add_frames(db, course, document, frames, images, embedder)
             db.commit()
         except Exception:
-            vtt_path.unlink(missing_ok=True)
+            remove_paths([vtt_path, images])
             raise
-    job.input_path.unlink(missing_ok=True)

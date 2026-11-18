@@ -396,8 +396,9 @@ erişimi herkeste yok.
   çıkarılır. Yalnızca `.vtt` yüklenen videoda medya olmadığı için kare yoktur. `FRAME_EXTRACTION=off` (varsayılan)
   ya da `ocr`.
 - **Kare seçimi:** video düzenli aralıkla örneklenir; görüntü bir süre sabit kalınca (slayt, duraklatılmış ekran) bir
-  kare alınır ve ekranda kaldığı aralık (`t_start`–`t_end`) saklanır. Sürekli hareketli görüntüden kare alınmaz.
-  Video başına kare sayısı sınırlıdır.
+  kare alınır ve ekranda kaldığı aralık (`t_start`–`t_end`) saklanır. Köşedeki küçük hareketli bölge (konuşmacı
+  kamerası) karşılaştırmaya katılmaz; ekranın büyük kısmı hareketliyse (kamera görüntüsü) kare alınmaz. Video başına
+  kare sayısı sınırlıdır.
 - **Okuma: yerel Tesseract** (Türkçe + İngilizce dil paketleri, Docker imajında). Hosted görsel model bu kararın
   parçası değildir; isteğe bağlı ikinci yol olarak ayrıca önerilir (ADR-5, ADR-8 rotasıyla).
 - **Açık durum:** her karenin durumu `readable | partial | unreadable | no_text`. Okunamayan ve yazısız kareler

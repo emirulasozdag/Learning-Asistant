@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.db.models import Document, ProcessingJob
-from app.ingestion.documents import document_files
+from app.ingestion.documents import document_files, remove_paths
 
 logger = logging.getLogger(__name__)
 
@@ -234,5 +234,4 @@ def _fail_document(db: Session, document_id: int, message: str) -> list[Path]:
 
 
 def _remove(files: list[Path]) -> None:
-    for path in files:
-        path.unlink(missing_ok=True)
+    remove_paths(files)

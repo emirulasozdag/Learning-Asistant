@@ -181,6 +181,20 @@ yeniden başlarsa iş kendiliğinden yeniden denenir. Eğitmen süren işi iptal
 Hızlı deneme için `TRANSCRIPTION_MODEL=tiny` (düşük doğruluk). Sınırlar, iş durumları ve kurtarma adımları:
 [docs/OPERATIONS.md](docs/OPERATIONS.md).
 
+### Video karelerini okumak (isteğe bağlı)
+
+Transkripsiyon açıkken yüklenen ders videosundan slayt kareleri de çıkarılabilir: görüntü birkaç saniye sabit kalınca
+(slayt) kare alınır ve üstündeki yazı yerel Tesseract ile okunur (Türkçe + İngilizce; formül, kod, diyagram etiketi).
+Görüntü sunucudan çıkmaz (DECISIONS.md ADR-10). Varsayılan **kapalıdır**; açmak için `.env`:
+
+```
+FRAME_EXTRACTION=ocr
+```
+
+Sonra `docker compose up -d --build --force-recreate`. Kareler `GET /api/documents/{id}/frames` ile listelenir ve kaynak
+görüntüleyicide video alıntısının `frames` alanında görünür. Okunan metin cevaplarda kanıt olarak **kullanılmaz** (#26).
+Yalnızca `.vtt` ile yüklenen videoda medya olmadığı için kare yoktur. Ayrıntılar: [CONTRACTS.md §4.1](docs/CONTRACTS.md).
+
 ### AI Tutor (orkestratör)
 `POST /api/tutor/turn` (ve `/turn/stream`) bir öğrenci mesajını bir tura dönüştürür: orkestratör modeli araç
 seçer (kaynaklı cevap, netleştirme, bilgilendirme…), öğrenciye giden içerik yalnızca araçlardan gelir ve kökenini
