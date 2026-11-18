@@ -1,8 +1,8 @@
 import type { DocumentOut, SourceDetail } from "../../../api/types";
 import type { Course } from "../../../services/courseService";
-import { formatTimeRange } from "../../../text";
+import { pageLabel } from "../../../labels";
+import { formatDate, formatTimeRange } from "../../../text";
 
-const DATE = new Intl.DateTimeFormat("tr-TR", { day: "2-digit", month: "2-digit", year: "numeric" });
 
 /**
  * Kaynağın künyesi (teknik çizimdeki antet gibi): hangi dersin hangi dokümanı, hangi sayfa ya da
@@ -20,7 +20,7 @@ export default function ProvenanceTable({
 }) {
   const where =
     source.page != null
-      ? { label: "Sayfa", value: document?.page_count ? `${source.page} / ${document.page_count}` : `${source.page}` }
+      ? { label: "Sayfa", value: pageLabel(source.page, document?.page_count) }
       : source.t_start != null
         ? { label: "Zaman", value: formatTimeRange(source.t_start, source.t_end) }
         : null;
@@ -30,7 +30,7 @@ export default function ProvenanceTable({
     { label: "Doküman", value: source.document_title },
     ...(where ? [where] : []),
     { label: "Dersin eğitmeni", value: course.instructor_name ?? "—", wide: true },
-    ...(document ? [{ label: "Eklendi", value: DATE.format(new Date(document.created_at)) }] : []),
+    ...(document ? [{ label: "Eklendi", value: formatDate(document.created_at) }] : []),
   ];
 
   return (

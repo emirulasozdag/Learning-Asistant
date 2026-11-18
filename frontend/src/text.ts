@@ -1,5 +1,6 @@
 const RELATIVE = new Intl.RelativeTimeFormat("tr", { numeric: "auto" });
 const SHORT_DATE = new Intl.DateTimeFormat("tr", { day: "numeric", month: "short" });
+const FULL_DATE = new Intl.DateTimeFormat("tr", { day: "numeric", month: "short", year: "numeric" });
 
 /** "az önce", "5 dakika önce", "dün", "12 Eki" */
 export function formatRelative(iso: string, now: Date = new Date()): string {
@@ -11,6 +12,19 @@ export function formatRelative(iso: string, now: Date = new Date()): string {
   if (abs < 86400) return RELATIVE.format(Math.round(seconds / 3600), "hour");
   if (abs < 7 * 86400) return RELATIVE.format(Math.round(seconds / 86400), "day");
   return SHORT_DATE.format(date);
+}
+
+/**
+ * Tarihin iki biçimi var (#106): listelerde göreli ("dün", "12 Eki", `formatRelative`), kesin
+ * tarih gereken yerde gün-ay-yıl ("12 Eki 2026", `formatDate`). Grafik ekseninde `formatDay`.
+ */
+export function formatDate(iso: string): string {
+  return FULL_DATE.format(new Date(iso));
+}
+
+/** "12 Eki": grafik ekseni ve gün etiketleri. */
+export function formatDay(date: Date | string): string {
+  return SHORT_DATE.format(typeof date === "string" ? new Date(date) : date);
 }
 
 /** Saate göre selamlama. */

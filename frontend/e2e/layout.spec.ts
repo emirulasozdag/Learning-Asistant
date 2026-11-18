@@ -37,3 +37,26 @@ test("dar ekran menüsü: ürün adı görünür, Escape kapatır @dar-ekran", a
   await page.keyboard.press("Escape");
   await expect(menu).toHaveCount(0);
 });
+
+test("izlence yüklenemezse tekrar denenir; her sayfada tek h1 var", async ({ page }) => {
+  const algorithms = course("A");
+  let fail = true;
+  await page.route(`**/api/courses/${algorithms.id}/outline`, async (route) => {
+    if (fail) {
+      fail = false;
+      await route.fulfill({ status: 500, body: "" });
+      return;
+    }
+    await route.continue();
+  });
+
+  await page.goto(`/student/courses/${algorithms.id}/syllabus`);
+  await expect(page.getByText("İzlence yüklenemedi")).toBeVisible();
+  await page.getByRole("button", { name: "Tekrar dene" }).click();
+  await expect(page.getByText("İzlence yüklenemedi")).toHaveCount(0);
+
+  for (const section of ["", "/syllabus", "/calendar", "/lecture-notes", "/videos", "/learning", "/materials"]) {
+    await page.goto(`/student/courses/${algorithms.id}${section}`);
+    await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
+  }
+});

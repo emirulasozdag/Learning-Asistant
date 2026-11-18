@@ -1,13 +1,14 @@
 import { ChevronDown } from "lucide-react";
 
 import type { AskResponse, RetrievalHit } from "../../../api/types";
+import { pageLabel } from "../../../labels";
 import { formatTime } from "../../../text";
 import { cx } from "../../../ui/cx";
 import type { SelectSourceProps } from "../types";
 import { formatScore } from "./format";
 
 function hitLocation(hit: RetrievalHit): string {
-  if (hit.page) return `s.${hit.page}`;
+  if (hit.page) return pageLabel(hit.page);
   if (hit.t_start != null) return formatTime(hit.t_start);
   return "";
 }

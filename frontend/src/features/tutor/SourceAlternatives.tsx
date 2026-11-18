@@ -1,5 +1,5 @@
 import type { SourceAlternative } from "../../api/types";
-import { materialLabel } from "../../labels";
+import { materialLabel, pageLabel } from "../../labels";
 
 /**
  * Video alıntısının aynı içeriği anlatan doküman karşılıkları (slayt, ders notu).
@@ -28,7 +28,7 @@ export default function SourceAlternatives({
             >
               <span className="min-w-0 truncate">{alternative.document_title}</span>
               <span className="shrink-0 font-mono text-xs text-graphite">
-                {alternative.page != null ? `s.${alternative.page}` : materialLabel(alternative.material_type)}
+                {alternative.page != null ? pageLabel(alternative.page) : materialLabel(alternative.material_type)}
               </span>
             </button>
           </li>

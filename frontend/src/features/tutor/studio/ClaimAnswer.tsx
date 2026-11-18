@@ -1,7 +1,7 @@
 import { ClipboardCheck, FlaskConical, PlayCircle, SearchX, WandSparkles } from "lucide-react";
 
 import type { AskResponse, Citation } from "../../../api/types";
-import { citationLabel } from "../../../labels";
+import { citationLabel, pageLabel } from "../../../labels";
 import type { QuickAction } from "../../../services/tutorService";
 import Button from "../../../ui/Button";
 import { cx } from "../../../ui/cx";
@@ -181,7 +181,7 @@ function CitationChips({
             title={citationLabel(citation)}
             className="ml-2 inline-flex h-6 -translate-y-1.5 items-center rounded-[3px] bg-marker-soft px-1.5 align-middle font-mono text-[11px] font-semibold tracking-normal text-ink hover:bg-marker"
           >
-            {citation.page != null ? `s.${citation.page}` : number}
+            {citation.page != null ? pageLabel(citation.page) : number}
           </button>
         );
       })}

@@ -2,6 +2,7 @@ import { CalendarDays, ServerOff } from "lucide-react";
 
 import type { DocumentOut } from "../../api/types";
 import { useCourseOutlet } from "../../features/courses/courseOutlet";
+import Button from "../../ui/Button";
 import EmptyState from "../../ui/EmptyState";
 import PageTitle from "../../ui/PageTitle";
 import { SkeletonRows } from "../../ui/Skeleton";
@@ -9,7 +10,7 @@ import { Table, TD, TH, THead, TR } from "../../ui/Table";
 
 /** Haftalık takvim (OCW "Calendar"); dokümanı yüklenmiş satırlar dokümana bağlanır. */
 export default function CalendarPage() {
-  const { outline, outlineFailed, documents } = useCourseOutlet();
+  const { outline, outlineFailed, reloadOutline, documents } = useCourseOutlet();
   const calendar = outline?.calendar;
   const byLabel = documentsByLabel(documents ?? []);
 
@@ -21,7 +22,8 @@ export default function CalendarPage() {
           icon={ServerOff}
           tone="danger"
           title="Takvim yüklenemedi"
-          description="Ders bilgisine şu an ulaşılamıyor. Sayfayı yenileyip tekrar dene."
+          description="Ders bilgisine şu an ulaşılamıyor. Bağlantını kontrol edip tekrar dene."
+          action={<Button onClick={reloadOutline}>Tekrar dene</Button>}
         />
       ) : outline === null ? (
         <SkeletonRows rows={6} />

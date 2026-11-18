@@ -2,7 +2,7 @@ import { Check, Copy, ExternalLink, FileText, PlayCircle, X } from "lucide-react
 import { useState } from "react";
 
 import type { DocumentOut } from "../../../api/types";
-import { materialLabel } from "../../../labels";
+import { materialLabel, pageLabel } from "../../../labels";
 import type { Course } from "../../../services/courseService";
 import { formatTimeRange } from "../../../text";
 import Button from "../../../ui/Button";
@@ -48,7 +48,7 @@ export default function EvidencePanel({
   const isVideo = source?.material_type === "video";
   const location = source
     ? source.page != null
-      ? `s.${source.page}${document?.page_count ? ` / ${document.page_count}` : ""}`
+      ? pageLabel(source.page, document?.page_count)
       : source.t_start != null
         ? formatTimeRange(source.t_start, source.t_end)
         : materialLabel(source.material_type)
