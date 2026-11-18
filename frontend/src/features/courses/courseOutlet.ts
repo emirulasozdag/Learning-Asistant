@@ -14,6 +14,8 @@ export interface CourseOutlet {
   /** İzlence ve takvim; `null` = yükleniyor. */
   outline: CourseOutline | null;
   outlineFailed: boolean;
+  /** İzlence ve takvimi yeniden yükler (hata sonrası "Tekrar dene"). */
+  reloadOutline: () => void;
 }
 
 export function useCourseOutlet(): CourseOutlet {

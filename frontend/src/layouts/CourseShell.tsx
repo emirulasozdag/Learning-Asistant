@@ -97,6 +97,7 @@ function CourseFrame({ course, role }: { course: Course; role: "student" | "inst
   const [infoClosed, setInfoClosed] = useState(readInfoClosed);
   const [outline, setOutline] = useState<CourseOutline | null>(null);
   const [outlineFailed, setOutlineFailed] = useState(false);
+  const [outlineAttempt, setOutlineAttempt] = useState(0);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -122,7 +123,13 @@ function CourseFrame({ course, role }: { course: Course; role: "student" | "inst
         if (!controller.signal.aborted) setOutlineFailed(true);
       });
     return () => controller.abort();
-  }, [course.id]);
+  }, [course.id, outlineAttempt]);
+
+  function reloadOutline() {
+    setOutlineFailed(false);
+    setOutline(null);
+    setOutlineAttempt((value) => value + 1);
+  }
 
   function reloadDocuments() {
     setDocumentsFailed(false);
@@ -143,7 +150,15 @@ function CourseFrame({ course, role }: { course: Course; role: "student" | "inst
   const content = contentSections(role, base);
   // Tutor tam yükseklikte çalışır ve sağ tarafı kaynak paneli için kullanır.
   const tutor = pathname.endsWith("/tutor");
-  const outlet: CourseOutlet = { course, documents, documentsFailed, reloadDocuments, outline, outlineFailed };
+  const outlet: CourseOutlet = {
+    course,
+    documents,
+    documentsFailed,
+    reloadDocuments,
+    outline,
+    outlineFailed,
+    reloadOutline,
+  };
 
   const frame = (
     <div className="flex h-full min-h-0 flex-col">

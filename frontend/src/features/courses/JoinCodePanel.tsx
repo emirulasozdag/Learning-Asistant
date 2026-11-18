@@ -6,6 +6,7 @@ import { courseService } from "../../services/courseService";
 import Button from "../../ui/Button";
 import PageTitle from "../../ui/PageTitle";
 import { SkeletonRows } from "../../ui/Skeleton";
+import { formatDate } from "../../text";
 import { useToast } from "../../ui/toast/context";
 
 /** Eğitmen: öğrencilerin derse katılması için kod (ADR-2). Yenilenince eski kod geçersiz olur. */
@@ -73,7 +74,7 @@ export default function JoinCodePanel({ courseId }: { courseId: number }) {
           </Button>
           {joinCode.expires_at && (
             <p className="w-full text-sm text-graphite">
-              Geçerlilik: {new Date(joinCode.expires_at).toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" })}
+              Geçerlilik: {formatDate(joinCode.expires_at)}
             </p>
           )}
         </div>

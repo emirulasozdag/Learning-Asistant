@@ -2,6 +2,7 @@ import { FileText, ServerOff } from "lucide-react";
 
 import type { SyllabusBlock } from "../../api/types";
 import { useCourseOutlet } from "../../features/courses/courseOutlet";
+import Button from "../../ui/Button";
 import EmptyState from "../../ui/EmptyState";
 import PageTitle from "../../ui/PageTitle";
 import { SkeletonRows } from "../../ui/Skeleton";
@@ -9,7 +10,7 @@ import { Table, TD, TH, THead, TR } from "../../ui/Table";
 
 /** Dersin izlencesi (OCW "Syllabus"): ön koşullar, kaynaklar, notlandırma… */
 export default function SyllabusPage() {
-  const { outline, outlineFailed } = useCourseOutlet();
+  const { outline, outlineFailed, reloadOutline } = useCourseOutlet();
 
   return (
     <div>
@@ -19,7 +20,8 @@ export default function SyllabusPage() {
           icon={ServerOff}
           tone="danger"
           title="İzlence yüklenemedi"
-          description="Ders bilgisine şu an ulaşılamıyor. Sayfayı yenileyip tekrar dene."
+          description="Ders bilgisine şu an ulaşılamıyor. Bağlantını kontrol edip tekrar dene."
+          action={<Button onClick={reloadOutline}>Tekrar dene</Button>}
         />
       ) : outline === null ? (
         <SkeletonRows rows={4} />

@@ -4,8 +4,9 @@ import { useParams } from "react-router";
 
 import type { CourseActivity, QuestionItem } from "../../api/types";
 import ReviewDialog, { type ReviewTarget } from "../../features/instructor/ReviewDialog";
+import { pageLabel } from "../../labels";
 import { instructorService } from "../../services/instructorService";
-import { formatRelative } from "../../text";
+import { formatDay, formatRelative } from "../../text";
 import Badge from "../../ui/Badge";
 import Button from "../../ui/Button";
 import EmptyState from "../../ui/EmptyState";
@@ -207,7 +208,6 @@ function OutcomeBar({ activity }: { activity: CourseActivity }) {
   );
 }
 
-const DAY = new Intl.DateTimeFormat("tr", { day: "numeric", month: "short" });
 
 /** Tek seri sütun grafiği: ince çubuklar, üzerine gelince değer; ekran okuyucu için tablo. */
 function DailyChart({ daily }: { daily: CourseActivity["daily"] }) {
@@ -237,14 +237,14 @@ function DailyChart({ daily }: { daily: CourseActivity["daily"] }) {
                 style={{ height: `${(day.questions / max) * 100}%` }}
               />
               <span className="pointer-events-none absolute bottom-full mb-1.5 hidden rounded-control bg-nav px-2 py-1 text-xs whitespace-nowrap text-white group-hover:block">
-                {DAY.format(new Date(day.day))}: {day.questions} soru
+                {formatDay(day.day)}: {day.questions} soru
               </span>
             </div>
           ))}
         </div>
       </div>
       <div aria-hidden className="mt-2 flex justify-between pr-8 text-xs text-graphite">
-        <span>{DAY.format(new Date(daily[0].day))}</span>
+        <span>{formatDay(daily[0].day)}</span>
         <span>Bugün</span>
       </div>
       <table className="sr-only">
@@ -252,7 +252,7 @@ function DailyChart({ daily }: { daily: CourseActivity["daily"] }) {
         <tbody>
           {daily.map((day) => (
             <tr key={day.day}>
-              <th scope="row">{DAY.format(new Date(day.day))}</th>
+              <th scope="row">{formatDay(day.day)}</th>
               <td>{day.questions}</td>
             </tr>
           ))}
@@ -283,7 +283,7 @@ function TopSources({ sources }: { sources: CourseActivity["top_sources"] }) {
           </div>
           <div className="shrink-0 text-right text-sm whitespace-nowrap">
             <p className="font-semibold text-ink tabular-nums">{source.citations} alıntı</p>
-            <p className="text-graphite">{source.page ? `Sayfa ${source.page}` : "—"}</p>
+            <p className="text-graphite">{source.page ? pageLabel(source.page) : "—"}</p>
           </div>
         </li>
       ))}

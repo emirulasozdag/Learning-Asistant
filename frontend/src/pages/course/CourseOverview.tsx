@@ -11,6 +11,7 @@ import { MATERIAL_LABELS, TYPE_ORDER, materialTotals, totalsHeading } from "../.
 import { formatTime } from "../../text";
 import { instructorService } from "../../services/instructorService";
 import { buttonClasses } from "../../ui/buttonStyles";
+import InlineError from "../../ui/InlineError";
 import Button from "../../ui/Button";
 import PageTitle from "../../ui/PageTitle";
 import { SkeletonRows } from "../../ui/Skeleton";
@@ -20,7 +21,7 @@ import { Table, TD, TH, THead, TR } from "../../ui/Table";
 /** Dersin ana sayfası (iki rol): ders hakkında, materyal özeti ve role göre bir sonraki adım. */
 export default function CourseOverview() {
   const { user } = useAuth();
-  const { course, documents, documentsFailed } = useCourseOutlet();
+  const { course, documents, documentsFailed, reloadDocuments } = useCourseOutlet();
   const instructor = user?.role === "instructor";
   const [editing, setEditing] = useState(false);
   const base = `/${user?.role ?? "student"}/courses/${course.id}`;
@@ -74,7 +75,13 @@ export default function CourseOverview() {
             </Link>
           }
         />
-        <MaterialSummary documents={documents} failed={documentsFailed} instructor={instructor} base={base} />
+        <MaterialSummary
+          documents={documents}
+          failed={documentsFailed}
+          onRetry={reloadDocuments}
+          instructor={instructor}
+          base={base}
+        />
       </section>
 
       {course.role === "instructor" && <JoinCodePanel courseId={course.id} />}
@@ -91,15 +98,17 @@ export default function CourseOverview() {
 function MaterialSummary({
   documents,
   failed,
+  onRetry,
   instructor,
   base,
 }: {
   documents: DocumentOut[] | null;
   failed: boolean;
+  onRetry: () => void;
   instructor: boolean;
   base: string;
 }) {
-  if (failed) return <p className="text-md text-danger">Materyal listesine şu an ulaşılamıyor.</p>;
+  if (failed) return <InlineError message="Materyal listesine şu an ulaşılamıyor." onRetry={onRetry} />;
   if (documents === null) return <SkeletonRows rows={2} />;
   if (documents.length === 0) {
     return instructor ? (
@@ -146,6 +155,7 @@ function MaterialSummary({
 function ActivitySummary({ courseId, base }: { courseId: number; base: string }) {
   const [activity, setActivity] = useState<CourseActivity | null>(null);
   const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -158,7 +168,13 @@ function ActivitySummary({ courseId, base }: { courseId: number; base: string })
         if (!controller.signal.aborted) setFailed(true);
       });
     return () => controller.abort();
-  }, [courseId]);
+  }, [courseId, attempt]);
+
+  function retry() {
+    setFailed(false);
+    setActivity(null);
+    setAttempt((value) => value + 1);
+  }
 
   return (
     <section>
@@ -172,11 +188,15 @@ function ActivitySummary({ courseId, base }: { courseId: number; base: string })
         }
       />
       {failed ? (
-        <p className="text-md text-danger">Etkinlik bilgisine şu an ulaşılamıyor.</p>
+        <InlineError message="Etkinlik bilgisine şu an ulaşılamıyor." onRetry={retry} />
       ) : activity === null ? (
         <SkeletonRows rows={1} />
       ) : activity.questions === 0 ? (
-        <p className="text-md text-graphite">Öğrenciler bu derste henüz soru sormadı.</p>
+        // Sıfır "hiç soru yok" demek değildir: kayıt ve en az üç öğrenci kuralı (ADR-4, #105).
+        <p className="text-md text-graphite">
+          Gösterilecek etkinlik yok. Etkinlik, araştırma kaydını açan en az üç farklı öğrenci soru
+          sorduğunda görünür.
+        </p>
       ) : (
         <StatRow
           stats={[

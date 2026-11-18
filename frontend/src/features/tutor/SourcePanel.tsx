@@ -1,7 +1,7 @@
 import { ExternalLink, FileText, PlayCircle, X } from "lucide-react";
 
 import Sheet from "../../components/Sheet";
-import { materialLabel } from "../../labels";
+import { materialLabel, pageLabel } from "../../labels";
 import { formatTimeRange } from "../../text";
 import Button from "../../ui/Button";
 import { buttonClasses } from "../../ui/buttonStyles";
@@ -51,7 +51,7 @@ export default function SourcePanel({
               <p className="truncate text-base font-medium text-ink">{current.document_title}</p>
               <p className="truncate text-sm text-graphite">
                 {materialLabel(current.material_type)}
-                {current.page ? `, sayfa ${current.page}` : ""}
+                {current.page ? `, ${pageLabel(current.page)}` : ""}
                 {current.page == null && current.t_start != null
                   ? `, ${formatTimeRange(current.t_start, current.t_end)}`
                   : ""}

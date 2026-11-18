@@ -51,7 +51,7 @@ export function languageLabel(code: string): string {
 
 export function citationLabel(citation: Citation): string {
   const title = citation.document_title ?? "Kaynak";
-  if (citation.page) return `${title}, s. ${citation.page}`;
+  if (citation.page) return `${title}, ${pageLabel(citation.page)}`;
   return citation.t_start != null ? `${title}, ${formatTime(citation.t_start)}` : title;
 }
 
@@ -114,4 +114,9 @@ export function compactTotals(totals: MaterialTotals): string {
 /** Sayfa/süre sütununun başlığı. */
 export function totalsHeading(totals: MaterialTotals): string {
   return totals.hasVideo ? (totals.hasPages ? "Sayfa / süre" : "Süre") : "Sayfa";
+}
+
+/** Sayfa numarasının tek biçimi (#106): "s. 4", toplam biliniyorsa "s. 4 / 12". */
+export function pageLabel(page: number, total?: number | null): string {
+  return total ? `s. ${page} / ${total}` : `s. ${page}`;
 }
