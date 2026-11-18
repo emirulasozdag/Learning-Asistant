@@ -32,7 +32,21 @@ export type ErrorCode =
   // İptal edilecek süren bir işlem yok (doküman hazır ya da başarısız).
   | "document_not_processing"
   // Bu dokümana slayt karesi için video eklenemez; `detail` nedeni söyler (#27).
-  | "frames_unavailable";
+  | "frames_unavailable"
+  // #25: seçilen kare bu videonun değil ya da durdurulan anda ekranda değil.
+  | "invalid_frame"
+  // #25: kare yok ya da başka dokümanın.
+  | "frame_not_found"
+  // #25: iş yok ya da başka dokümanın.
+  | "job_not_found"
+  // #25: iş bitmiş (iptal edilecek bir şey yok).
+  | "job_not_active"
+  // #25: aynı türden bir iş zaten kuyrukta ya da çalışıyor.
+  | "job_already_active"
+  // #25: sunucuda kare yorumlayıcısı yapılandırılmamış.
+  | "interpreter_not_configured"
+  // #25: dokümanın yorumlanacak karesi yok.
+  | "no_frames";
 
 /** Hata zarfı: `detail` kullanıcıya gösterilebilir metin, `code` programın kullandığı sabit. */
 export interface ApiErrorBody {
@@ -51,8 +65,24 @@ export interface Citation {
 /** Öğrencinin izlediği ders videosu (doküman kimliği) ve durdurduğu an. */
 export interface VideoRef {
   document_id: number;
-  /** Videonun başından itibaren saniye (>= 0). */
+  /** Videonun başından itibaren saniye (>= 0, sonlu); sunucu videonun süresine kırpar. */
   time_s: number;
+  /**
+   * Öğrencinin baktığı kare (#25). Bu videonun karesi olmalı ve `time_s` anında ekranda olmalı
+   * (değilse 422 `invalid_frame`). Verilmezse sunucu o anda ekrandaki kareyi seçer.
+   */
+  frame_id?: number | null;
+}
+
+/** İsteğin doğrulanmış video bağlamı (#25): video varlığı, kırpılmış an ve o andaki kare. */
+export interface VideoContext {
+  document_id: number;
+  /** Medya dosyasının SHA-256 özeti; altyazıyla yüklenen videoda null. */
+  media_sha256: string | null;
+  duration_s: number | null;
+  time_s: number;
+  /** O anda ekrandaki (ya da seçilen) kare; kare çıkarılmadıysa null. */
+  frame: FrameRef | null;
 }
 
 export interface AskRequest {
@@ -141,6 +171,8 @@ export interface AskResponse {
   claim_check?: ClaimCheck | null;
   /** Video durdurulmuşsa cevabın başına sabitlenen bölüm (#102). */
   video_moment?: VideoMoment | null;
+  /** İstekte video verildiyse doğrulanmış video bağlamı (#25). */
+  video_context?: VideoContext | null;
 }
 
 /**
@@ -567,8 +599,33 @@ export interface DocumentOut {
   /** Video: çıkarılmış slayt karesi sayısı ve kare işi sürüyor mu (#27). */
   frame_count?: number;
   frames_processing?: boolean;
+  /** Yüklenen medya dosyasının SHA-256 özeti (#25); altyazıyla yüklenen videoda ve diğerlerinde null. */
+  media_sha256?: string | null;
   /** Yalnızca yükleme cevabında: hattın adım adım özeti. */
   report: IngestionReport | null;
+}
+
+/**
+ * Dokümanın uzun süren işleri (#25, ADR-11): transcription (medya → transkript),
+ * frames (slayt kareleri + OCR), frame_interpretation (karelerin görsel betimlemesi).
+ */
+export type JobKind = "transcription" | "frames" | "frame_interpretation";
+export type JobStatus = "queued" | "running" | "succeeded" | "failed" | "cancelled";
+
+/** Dokümanın bir işi: durum, deneme ve hata (yalnızca eğitmen görür). */
+export interface ProcessingJobOut {
+  id: number;
+  document_id: number;
+  kind: JobKind;
+  status: JobStatus;
+  attempts: number;
+  max_attempts: number;
+  /** Çalışan iş için iptal istendi; birkaç saniye içinde durur. */
+  cancel_requested: boolean;
+  error: string | null;
+  created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
 }
 
 export interface IngestionReport {
@@ -641,6 +698,12 @@ export interface FrameRef {
   confidence: number | null;
   /** Metni türeten araç, ör. "tesseract/5.5.0/tur+eng". */
   extractor: string;
+  /**
+   * Görsel yorumlayıcının betimlemesi (#25; türetilmiş, kanıt değildir) ve yorumlayıcının
+   * kimliği. `description_model` null ise kare yorumlanmadı.
+   */
+  description?: string | null;
+  description_model?: string | null;
 }
 
 export interface SourceAlternative {

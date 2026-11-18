@@ -50,6 +50,11 @@ class FrameRef(BaseModel):
     confidence: float | None = None
     # Metni türeten araç, ör. "tesseract/5.5.0/tur+eng".
     extractor: str
+    # [ekleme, #25] Görsel yorumlayıcının betimlemesi (türetilmiş; kanıt değildir) ve
+    # yorumlayıcının kimliği. `description_model` boşsa kare yorumlanmadı; doluyken
+    # `description` boşsa yorumlayıcı güvenilir bir betimleme veremedi.
+    description: str | None = None
+    description_model: str | None = None
 
 
 class SourceDetail(BaseModel):

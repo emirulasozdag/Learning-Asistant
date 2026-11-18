@@ -379,7 +379,8 @@ yönteminden bağımsız, opak bir URL'dir.
   değilse `422`. Değer opak saklanır ve `DocumentOut.media_url` ile video `SourceDetail.media_url` olarak aynen döner
   (`#t=` eklenmez; zamanı sarmak oynatıcının işidir). Verilmezse `null`.
 - `AskRequest.video` verilirse: doküman var, aynı derse ait ve `material_type = "video"` olmalı, değilse
-  `422` (Türkçe `detail`; hata zarfında `code` alanı **henüz yok**, bkz. §5). `time_s > duration_s` ise `duration_s`e kırpılır (hata değil).
+  `422 {code: "invalid_video"}` (#25'ten önce `code` yoktu). `time_s > duration_s` ise `duration_s`e kırpılır (hata değil);
+  `time_s` sonlu olmalıdır (#25). Kare referansı (`frame_id`) ve doğrulanmış bağlam: §4.3.
 - Öncelik: `retrieve(video=…)` o videonun `[time_s − video_window_s, time_s + video_window_s]` ile örtüşen parçalarını
   (`video_neighbors`, orta noktaya uzaklığa göre) RRF'e **ayrı bir sıralama** olarak `video_weight` ağırlığıyla ekler. Hiçbir
   parça elenmez; başka videoların aynı saniyesi öne çıkmaz. Alakasızlık kapısı (`relevant`, `best_similarity`,
@@ -500,7 +501,7 @@ Kurallar:
 
 **Durum:** koda geçti (#24): sözleşme PR #98, davranış #24'ün uygulama PR'ı. Kare seçimi `ingestion/frames.py`, OCR
 `ingestion/ocr.py`, iş adımı `ingestion/lecture_frames.py`, arama `retrieval/frames.py` (cevaplara bağlı değil).
-#25 (görsel bağlam ve saklama) bu tabloyu genişletecekse burada önerir.
+#25 tabloyu `description`/`description_model` ile genişletti ve kare işini ayırdı: §4.3.
 
 **Davranış.**
 - Kare: görüntü 2 sn sabit kalınca alınır (`t_frame` = sabitlik başı + 2 sn); `t_end` görüntünün değiştiği ilk örnek
@@ -510,13 +511,14 @@ Kurallar:
   %25'i aşarsa `partial`. Görüntü üç biçimde okunur (gri ton; siyah-beyaz ve koyu dolu kutuların içi ters çevrilmiş;
   yarı boyut, çok büyük başlıklar için), daha çok kelimeyi güvenle okuyan seçilir; hepsinde diyagramın ince
   çizgileri silinir. Tesseract'ın tanımadığı matematik işaretleri (Σ, üst simge) metne girmez.
-- Kare adımı yapılamazsa (video çözülemedi, Tesseract yok) doküman karesiz `ready` olur; iş başarısız sayılmaz.
+- Kare adımı yapılamazsa (video çözülemedi, Tesseract yok) doküman karesiz `ready` olur. #25'ten beri kareler ayrı bir
+  `frames` işindedir: o iş "Videodan slayt karesi çıkarılamadı." ile `failed` olur (§4.3).
 - Görüntü uç noktası yalnızca dokümanın kare klasöründeki dosyayı sunar; başka dokümanın kare kimliği ya da dosyası
   olmayan kare `404` ("Kare görüntüsü yok"; hata zarfında `code` yok, sayfa görüntüsü gibi).
 
 **Kurallar.**
-- Kare yalnızca yüklenen medya dosyasından, transkripsiyon işinde, medya silinmeden önce çıkarılır
-  (`FRAME_EXTRACTION=ocr`; varsayılan `off`). `.vtt` ile yüklenen videoda kare yoktur.
+- Kare yalnızca yüklenen medya dosyasından çıkarılır (`FRAME_EXTRACTION=ocr`; varsayılan `off`): yüklenen videoda
+  transkripsiyondan sonraki `frames` işinde (#25), `.vtt` ile yüklenen videoda sonradan eklenen medyadan (#27).
 - Orijinal kanıt karenin görüntüsü (`image_url`) ve zamanıdır: `t_start`–`t_end` slaytın ekranda sabit kaldığı
   aralık, `t_frame` görüntünün alındığı an (saniye, videonun başından; `t_start <= t_frame <= t_end`).
 - `text` OCR'ın türettiği metindir; `chunks`a girmez, `/ask` ve AI Tutor cevaplarında kanıt olarak alıntılanmaz
@@ -525,7 +527,8 @@ Kurallar:
   indeksi `null`; kare yine listelenir.
 - Erişim dokümanınkiyle aynıdır (§3): dersin üyesi değilse, doküman onaysızsa ya da `ready` değilse eğitmen dışındakilere
   `404` (`document_not_found`). Başka dokümanın kare kimliği `404`.
-- Doküman silinince ya da işi başarısız olunca kareler ve görüntü dosyaları silinir.
+- Doküman silinince ya da transkripsiyonu başarısız olunca kareler ve görüntü dosyaları silinir; kare işinin hatası
+  önceki kareleri silmez (#27). Tek kare eğitmence silinebilir (§4.3).
 
 **Sözleşme.**
 
@@ -559,6 +562,110 @@ Settings.frame_extraction: "off" | "ocr"  (FRAME_EXTRACTION; docker-compose api 
 davranış değişmedi (`FRAME_EXTRACTION=off` iken transkripsiyon işi önceki gibidir).
 #27 **[ekleme]**: `POST /documents/{id}/frames`, iş türü `frames` (`jobs/queue.FRAMES`, `ingestion/media.frames_job`),
 `DocumentOut.frame_count/frames_processing`, hata kodu `frames_unavailable`; iptal uç noktası kare işini de iptal eder.
+
+### 4.3 Görsel medya bağlamı, işler ve saklama (#25, ADR-11)
+
+**Durum:** koda geçti (#25). İstekteki video bağlamı doğrulanır, cevaba (`video_context`) ve mesaj kaydına
+(`meta.video`) yazılır; kare çıkarma ve yorumlama kalıcı işlerdir; sahipsiz dosyalar temizlenir. #26'nın görsel kanıt
+sözleşmesi (§4.2, `generation/visual.py`) henüz `main`'de değil: `qa/service.answer_stream` kareleri üreticiye
+**vermez**. İkisi birleşince bağlantı tek adımdır (aşağıda "#26 ile bağlantı").
+
+**İstek bağlamı.**
+- `VideoRef.frame_id` **[ekleme]**: öğrencinin baktığı kare. Bu videonun karesi olmalı ve `time_s` anında ekranda olmalı
+  (`FRAME_TIME_TOLERANCE_S = 1` sn payla); değilse `422 invalid_frame` (başka videonun, silinmiş ya da var olmayan kare de
+  aynı yanıtı alır). Verilmezse sunucu o anda ekrandaki kareyi seçer; kare yoksa boş kalır.
+- `VideoRef.time_s` sonlu olmalı (`inf`/`NaN` → 422). Hatalı girdideki sonsuz sayı 422 yanıtında metne çevrilir
+  (önceden yanıt yazılamıyor ve 500 dönüyordu).
+- Video bu dersin onaylı ve `ready` video dokümanı değilse `422 invalid_video` (artık `code` taşır).
+- `AskResponse.video_context` **[ekleme]** (AI Tutor'da `course_answer` bloğunun içinde de): doğrulanmış bağlam.
+- Asistan mesajının `meta.video`'su (hem `/ask` hem AI Tutor turu): `{document_id, media_sha256, time_s, frame_id,
+  frame: {t_start, t_end, t_frame} | null}`. Kare görüntüsü, OCR metni ve betimleme kayda **girmez**; kare kendi
+  tablosunda kalır, silinirse kayıttaki kimlik boşa düşer (görüntü `404`).
+- `GET /sources/frame:<kare kimliği>` **[ekleme]**: kare alıntısının (#26) görünümü. `SourceDetail { source_id:
+  "frame:<id>", document_id, material_type: "video", text: OCR metni ya da "", page: null, t_start, t_end (karenin
+  aralığı), media_url, frames: [o kare] }`. Erişim parça kaynağıyla aynı (üye değil, onaysız ya da hazır olmayan
+  doküman → `404 source_not_found`; bozuk kimlik de `404`).
+
+**Video varlığı.** `Document.media_sha256` / `DocumentOut.media_sha256` **[ekleme]**: yüklenen medyanın SHA-256 özeti
+(yüklemede yazılır); kareler yazılınca karelerin geldiği medyanın özeti olur (#27'de altyazılı videoya eklenen medya).
+Altyazıyla yüklenip medya eklenmemiş videoda `null`.
+
+**Sınırlar.**
+- `MAX_MEDIA_DURATION_S` (varsayılan 4 saat): daha uzun altyazı yüklemede `422`; daha uzun medya transkripsiyon
+  başlamadan (faster-whisper süreyi segmentlerden önce verir) "Medya süresi 4 saat sınırını aşıyor." ile `failed`.
+  Her `frames` işi de kare çıkarmadan önce medyanın süresini okur (altyazılı videoya eklenen medya dahil): sınırı
+  aşarsa aynı mesajla, süre okunamaz ya da sonlu ve pozitif değilse "Videonun süresi okunamadı." ile, dosya
+  açılamazsa "Video dosyası açılamadı." ile iş `failed` olur (yeniden denenmez; doküman hazır kalır, medya silinir).
+- Boyut: `MAX_MEDIA_BYTES` (değişmedi). Kare sayısı ve genişliği: §4.1.
+- Kare görüntüsü yalnızca dokümanın kare klasöründen okunur ve sunulur; yorumlama işi klasör dışındaki yolu atlar.
+
+**İşler** (ADR-9 kuyruğu; yeni kuyruk yok). `processing_jobs.kind` artık CHECK ile sınırlı:
+
+| Tür | Ne zaman | Hata / iptal |
+|---|---|---|
+| `transcription` | medya yüklemesi | doküman `failed`, dosyaları silinir |
+| `frames` | yüklenen videonun transkripsiyonu bitince aynı medyadan (#25, `FRAME_EXTRACTION=ocr`, ses dosyasında yok) ya da altyazılı videoya medya eklenince (#27) | doküman `ready` kalır, önceki kareler korunur, medya silinir |
+| `frame_interpretation` | `POST /documents/{id}/frames/interpret` | doküman ve kareler değişmez |
+
+**[KIRICI davranış]** Yüklenen videoda kareler artık transkripsiyon işinin içinde değil ayrı `frames` işinde çıkarılır:
+doküman kareleri beklemeden `ready` olur (`frames_processing = true`), kare adımının iptali ya da hatası dokümanı
+`failed` yapmaz. Kare çıkarılamazsa iş görünür biçimde `failed` olur (önceden yalnızca günlüğe uyarı yazılıyordu).
+Yeniden deneme ADR-9'daki gibidir: beklenmeyen hata ve sahipsiz iş `JOB_MAX_ATTEMPTS`e kadar yeniden denenir (medya
+korunur); kalıcı hata yeniden denenmez.
+
+```
+JobKind   = "transcription" | "frames" | "frame_interpretation"
+JobStatus = "queued" | "running" | "succeeded" | "failed" | "cancelled"
+ProcessingJobOut { id, document_id, kind: JobKind, status: JobStatus, attempts: int, max_attempts: int,
+                   cancel_requested: bool, error: str | null, created_at, started_at, finished_at }
+
+GET    /documents/{id}/jobs                  → ProcessingJobOut[]  (eğitmen; eskiden yeniye)
+POST   /documents/{id}/jobs/{job_id}/cancel  → ProcessingJobOut    (eğitmen) 404 job_not_found · 409 job_not_active
+POST   /documents/{id}/frames/interpret      → 202 ProcessingJobOut (eğitmen)
+       409 interpreter_not_configured · 409 no_frames · 409 job_already_active (dokümanda süren iş var)
+DELETE /documents/{id}/frames/{frame_id}     → 204 (eğitmen) 404 frame_not_found
+POST   /documents/{id}/cancel                 (değişmedi, #27: dokümanın süren işini iptal eder)
+Öğrenciye: hazır dokümanda 403 insufficient_role, işlenen dokümanda 404.
+
+VideoRef        + { frame_id?: int | null }
+VideoContextOut { document_id: int, media_sha256: str | null, duration_s: float | null, time_s: float,
+                  frame: FrameRef | null }
+AskResponse     + { video_context: VideoContextOut | null }
+FrameRef        + { description: str | null, description_model: str | null }
+DocumentOut     + { media_sha256: str | null }
+
+Document (ORM)     + { media_sha256: str(64) | null }
+VideoFrame (ORM)   + { description: text | null, description_model: str(200) | null }
+ProcessingJob      CHECK kind IN ('transcription', 'frames', 'frame_interpretation')   (migration f7c3a9e2d415)
+Settings           + max_media_duration_s (14400), frame_interpreter (""), storage_sweep_interval_s (3600),
+                     storage_orphan_grace_s (3600)
+```
+
+**Yorumlama (arayüz; #24'e devir).** `ingestion/frame_interpretation.py`: `FrameInterpreter { identity: str;
+interpret(image_path, FrameContext) -> str | null }`, `FrameContext { frame_id, document_id, t_start, t_end, t_frame,
+ocr_text, transcript, language }`, kayıt `INTERPRETERS[ad] = üretici`, seçim `FRAME_INTERPRETER=ad`. Bu PR'da kayıtlı
+yorumlayıcı **yoktur**: yorumlama kapalıdır ve uç nokta `409 interpreter_not_configured` döner. Sonuç: `description`
+(boşluk kırpılır, en çok 4000 karakter; güvenilir betimleme yoksa `null`, uydurma yok) ve `description_model`
+(doluysa kare yorumlandı). Betimleme türetilmiştir: aranmaz, alıntılanmaz. `InterpretationError` kalıcı hatadır;
+diğer hatalar yeniden denenir. Hosted görsel model ADR-5/ADR-8 rotasına ve eğitmen beyanına (ADR-3) bağlıdır.
+
+**Saklama.**
+- Medya yalnızca onu okuyacak iş bitene kadar diskte kalır: kare işi varsa o bitince (başarı, hata, iptal), yoksa
+  transkripsiyon bitince silinir.
+- Kare görüntüleri dokümanla yaşar; doküman silinince silinir. Eğitmen tek kareyi silebilir (yanlışlıkla yakalanmış
+  gizli içerik).
+- Çalıştırıcı `STORAGE_SWEEP_INTERVAL_S` aralığıyla sahipsiz dosyaları siler (`jobs/retention.py`): dokümanı olmayan
+  dosya ve kare klasörleri, kare işi sürmeyen `.partial`/`.previous` klasörleri, hiçbir etkin işin girdisi olmayan ve
+  dokümanın dosyası da olmayan `<doküman>[.frames].<uzantı>`. `STORAGE_ORPHAN_GRACE_S`'ten yeni dosyaya dokunulmaz.
+  Sembolik bağlantı izlenmez ve silinecek yol `UPLOAD_DIR` altında olmalıdır. Karar silmeden hemen önce dokümanın
+  satır kilidi altında yeniden verilir (etkin işler, dokümanın dosyası, yolun inode/değişme zamanı); kilitli doküman
+  o turda atlanır. Kare videosu ekleme ucu dosyayı aynı kilit altında yazar.
+
+**#26 ile bağlantı.** `FrameLocator(document_id, frame_id=VideoRef.frame_id)` ya da `.moment(VideoPosition)`: isteğin
+doğrulanmış `VideoRef`'i (API'de `checked_video`) bunun için yeterlidir. #26 birleşince `answer_stream` içinde
+`StoredFrameSource(db, course)` ile `VisualContext` kurulup `stream_answer(visual=…)`a verilir; kare kimliği alıntıları
+`GET /sources/frame:<id>` ile açılır. Hosted judge'a kare görüntüsü gitmeden önce eğitmen beyanının (ADR-3) video
+görüntülerini kapsadığı ekip kararı olarak kaydedilmelidir (§4.2).
 
 ---
 
@@ -619,7 +726,9 @@ Değişmezler (`AskResponse`):
 
 Hata kodu listesi (başlangıç): `course_not_found`, `source_not_found`, `conversation_not_found`, `document_not_found`,
 `unsupported_file_type`, `file_too_large`, `ingestion_failed`, `course_exists`, `no_valid_item`, `ai_unavailable`, `invalid_video`,
-`not_authenticated`, `insufficient_role`, `not_implemented`, `validation_error`.
+`not_authenticated`, `insufficient_role`, `not_implemented`, `validation_error`. Sonradan eklenenler `schemas/common.py`
+`ErrorCode`'dadır (ör. #25: `invalid_frame`, `frame_not_found`, `job_not_found`, `job_not_active`, `job_already_active`,
+`interpreter_not_configured`, `no_frames`; §4.3).
 
 **Koddan farklar.**
 - `provider_error`, `decline_source` — **[ekleme]** (frontend `outcome.ts` önce `decline_source`'a geçer, sonra string karşılaştırması silinir).

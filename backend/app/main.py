@@ -4,6 +4,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import RequestResponseEndpoint
@@ -21,7 +22,7 @@ from app.api import (
     sources,
     tutor,
 )
-from app.api.errors import ApiError, api_error_handler
+from app.api.errors import ApiError, api_error_handler, validation_error_handler
 from app.core.config import settings
 from app.core.limits import RequestSizeLimit
 from app.db.session import SessionLocal
@@ -83,6 +84,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(title="Interactive Learning Assistant API", version="0.0.1", lifespan=lifespan)
 
 app.add_exception_handler(ApiError, api_error_handler)
+app.add_exception_handler(RequestValidationError, validation_error_handler)
 
 _SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 

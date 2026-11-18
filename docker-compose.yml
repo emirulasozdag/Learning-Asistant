@@ -53,6 +53,9 @@ services:
       TRANSCRIPTION_MODEL: ${TRANSCRIPTION_MODEL:-}
       # off = kapalı; ocr = medya yüklemesinde slayt karelerini çıkar ve yerel OCR ile oku (ADR-10).
       FRAME_EXTRACTION: ${FRAME_EXTRACTION:-off}
+      # Video/ses ve altyazının en uzun süresi (saniye, #25); boş yorumlayıcı = kare yorumlama kapalı.
+      MAX_MEDIA_DURATION_S: ${MAX_MEDIA_DURATION_S:-14400}
+      FRAME_INTERPRETER: ${FRAME_INTERPRETER:-}
       RETRIEVAL_MIN_SIMILARITY: ${RETRIEVAL_MIN_SIMILARITY:-0.78}
       RETRIEVAL_MIN_KEYWORD_COVERAGE: ${RETRIEVAL_MIN_KEYWORD_COVERAGE:-0.5}
       RETRIEVAL_FOLLOW_UP_MIN_SIMILARITY: ${RETRIEVAL_FOLLOW_UP_MIN_SIMILARITY:-0.77}
@@ -106,7 +109,12 @@ services:
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-intfloat/multilingual-e5-base}
       TRANSCRIPTION_MODEL: ${TRANSCRIPTION_MODEL:-}
       FRAME_EXTRACTION: ${FRAME_EXTRACTION:-off}
+      MAX_MEDIA_DURATION_S: ${MAX_MEDIA_DURATION_S:-14400}
+      FRAME_INTERPRETER: ${FRAME_INTERPRETER:-}
       JOB_MAX_ATTEMPTS: ${JOB_MAX_ATTEMPTS:-2}
+      # Sahipsiz dosya temizliği (#25): aralık (0 = kapalı) ve dokunulmayan yeni dosya yaşı (saniye).
+      STORAGE_SWEEP_INTERVAL_S: ${STORAGE_SWEEP_INTERVAL_S:-3600}
+      STORAGE_ORPHAN_GRACE_S: ${STORAGE_ORPHAN_GRACE_S:-3600}
       # Modelleri `api` indirir; çalıştırıcı önbellekten kullanır.
       HF_HUB_OFFLINE: "1"
     command: python -m app.jobs.worker

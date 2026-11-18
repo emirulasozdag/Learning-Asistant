@@ -2,7 +2,8 @@
 
 Sprint 1: Course, Document, Chunk, Conversation, Message. #11: User, AuthSession, Enrollment
 (DECISIONS.md ADR-1, 2, 4). #15: PracticeQuestion, PracticeRubric, PracticeAttempt. #21:
-ProcessingJob (ADR-9). #24: VideoFrame (ADR-10). Kalan varlıklar (ClaimCheck, InstructorReview,
+ProcessingJob (ADR-9). #24: VideoFrame (ADR-10). #25: kare çıkarma/yorumlama işleri, medya
+kimliği ve kare betimlemesi (ADR-11). Kalan varlıklar (ClaimCheck, InstructorReview,
 ...) ilgili özelliklerle eklenecek — docs/ANALYSIS.md §8.
 
 Model değişince: `alembic revision --autogenerate -m "açıklama"`.
@@ -134,6 +135,10 @@ class Document(Base):
     # asr için model kimliği (ör. faster-whisper/large-v3-turbo/int8). Diğer dokümanlarda boş.
     transcript_source: Mapped[str | None] = mapped_column(String(8))
     transcript_model: Mapped[str | None] = mapped_column(String(200))
+    # Yüklenen medya dosyasının SHA-256 özeti (#25): video varlığının kimliği. Kareler ve soru
+    # kayıtlarındaki video bağlamı bu dosyadan gelir. Altyazıyla yüklenen videoda ve diğer
+    # dokümanlarda boş.
+    media_sha256: Mapped[str | None] = mapped_column(String(64))
 
     course: Mapped[Course] = relationship(back_populates="documents")
     chunks: Mapped[list["Chunk"]] = relationship(
@@ -226,16 +231,27 @@ class VideoFrame(Base):
     search_vector: Mapped[str | None] = mapped_column(TSVECTOR)
     embedding: Mapped[list[float] | None] = mapped_column(Vector(EMBEDDING_DIM))
     embedding_model: Mapped[str | None] = mapped_column(String(200))
+    # Görsel yorumlayıcının betimlemesi (#25, ADR-11): türetilmiş metin, orijinal kanıt değildir;
+    # aranmaz ve alıntılanmaz. `description_model` doluysa kare yorumlandı (betimleme boşsa
+    # yorumlayıcı güvenilir bir betimleme veremedi); ikisi de boşsa yorumlanmadı.
+    description: Mapped[str | None] = mapped_column(Text)
+    description_model: Mapped[str | None] = mapped_column(String(200))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class ProcessingJob(Base):
-    """Uzun süren doküman işi (medya transkripsiyonu; altyazılı videoya kare ekleme, #27), ADR-9.
+    """Uzun süren doküman işi, ADR-9. Türler (#27, #25, ADR-11):
+
+    - `transcription`: medya → transkript. Başarısız olursa doküman da `failed` olur.
+    - `frames`: medyadan slayt kareleri + OCR; yüklenen videonun transkripsiyonundan sonra (#25)
+      ya da altyazılı videoya sonradan eklenen medyadan (#27). Başarısız olursa doküman `ready`
+      kalır, önceki kareler korunur.
+    - `frame_interpretation`: saklanan karelerin görsel yorumlayıcıyla betimlenmesi.
 
     Durum: queued → running → succeeded | failed | cancelled. Çalışan iş `heartbeat_at`'i
     düzenli günceller; güncellemesi duran iş (süreç öldü) yeniden kuyruğa alınır ya da deneme
-    hakkı bittiyse başarısız olur. Girdi dosyası (`input_path`) iş bitene kadar diskte kalır.
-    Doküman silinince iş de silinir.
+    hakkı bittiyse başarısız olur. Girdi dosyası (`input_path`) onu okuyan son iş bitene kadar
+    diskte kalır. Doküman silinince iş de silinir.
     """
 
     __tablename__ = "processing_jobs"
@@ -243,6 +259,10 @@ class ProcessingJob(Base):
         CheckConstraint(
             "status IN ('queued', 'running', 'succeeded', 'failed', 'cancelled')",
             name="ck_processing_jobs_status",
+        ),
+        CheckConstraint(
+            "kind IN ('transcription', 'frames', 'frame_interpretation')",
+            name="ck_processing_jobs_kind",
         ),
         Index("ix_processing_jobs_status_id", "status", "id"),
     )

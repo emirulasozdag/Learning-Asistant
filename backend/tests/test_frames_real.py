@@ -71,7 +71,9 @@ def process(api, db: Session, db_engine, monkeypatch: pytest.MonkeyPatch):
         assert response.status_code == 201, response.text
         db.commit()
         transcriber = FakeTranscriber(segments=SPEECH, duration_s=24.0)
-        assert run_pending(session_factory(db_engine), transcriber, FakeEmbedder()) == 1
+        # Videoda kareler ayrı bir işte çıkarılır (#25): transkripsiyon + kare çıkarma.
+        jobs = 1 if name.endswith(".wav") else 2
+        assert run_pending(session_factory(db_engine), transcriber, FakeEmbedder()) == jobs
         return refreshed(db, response.json()["id"])
 
     return run

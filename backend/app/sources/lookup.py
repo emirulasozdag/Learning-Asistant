@@ -11,6 +11,9 @@ from app.schemas.materials import MaterialType
 from app.schemas.sources import FrameRef, SourceAlternative, SourceDetail
 
 MAX_ALTERNATIVES = 3
+# Kare alıntılarının kimlik öneki (#26 `generation/visual.FRAME_SOURCE_PREFIX` ile aynı); parça
+# kimlikleri yalnızca rakamdır.
+FRAME_SOURCE_PREFIX = "frame:"
 
 
 def chunk_id(source_id: str) -> int | None:
@@ -30,6 +33,33 @@ def find_chunk(db: Session, source_id: str) -> Chunk | None:
     """Alıntı kimliğinin (chunk id) parçası. Erişimi çağıran denetler (`chunk.course_id`)."""
     value = chunk_id(source_id)
     return db.get(Chunk, value) if value is not None else None
+
+
+def find_frame(db: Session, source_id: str) -> VideoFrame | None:
+    """Kare alıntısının (`frame:<kare kimliği>`, #26) karesi. Erişimi çağıran denetler."""
+    if not source_id.startswith(FRAME_SOURCE_PREFIX):
+        return None
+    value = chunk_id(source_id.removeprefix(FRAME_SOURCE_PREFIX))
+    return db.get(VideoFrame, value) if value is not None else None
+
+
+def frame_source_detail(frame: VideoFrame, document: Document) -> SourceDetail:
+    """Kare alıntısının görünümü (#25): videonun o aralığı ve karenin kendisi (`frames[0]`).
+
+    `text` karenin türetilmiş (OCR) metnidir, okunamadıysa boş; orijinal kanıt görüntüdür.
+    """
+    return SourceDetail(
+        source_id=f"{FRAME_SOURCE_PREFIX}{frame.id}",
+        course_id=document.course_id,
+        document_id=document.id,
+        document_title=document.title,
+        material_type=MaterialType(document.material_type),
+        text=frame.text or "",
+        t_start=frame.t_start,
+        t_end=frame.t_end,
+        media_url=document_media_url(document),
+        frames=[to_frame_ref(frame)],
+    )
 
 
 def source_detail(db: Session, chunk: Chunk) -> SourceDetail:
@@ -90,6 +120,8 @@ def to_frame_ref(frame: VideoFrame) -> FrameRef:
         text=frame.text,
         confidence=frame.confidence,
         extractor=frame.extractor,
+        description=frame.description,
+        description_model=frame.description_model,
     )
 
 

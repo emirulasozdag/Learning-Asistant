@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.db.models import Conversation, Course, Message, User
+from app.db.models import Conversation, Course, Document, Message, User, VideoFrame
 from app.embeddings.base import Embedder
 from app.generation.answer import stream_answer
 from app.llm.base import ChatMessage, LLMClient
@@ -14,7 +14,15 @@ from app.llm.gateway import resolve_judge
 from app.retrieval.hybrid import retrieve
 from app.retrieval.rerank import rerank
 from app.retrieval.types import RetrievalResult, VideoPosition
-from app.schemas.ask import AskRequest, AskResponse, RetrievalHit, VideoMomentOut, VideoRef
+from app.schemas.ask import (
+    AskRequest,
+    AskResponse,
+    RetrievalHit,
+    VideoContextOut,
+    VideoMomentOut,
+    VideoRef,
+)
+from app.sources.lookup import to_frame_ref
 
 # LLM'e verilen önceki soru-cevap sayısı.
 HISTORY_TURNS = 3
@@ -126,7 +134,7 @@ def ask_stream(
                 conversation_id=conversation.id,
                 role="assistant",
                 content=response.answer or response.decline_reason or "",
-                meta=answer_meta(response),
+                meta={**answer_meta(response), "video": video_trace(response.video_context)},
                 research_logged=logged,
             ),
         ]
@@ -169,6 +177,8 @@ def answer_stream(
         embedder=embedder,
         context=previous_question,
     )
+    # Doğrulanmış video bağlamı (#25) model çağrılarından önce, aynı okuma işleminde okunur.
+    context = video_context(db, video)
     if release is not None:
         release()
     # Durdurulan andaki bölüm (#102) yeniden sıralamaya girmez, her zaman başta kalır.
@@ -215,9 +225,50 @@ def answer_stream(
             t_end=moment.t_end,
             deictic=retrieval.deictic,
         )
+    response.video_context = context
     response.similarity_threshold = settings.retrieval_min_similarity
     response.best_similarity = retrieval.best_similarity
     yield DoneEvent(response, retrieval)
+
+
+def video_context(db: Session, video: VideoRef | None) -> VideoContextOut | None:
+    """İsteğin doğrulanmış video bağlamı (#25): video varlığı, kırpılmış an ve o andaki kare.
+
+    `video` API katmanında doğrulanmıştır (`api.deps.checked_video`); bu yalnızca okur. Video ya
+    da kare istek sürerken silindiyse ilgili alan boş kalır.
+    """
+    if video is None:
+        return None
+    document = db.get(Document, video.document_id)
+    frame = db.get(VideoFrame, video.frame_id) if video.frame_id is not None else None
+    if frame is not None and frame.document_id != video.document_id:
+        frame = None
+    return VideoContextOut(
+        document_id=video.document_id,
+        media_sha256=document.media_sha256 if document else None,
+        duration_s=document.duration_s if document else None,
+        time_s=video.time_s,
+        frame=to_frame_ref(frame) if frame is not None else None,
+    )
+
+
+def video_trace(context: VideoContextOut | None) -> dict | None:
+    """Mesaj kaydına yazılan video bağlamı (#25): kimlikler ve zamanlar. Kare görüntüsü ve
+    türetilmiş metin (OCR, betimleme) kayda girmez; kare kendi tablosunda kalır."""
+    if context is None:
+        return None
+    frame = context.frame
+    return {
+        "document_id": context.document_id,
+        "media_sha256": context.media_sha256,
+        "time_s": context.time_s,
+        "frame_id": frame.frame_id if frame else None,
+        "frame": (
+            {"t_start": frame.t_start, "t_end": frame.t_end, "t_frame": frame.t_frame}
+            if frame
+            else None
+        ),
+    }
 
 
 def research_logging_now(db: Session, user_id: int | None) -> bool:

@@ -13,7 +13,7 @@ from app.embeddings.base import Embedder
 from app.embeddings.provider import get_embedder
 from app.ingestion.chunking import chunk_segments, chunk_timed_segments
 from app.ingestion.cleaning import clean_segments_with_stats, normalize_timed_segments
-from app.ingestion.documents import validate_media_url
+from app.ingestion.documents import media_duration_error, validate_media_url
 from app.ingestion.parsers.pdf_parser import parse_pdf
 from app.ingestion.parsers.pptx_parser import parse_pptx
 from app.ingestion.parsers.vtt_parser import ParsedVtt, parse_vtt
@@ -98,6 +98,8 @@ def ingest_document(
             try:
                 if is_video:
                     parsed = parse_vtt(path)
+                    if too_long := media_duration_error(parsed.duration_s):
+                        raise IngestionError(too_long)
                     segments = parsed.segments
                 else:
                     segments = PARSERS[extension](path)

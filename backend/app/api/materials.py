@@ -8,7 +8,8 @@ from sqlalchemy import func, select
 from app.api.deps import DbSession, get_course_for
 from app.api.errors import ApiError
 from app.auth.dependencies import AuthUser, CurrentUser, not_found_error, require_course_role
-from app.db.models import Document, VideoFrame
+from app.core.config import settings
+from app.db.models import Document, ProcessingJob, VideoFrame
 from app.ingestion.documents import (
     chunk_previews,
     document_files,
@@ -18,12 +19,19 @@ from app.ingestion.documents import (
     to_document_out,
     validate_upload_fields,
 )
+from app.ingestion.frame_interpretation import interpreter_configured
 from app.ingestion.media import add_frame_media, create_media_document, is_media
 from app.ingestion.pipeline import MAX_UPLOAD_BYTES, IngestionError, ingest_document
 from app.ingestion.rendering import page_image_path, remove_cached_pages
-from app.jobs.queue import active_job, request_cancel
+from app.jobs.queue import (
+    FRAME_INTERPRETATION,
+    active_job,
+    cancel_job,
+    enqueue,
+    request_cancel,
+)
 from app.schemas.common import Role
-from app.schemas.materials import ChunkPreview, DocumentOut, MaterialType
+from app.schemas.materials import ChunkPreview, DocumentOut, MaterialType, ProcessingJobOut
 from app.schemas.sources import FrameRef
 from app.sources.lookup import to_frame_ref
 
@@ -151,7 +159,11 @@ def add_frames_from_video(
             "Slayt kareleri yalnızca hazır bir ders videosuna eklenebilir.",
             "frames_unavailable",
         )
+    # Dosya yazılırken doküman satırı kilitli kalır (#25): eşzamanlı ikinci ekleme beklenir,
+    # depolama temizliği aynı adlı eski bir artığı bu sırada silemez (`jobs/retention.py`).
+    _lock_document(db, document.id)
     if active_job(db, document.id) is not None:
+        db.rollback()
         raise ApiError(
             status.HTTP_409_CONFLICT,
             "Bu video için süren bir işlem var; bitince tekrar dene.",
@@ -187,6 +199,120 @@ def document_frame_image(
     # Sayfa görüntüsü gibi: oturumla yetkilendirilir, tarayıcı her seferinde sunucuya sorar.
     return FileResponse(
         image, media_type="image/png", headers={"Cache-Control": "private, no-cache"}
+    )
+
+
+@router.delete("/documents/{document_id}/frames/{frame_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_frame(document_id: int, frame_id: int, user: AuthUser, db: DbSession) -> None:
+    """Tek bir kareyi ve görüntüsünü siler (yalnızca eğitmen, #25).
+
+    Kare yanlışlıkla gizli bir içerik yakaladıysa (ör. öğrenci listesi, açık bir pencere) eğitmen
+    onu kaldırır; transkript ve diğer kareler etkilenmez. Soru kayıtlarındaki kare kimliği kalır,
+    görüntüsü artık sunulmaz. Başka dokümanın karesi 404 `frame_not_found`.
+    """
+    document = _get_document(db, user, document_id, "instructor")
+    frame = db.get(VideoFrame, frame_id)
+    if frame is None or frame.document_id != document.id:
+        raise not_found_error("frame_not_found")
+    image = Path(frame.image_path)
+    db.delete(frame)
+    db.commit()
+    if image.resolve().is_relative_to(frame_dir(document.course_id, document.id).resolve()):
+        image.unlink(missing_ok=True)
+
+
+@router.post(
+    "/documents/{document_id}/frames/interpret",
+    response_model=ProcessingJobOut,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+def interpret_frames(document_id: int, user: AuthUser, db: DbSession) -> ProcessingJobOut:
+    """Videonun karelerini görsel yorumlayıcıyla betimleme işini kuyruğa alır (eğitmen, #25).
+
+    Sunucuda yorumlayıcı yoksa 409 `interpreter_not_configured`; karesi yoksa 409 `no_frames`;
+    dokümanda süren bir iş (kare çıkarma, yorumlama) varsa 409 `job_already_active`. Başarısız ya
+    da iptal edilen yorumlama bu uçla yeniden başlatılır.
+    """
+    document = _get_document(db, user, document_id, "instructor")
+    if not interpreter_configured():
+        raise ApiError(
+            status.HTTP_409_CONFLICT,
+            "Bu sunucuda kare yorumlayıcısı yapılandırılmamış.",
+            "interpreter_not_configured",
+        )
+    # Aynı doküman için eşzamanlı iki istek iki iş açmasın: doküman satırı kilitlenir.
+    _lock_document(db, document.id)
+    if active_job(db, document.id) is not None:
+        db.rollback()
+        raise ApiError(
+            status.HTTP_409_CONFLICT,
+            "Bu videonun kareleri şu anda işleniyor.",
+            "job_already_active",
+        )
+    if (
+        db.scalar(select(VideoFrame.id).where(VideoFrame.document_id == document.id).limit(1))
+        is None
+    ):
+        db.rollback()
+        raise ApiError(status.HTTP_409_CONFLICT, "Bu videonun karesi yok.", "no_frames")
+    job = enqueue(db, FRAME_INTERPRETATION, document, frame_dir(document.course_id, document.id))
+    db.commit()
+    db.refresh(job)
+    return _job_out(job)
+
+
+@router.get("/documents/{document_id}/jobs", response_model=list[ProcessingJobOut])
+def document_jobs(document_id: int, user: AuthUser, db: DbSession) -> list[ProcessingJobOut]:
+    """Dokümanın uzun süren işleri (transkripsiyon, kare çıkarma, yorumlama), eskiden yeniye
+    (yalnızca eğitmen, #25)."""
+    document = _get_document(db, user, document_id, "instructor")
+    jobs = db.scalars(
+        select(ProcessingJob)
+        .where(ProcessingJob.document_id == document.id)
+        .order_by(ProcessingJob.id)
+    )
+    return [_job_out(job) for job in jobs]
+
+
+@router.post("/documents/{document_id}/jobs/{job_id}/cancel", response_model=ProcessingJobOut)
+def cancel_document_job(
+    document_id: int, job_id: int, user: AuthUser, db: DbSession
+) -> ProcessingJobOut:
+    """Dokümanın bir işini iptal eder (yalnızca eğitmen, #25).
+
+    Kuyruktaki iş hemen `cancelled` olur; çalışan iş işaretlenir (`cancel_requested`) ve birkaç
+    saniye içinde durur. Transkripsiyonun iptali dokümanı `failed` yapar; kare işlerinin iptali
+    dokümanı `ready` bırakır. Başka dokümanın işi 404 `job_not_found`; bitmiş iş 409
+    `job_not_active`.
+    """
+    document = _get_document(db, user, document_id, "instructor")
+    job = db.get(ProcessingJob, job_id)
+    if job is None or job.document_id != document.id:
+        raise not_found_error("job_not_found")
+    if not cancel_job(db, job.id):
+        raise ApiError(status.HTTP_409_CONFLICT, "Bu iş zaten bitmiş.", "job_not_active")
+    db.refresh(job)
+    return _job_out(job)
+
+
+def _lock_document(db: DbSession, document_id: int) -> None:
+    """Doküman satırını işlem sonuna kadar kilitler (`FOR UPDATE`)."""
+    db.execute(select(Document.id).where(Document.id == document_id).with_for_update())
+
+
+def _job_out(job: ProcessingJob) -> ProcessingJobOut:
+    return ProcessingJobOut(
+        id=job.id,
+        document_id=job.document_id,
+        kind=job.kind,  # type: ignore[arg-type]
+        status=job.status,  # type: ignore[arg-type]
+        attempts=job.attempts,
+        max_attempts=settings.job_max_attempts,
+        cancel_requested=job.cancel_requested,
+        error=job.error,
+        created_at=job.created_at,
+        started_at=job.started_at,
+        finished_at=job.finished_at,
     )
 
 

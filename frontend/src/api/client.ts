@@ -21,6 +21,7 @@ import type {
   PracticeItem,
   PracticeItemReview,
   PracticeRequest,
+  ProcessingJobOut,
   RegisterRequest,
   ReviewDecision,
   ReviewOut,
@@ -295,6 +296,24 @@ export const api = {
 
   cancelDocument: (documentId: number) =>
     request<DocumentOut>(`/documents/${documentId}/cancel`, { method: "POST" }),
+
+  /** Dokümanın işleri: transkripsiyon, kare çıkarma, yorumlama (eğitmen, #25). */
+  documentJobs: (documentId: number) =>
+    request<ProcessingJobOut[]>(`/documents/${documentId}/jobs`),
+
+  cancelJob: (documentId: number, jobId: number) =>
+    request<ProcessingJobOut>(`/documents/${documentId}/jobs/${jobId}/cancel`, { method: "POST" }),
+
+  /** Karelerin görsel yorumlamasını kuyruğa alır (eğitmen, #25). */
+  interpretFrames: (documentId: number) =>
+    request<ProcessingJobOut>(`/documents/${documentId}/frames/interpret`, { method: "POST" }),
+
+  deleteFrame: async (documentId: number, frameId: number) => {
+    const response = await send(`${BASE}/documents/${documentId}/frames/${frameId}`, {
+      method: "DELETE",
+    });
+    if (!response.ok) throw await httpError(response);
+  },
 
   deleteDocument: async (documentId: number) => {
     const response = await send(`${BASE}/documents/${documentId}`, { method: "DELETE" });

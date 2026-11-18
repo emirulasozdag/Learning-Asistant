@@ -64,8 +64,36 @@ class DocumentOut(BaseModel):
     # Video: çıkarılmış slayt karesi sayısı ve kare işi sürüyor mu (#27).
     frame_count: int = 0
     frames_processing: bool = False
+    # [ekleme, #25] Yüklenen medya dosyasının SHA-256 özeti (video varlığının kimliği);
+    # altyazıyla yüklenen videoda ve diğer dokümanlarda None.
+    media_sha256: str | None = None
     # Yalnızca yükleme cevabında dolu.
     report: IngestionReport | None = None
+
+
+# transcription: medya → transkript · frames: medyadan slayt kareleri ve OCR (#27, #25) ·
+# frame_interpretation: saklanan karelerin görsel yorumlayıcıyla betimlenmesi (#25, ADR-11).
+JobKind = Literal["transcription", "frames", "frame_interpretation"]
+JobStatus = Literal["queued", "running", "succeeded", "failed", "cancelled"]
+
+
+class ProcessingJobOut(BaseModel):
+    """[ekleme, #25] Dokümanın uzun süren bir işi (ADR-9): durum, deneme ve hata (eğitmen)."""
+
+    id: int
+    document_id: int
+    kind: JobKind
+    status: JobStatus
+    # Yapılan deneme sayısı ve en çok deneme hakkı (`JOB_MAX_ATTEMPTS`).
+    attempts: int
+    max_attempts: int
+    # Çalışan iş için iptal istendi; çalıştırıcı birkaç saniye içinde durdurur.
+    cancel_requested: bool
+    # Son denemenin Türkçe kısa nedeni (yeniden denenecek hatalar da yazılır).
+    error: str | None = None
+    created_at: datetime
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
 
 
 class ChunkPreview(BaseModel):
