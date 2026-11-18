@@ -13,7 +13,7 @@ from app.embeddings.fake import FakeEmbedder
 from app.ingestion.pipeline import ingest_document
 from app.retrieval.hybrid import RetrievalParams, retrieve
 from app.retrieval.types import VideoPosition
-from app.retrieval.video_time import video_neighbors
+from app.retrieval.video_time import is_deictic, video_neighbors, video_window
 from app.schemas.materials import MaterialType
 from tests.conftest import make_vtt, vtt_text
 
@@ -345,7 +345,9 @@ def test_evidence_outside_the_window_is_still_retrieved(
         embedder=FakeEmbedder(),
     )
 
-    assert order(result)[0] == far and result.relevant
+    # Durdurulan anın bölümü başa sabitlenir (#102); konulu sorunun asıl kanıtı hemen ardından.
+    moment = str(chunk_at(db, video, 700).id)
+    assert order(result)[:2] == [moment, far] and result.relevant and not result.deictic
 
 
 def test_another_videos_same_second_is_not_boosted(
@@ -370,7 +372,9 @@ def test_another_videos_same_second_is_not_boosted(
         assert ranked.index(mine) < ranked.index(theirs)
 
 
-def test_zero_video_weight_equals_no_video(db: Session, course: Course, upload_dir: Path) -> None:
+def test_video_prior_and_moment_off_equals_no_video(
+    db: Session, course: Course, upload_dir: Path
+) -> None:
     video = add_video(db, course)
     embedder = FakeEmbedder()
 
@@ -382,7 +386,7 @@ def test_zero_video_weight_equals_no_video(db: Session, course: Course, upload_d
         VideoPosition(video.id, 705),
         k=10,
         embedder=embedder,
-        params=RetrievalParams(video_weight=0),
+        params=RetrievalParams(video_weight=0, moment_chunks=0),
     )
 
     assert order(off) == order(plain)
@@ -471,3 +475,134 @@ def test_invalid_video_is_rejected_in_turkish(
         )
         assert response.status_code == 422, document_id
         assert "video" in response.json()["detail"].lower()
+
+
+# --- durdurulan anın bölümü (#102) -----------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "question",
+    [
+        "burayı anlamadım",
+        "Burada ne yaptı?",
+        "bu adımı açıklar mısın",
+        "hocanın burada anlattığı şey ne",
+        "bunu anlamadım",
+        "neden?",
+        "nasıl yani",
+        "I don't get this part",
+        "explain this",
+    ],
+)
+def test_questions_pointing_at_the_moment_are_deictic(question: str) -> None:
+    assert is_deictic(question)
+
+
+@pytest.mark.parametrize(
+    "question",
+    ["Dijkstra nedir?", "ikili arama neden log n zaman alir", "What is a heap?", "AVL ağacı"],
+)
+def test_topical_questions_are_not_deictic(question: str) -> None:
+    assert not is_deictic(question)
+
+
+def test_video_window_prefers_what_was_just_said_and_stays_chronological(
+    db: Session, course: Course, upload_dir: Path
+) -> None:
+    video = add_video(db, course)
+
+    window = video_window(db, course, VideoPosition(video.id, 210), 120, 20, limit=2)
+
+    assert [p.t_start for p in window] == [100, 200]
+
+
+def test_deictic_question_is_answered_from_the_paused_moment(
+    db: Session, course: Course, upload_dir: Path
+) -> None:
+    video = add_video(db, course)
+    moment = str(chunk_at(db, video, 200).id)
+    embedder = FakeEmbedder()
+
+    plain = retrieve(db, course, "burayı anlamadım", embedder=embedder)
+    at_210 = VideoPosition(video.id, 210)
+    paused = retrieve(db, course, "burayı anlamadım", at_210, embedder=embedder)
+
+    assert not plain.relevant  # videosuz: içeriksiz soru kapıda kalır
+    assert paused.relevant and paused.deictic
+    assert moment in order(paused)[:3]
+    assert paused.video_moment is not None
+    assert paused.video_moment.t_start <= 200 <= paused.video_moment.t_end
+
+
+def test_topical_question_while_paused_still_finds_other_parts(
+    db: Session, course: Course, upload_dir: Path
+) -> None:
+    video = add_video(db, course)
+    elsewhere = str(chunk_at(db, video, 400).id)
+
+    result = retrieve(
+        db,
+        course,
+        "dogrusal arama n zaman alir",
+        VideoPosition(video.id, 210),
+        k=3,
+        embedder=FakeEmbedder(),
+    )
+
+    assert not result.deictic
+    assert result.video_moment is not None
+    assert elsewhere in order(result)
+
+
+def test_ask_reports_the_moment_and_cites_it(
+    client: TestClient, db: Session, course: Course, upload_dir: Path
+) -> None:
+    video = add_video(db, course)
+    moment = str(chunk_at(db, video, 200).id)
+
+    response = client.post(
+        "/ask",
+        json={
+            "course_id": course.id,
+            "question": "burayı anlamadım",
+            "video": {"document_id": video.id, "time_s": 210},
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["outcome"] == "answered"
+    assert body["video_moment"]["document_id"] == video.id
+    assert body["video_moment"]["deictic"] is True
+    assert moment in [c["source_id"] for c in body["citations"]]
+    flagged = [h["source_id"] for h in body["retrieval"] if h["video_moment"]]
+    assert moment in flagged
+
+
+def test_rerank_never_drops_the_paused_moment(
+    db: Session, course: Course, upload_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.qa import service as qa_service
+
+    video = add_video(db, course)
+    moment = str(chunk_at(db, video, 200).id)
+    monkeypatch.setattr(settings, "tutor_rerank_candidates", 10)
+    # Yeniden sıralayıcı bölümü hiç seçmese bile cevabın başında kalır.
+    monkeypatch.setattr(qa_service, "rerank", lambda query, passages, reranker, keep: [])
+
+    events = list(
+        qa_service.answer_stream(
+            db,
+            course,
+            "burayı anlamadım",
+            [],
+            None,
+            video=qa_service.VideoRef(document_id=video.id, time_s=210),
+            embedder=FakeEmbedder(),
+            reranker=object(),
+        )
+    )
+
+    done = events[-1]
+    assert moment in [p.source_id for p in done.retrieval.passages]
+    assert done.response.video_moment is not None

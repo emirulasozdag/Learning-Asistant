@@ -37,6 +37,7 @@ import TurnExtras from "../../features/tutor/TutorTurnView";
 import type { Segment, TutorTurn } from "../../features/tutor/types";
 import { useIsDesktop } from "../../features/tutor/useIsDesktop";
 import LecturePlayer, { type PlayerHandle } from "../../features/video/LecturePlayer";
+import VideoMomentNote from "../../features/video/VideoMomentNote";
 import { describeTotals, documentExtent, materialLabel, materialTotals } from "../../labels";
 import { courseService, type Course } from "../../services/courseService";
 import { formatTime } from "../../text";
@@ -453,6 +454,12 @@ function TutorSession({ course }: { course: Course }) {
               />
             ) : (
               <div className="flex flex-col gap-6">
+                {response?.video_moment && (
+                  <VideoMomentNote
+                    moment={response.video_moment}
+                    onPlay={playableVideo(materials, response.video_moment.document_id) ? playAt : undefined}
+                  />
+                )}
                 {structured && response ? (
                   <>
                     {classifyResponse(response) === "ai_unavailable" && (

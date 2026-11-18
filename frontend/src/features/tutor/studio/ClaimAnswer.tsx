@@ -124,7 +124,13 @@ export default function ClaimAnswer({
         <VerificationStrip
           claims={all.length}
           removed={response.unsupported_removed}
-          documents={distinctDocuments(response.citations.map((citation) => citation.document_title))}
+          // Video alıntısı (zamanlı, sayfasız) "video" olarak ayrı sayılır (#102).
+          videos={distinctDocuments(
+            response.citations.filter((c) => c.page == null && c.t_start != null).map((c) => c.document_title),
+          )}
+          documents={distinctDocuments(
+            response.citations.filter((c) => !(c.page == null && c.t_start != null)).map((c) => c.document_title),
+          )}
           elapsedMs={elapsedMs}
         />
         {isLatest && (

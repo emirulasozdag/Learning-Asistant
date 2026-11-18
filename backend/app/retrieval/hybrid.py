@@ -9,8 +9,8 @@ from app.embeddings.provider import get_embedder
 from app.retrieval.dense import dense_search
 from app.retrieval.fusion import RRF_K, reciprocal_rank_fusion
 from app.retrieval.lexical import lexical_search
-from app.retrieval.types import RetrievalResult, RetrievedPassage, VideoPosition
-from app.retrieval.video_time import video_neighbors
+from app.retrieval.types import RetrievalResult, RetrievedPassage, VideoMoment, VideoPosition
+from app.retrieval.video_time import is_deictic, video_neighbors, video_window, window_frame_text
 
 # Her yöntemden alınan aday sayısı; RRF sonrası ilk `k` tanesi kullanılır.
 CANDIDATES_PER_METHOD = 10
@@ -36,6 +36,11 @@ class RetrievalParams:
     # bir sıralama olarak video_weight ağırlığıyla girer (0 = kapalı). Eval'de kalibre edilecek.
     video_window_s: float = 120.0
     video_weight: float = 0.5
+    # Durdurulan anın bölümü (#102): anın şu kadar öncesi ve sonrası, en çok şu kadar parça
+    # cevabın başına sabitlenir. 0 parça = kapalı (yalnızca yumuşak öncelik).
+    moment_before_s: float = 90.0
+    moment_after_s: float = 20.0
+    moment_chunks: int = 3
     min_similarity: float | None = None
     min_keyword_coverage: float | None = None
     follow_up_min_similarity: float | None = None
@@ -101,14 +106,29 @@ def retrieve(
     yakın parçaları (`video_neighbors`) RRF'e ayrı bir sıralama olarak `video_weight` ağırlığıyla
     eklenir: pencere içindeki parça sıralamada yukarı çıkar, ama hiçbir parça elenmez; pencere
     dışındaki kanıt ve diğer videolar yine bulunur. Alakasızlık kapısı videodan etkilenmez, yalnızca
-    soru metninden hesaplanır. Bilinen sınırlama: "bu adımı açıklar mısın" gibi bağlamsız sorular
-    kapıda takılabilir (kapı kalibrasyonu #9'u bozmamak için değiştirilmedi).
+    soru metninden hesaplanır.
+
+    Durdurulan anın bölümü (#102): videonun durdurulan andan biraz öncesini kapsayan transkript
+    parçaları (`video_window`) her zaman sonuçların başına sabitlenir; öğrenci çoğunlukla o anda
+    anlatılanı sorar. "Burayı anlamadım" gibi o anı işaret eden sorular (`is_deictic`) o bölümün
+    metniyle aranır ve kapıdan geçer; konulu sorular eskisi gibi kendi sözcükleriyle aranır.
 
     Rerank ölçülen fayda olmadığı için kapalı (`rerank.py`).
     """
     params = (params or RetrievalParams()).resolved()
     embedder = embedder or get_embedder()
-    current = _search(db, course, query, embedder, params)
+    moment = _video_moment(db, course, video, params)
+    deictic = moment is not None and is_deictic(query)
+    search_text = query
+    if deictic:
+        # "Burayı anlamadım": konu sözcüklerde değil, o anda anlatılandadır. Arama o bölümün
+        # transkripti (ve varsa slayt yazısı) ile yapılır; ilgili doküman sayfaları da bulunur.
+        assert moment is not None
+        frame_text = window_frame_text(db, moment.document_id, moment.t_start, moment.t_end)
+        search_text = "\n".join(
+            part for part in (query, _moment_text(moment.passages), frame_text) if part
+        )
+    current = _search(db, course, search_text, embedder, params)
     rankings = list(current.rankings)
     weights = [1.0] * len(rankings)
     relevant = current.relevant(params)
@@ -133,13 +153,65 @@ def retrieve(
             rankings.append(neighbors)
             weights.append(params.video_weight)
 
+    fused = reciprocal_rank_fusion(rankings, k=params.rrf_k, weights=weights)
+    if moment is None:
+        return RetrievalResult(
+            passages=fused[:k],
+            relevant=relevant,
+            best_similarity=current.best_similarity,
+            keyword_coverage=current.keyword_coverage,
+            admitted_by_context=admitted_by_context,
+        )
+    # Durdurulan andaki bölüm cevabın ilk kaynaklarıdır; diğer dokümanlar ardından gelir.
+    pinned_ids = {passage.source_id for passage in moment.passages}
+    rest = [passage for passage in fused if passage.source_id not in pinned_ids][:k]
     return RetrievalResult(
-        passages=reciprocal_rank_fusion(rankings, k=params.rrf_k, weights=weights)[:k],
-        relevant=relevant,
+        passages=moment.passages + rest,
+        # O anı işaret eden soru, o bölüm kanıt olduğu için kapıdan geçer.
+        relevant=relevant or deictic,
         best_similarity=current.best_similarity,
         keyword_coverage=current.keyword_coverage,
         admitted_by_context=admitted_by_context,
+        video_moment=VideoMoment(
+            document_id=moment.document_id,
+            document_title=moment.passages[0].document_title,
+            t_start=moment.t_start,
+            t_end=moment.t_end,
+            source_ids=[passage.source_id for passage in moment.passages],
+        ),
+        deictic=deictic,
     )
+
+
+@dataclass
+class _Moment:
+    document_id: int
+    t_start: float
+    t_end: float
+    passages: list[RetrievedPassage]
+
+
+def _video_moment(
+    db: Session, course: Course, video: VideoPosition | None, params: RetrievalParams
+) -> _Moment | None:
+    if video is None or params.moment_chunks <= 0:
+        return None
+    passages = video_window(
+        db, course, video, params.moment_before_s, params.moment_after_s, params.moment_chunks
+    )
+    if not passages:
+        return None
+    return _Moment(
+        document_id=video.document_id,
+        t_start=min(p.t_start for p in passages if p.t_start is not None),
+        t_end=max(p.t_end for p in passages if p.t_end is not None),
+        passages=passages,
+    )
+
+
+def _moment_text(passages: list[RetrievedPassage], limit: int = 1500) -> str:
+    """Bölümün transkripti, embedder'ın girdi sınırını zorlamayacak uzunlukta."""
+    return " ".join(passage.text for passage in passages)[:limit]
 
 
 def _search(

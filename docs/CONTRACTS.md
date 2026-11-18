@@ -403,8 +403,19 @@ yönteminden bağımsız, opak bir URL'dir.
   `python -m harness.time_prior` aynı sorularda önceliksiz aramayı pencere × ağırlık ızgarasıyla karşılaştırır, ders
   (video) başına ve kanıtın yerine göre (pencere içi / aynı video uzak / başka doküman) Recall@5 verir. Gold sette
   oynatma konumlu soru olmadığı için henüz koşulmadı (#18 dış girdileri).
-- Bağlamsız sorular ("bu adımı açıklar mısın") soru metninden hesaplanan alakasızlık kapısında takılıp "materyalde yok" cevabı
-  alabilir; öncelik kapıdan **sonra** devreye girer. #9 kalibrasyonunu bozmamak için bu PR'da çözülmedi.
+- **[#102, çözüldü]** Bağlamsız sorular ("burayı anlamadım", "bu adımı açıklar mısın") eskiden kapıda takılıyor ya da
+  başka dokümanların genel eşleşmeleriyle cevaplanıyordu. Artık:
+  - Video verildiğinde durdurulan anın bölümü (`[time_s − 90, time_s + 20]` ile örtüşen, ana en yakın en çok 3 transkript
+    parçası; `RetrievalParams.moment_*`) sonuçların **başına sabitlenir**; yeniden sıralama onu atmaz.
+  - Soru o anı işaret ediyorsa (`retrieval/video_time.py: is_deictic`) arama o bölümün metniyle (ve varsa o andaki
+    kare OCR yazısıyla, yalnızca arama için; ADR-10) yapılır ve kapıdan geçer. Konulu sorular eskisi gibi kendi
+    sözcükleriyle aranır, bütün ders aranabilir kalır.
+  - AI Tutor'da video durdurulmuşken işaret eden soru orkestratöre sorulmadan kaynaklı cevaba gider
+    (`trace.fallback_reason = "video_moment"`); netleştirme istenmez.
+  - `AskResponse.video_moment {document_id, document_title, t_start, t_end, deictic}` ve
+    `RetrievalHit.video_moment` (bölümden gelen parça) eklendi; arayüz "Sorunu videonun 30:29–32:59 kısmına göre
+    anladım" notunu gösterir.
+  - Kare yazısının cevapta kanıt olarak kullanılması #26'nın işidir.
 - Boş (`""`) `media_url` gönderilirse form ayrıştırıcısı onu "verilmedi" sayar.
 
 **Sözleşme.**

@@ -338,3 +338,23 @@ def test_turn_requires_membership_consent_and_own_conversation(
     assert outsider.status_code == 404
     assert no_consent.status_code == 403 and no_consent.json()["code"] == "consent_required"
     assert foreign.status_code == 404 and foreign.json()["code"] == "conversation_not_found"
+
+
+def test_paused_video_and_vague_question_go_straight_to_the_sourced_answer(
+    client: TestClient, db, course: Course, ready, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """#102: "burayı anlamadım" + durdurulmuş video belirsiz değildir; netleştirme sorulmaz."""
+    from tests.test_video import add_video
+
+    video = add_video(db, course)
+    orchestrator = FakeOrchestrator([call("ask_clarification", question="Hangi kısmı?")])
+    use(monkeypatch, orchestrator, FakeLLM([ANSWER]))
+
+    body = turn(client, course, "burayı anlamadım", video={"document_id": video.id, "time_s": 210})
+
+    assert kinds(body)[0] == "course_answer"
+    assert body["trace"]["mode"] == "direct"
+    assert body["trace"]["fallback_reason"] == "video_moment"
+    assert orchestrator.messages == []
+    moment = body["blocks"][0]["response"]["video_moment"]
+    assert moment["document_id"] == video.id and moment["deictic"] is True
