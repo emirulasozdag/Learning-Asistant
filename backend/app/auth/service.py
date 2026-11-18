@@ -3,7 +3,7 @@
 import re
 from datetime import UTC, datetime
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -15,7 +15,7 @@ from app.auth.passwords import (
     verify_password,
 )
 from app.core.config import settings
-from app.db.models import Conversation, Enrollment, PracticeAttempt, User
+from app.db.models import Conversation, Enrollment, PracticeAttempt, PracticeQuestion, User
 from app.schemas.auth import Consent, ConsentUpdate, Me, Membership, RegisterRequest, UserOut
 
 _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -115,16 +115,28 @@ def update_consent(db: Session, user: User, data: ConsentUpdate) -> Consent:
 
 def delete_my_data(db: Session, user: User) -> None:
     """Verilerimi sil (ADR-4): kullanıcının bütün sohbetleri, mesajları ve pratik cevapları
-    (öğrenme kaydı) silinir. Ürettirdiği sorular dersin malıdır, kalır."""
+    (öğrenme kaydı) silinir. Ürettirdiği sorular dersin malıdır, kalır; ama ondan gelen alanlar
+    (yazdığı ya da eksiklerinden çıkan konu, isteyen kimliği) temizlenir (#104)."""
     db.execute(delete(Conversation).where(Conversation.user_id == user.id))
     db.execute(delete(PracticeAttempt).where(PracticeAttempt.user_id == user.id))
+    _forget_requested_questions(db, user)
     db.commit()
+
+
+def _forget_requested_questions(db: Session, user: User) -> None:
+    db.execute(
+        update(PracticeQuestion)
+        .where(PracticeQuestion.requested_by == user.id)
+        .values(topic=None, requested_by=None, research_logged=False)
+    )
 
 
 def delete_account(db: Session, user: User) -> None:
     """Hesabı siler: oturumlar, üyelikler, sohbetler ve mesajlar birlikte gider (CASCADE).
 
-    Kullanıcının onayladığı dokümanlar dersin malıdır, kalır; `approved_by` boşalır.
+    Kullanıcının onayladığı dokümanlar dersin malıdır, kalır; `approved_by` boşalır. İstediği
+    pratik sorularındaki konu da silinir (#104).
     """
+    _forget_requested_questions(db, user)
     db.delete(user)
     db.commit()

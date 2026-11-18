@@ -358,3 +358,17 @@ def test_paused_video_and_vague_question_go_straight_to_the_sourced_answer(
     assert orchestrator.messages == []
     moment = body["blocks"][0]["response"]["video_moment"]
     assert moment["document_id"] == video.id and moment["deictic"] is True
+
+
+def test_turn_messages_record_research_logging_at_the_time_they_were_written(
+    client: TestClient, db, user, course: Course, ready, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # #104: eğitmen ekranları mesajın yazıldığı andaki tercihe bakar, bugünkü tercihe değil.
+    use(monkeypatch, None, FakeLLM([ANSWER, ANSWER]))
+    turn(client, course, "Neden sag yari elenir?")
+    user.research_logging = True
+    db.commit()
+    turn(client, course, "Neden sag yari elenir?")
+
+    flags = db.scalars(select(Message.research_logged).order_by(Message.id)).all()
+    assert flags == [False, False, True, True]

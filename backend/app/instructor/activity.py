@@ -1,8 +1,9 @@
 """Eğitmen için ders etkinliği: tamamen kayıtlı soru-cevaplardan hesaplanır (sahte veri yok).
 
-ADR-4: analitik toplu ve anonimdir, kişi bazlı gösterim yoktur. Yalnızca araştırma kaydını
-(`research_logging`) açmış ve derste öğrenci olan kullanıcıların sohbetleri sayılır; kimse
-tercihini kapatınca ya da dersten çıkarılınca verisi bir sonraki hesapta düşer.
+ADR-4: analitik toplu ve anonimdir, kişi bazlı gösterim yoktur. Yalnızca araştırma kaydı
+açıkken yazılmış mesajlar (`Message.research_logged`, #104) ve hâlâ kaydı açık olan, derste
+öğrenci olan kullanıcılarınkiler sayılır. Kayıt kapalıyken sorulanlar sonradan kayıt açılsa da
+girmez; tercihini kapatan ya da dersten çıkarılanın verisi bir sonraki hesapta düşer.
 
 Küçük grup bastırılır (sayılar ve sorular tek kişiye bağlanamasın): en az `MIN_GROUP` farklı
 öğrenciden veri yoksa özet boş döner; bir soru listesi de ancak listedeki sorular en az
@@ -39,6 +40,7 @@ def course_activity(db: Session, course_id: int, today: date | None = None) -> C
         .where(
             Conversation.course_id == course_id,
             User.research_logging.is_(True),
+            Message.research_logged.is_(True),
             Enrollment.role == "student",
         )
         .order_by(Message.conversation_id, Message.id)

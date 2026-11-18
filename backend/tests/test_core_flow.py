@@ -121,6 +121,7 @@ def test_practice_attempt_is_stored_for_the_student_with_evidence(
     assert feedback["score"] == 1 and feedback["citations"][0]["source_id"] == chunk_id
     question = db.get(PracticeQuestion, item.json()["id"])
     assert question.requested_by == world.student_a.id and question.course_id == world.course.id
+    assert question.research_logged is world.student_a.research_logging
     assert question.rubric.source_ids == [chunk_id] and question.chunk_id == int(chunk_id)
     attempt = db.get(PracticeAttempt, feedback["attempt_id"])
     assert (attempt.user_id, attempt.question_id) == (world.student_a.id, question.id)

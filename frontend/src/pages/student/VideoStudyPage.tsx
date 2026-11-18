@@ -430,7 +430,9 @@ function Transcript({
       >
         <FileText size={14} aria-hidden className="text-graphite" />
         Transkript
-        <span className="flex-1 font-normal text-graphite">· videoyla birlikte akar</span>
+        <span className="min-w-0 flex-1 truncate font-normal text-graphite">
+          <span className="hidden sm:inline">· videoyla birlikte akar</span>
+        </span>
         <span className="font-normal text-graphite">{open ? "Gizle" : "Göster"}</span>
         <ChevronDown size={14} aria-hidden className={cx("text-graphite transition-transform", open && "rotate-180")} />
       </button>

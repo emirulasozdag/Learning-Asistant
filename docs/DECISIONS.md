@@ -131,7 +131,12 @@ ve saklama süresi tanımsız.
 - `research_logging` varsayılan **kapalı**. Kapalıyken pratik denemeleri öğrenme kaydına ve eğitmen analitiğine yazılmaz
   (öğrencinin kendi pratik ekranı için gereken en az bilgi hariç; ayrıntı uygulamada netleşir).
 - Eğitmen analitiği toplu ve anonimdir; kişi bazlı gösterim yoktur.
-- "Verilerimi sil" yolu bulunur.
+- Onay, verinin yazıldığı andaki tercihtir (#104): sohbet mesajları (`messages.research_logged`), pratik
+  denemeleri ve istenen sorular (`practice_questions.research_logged`) bu bayrağı taşır. Kayıt sonradan açılsa
+  da kapalıyken yazılanlar eğitmene gitmez; kapatılınca hepsi bir sonraki hesapta düşer. Takip sorusunun konusu
+  (öğrencinin eksikleri) eğitmene hiç gösterilmez.
+- "Verilerimi sil" yolu bulunur; sohbetler ve denemeler silinir, istenen sorulardaki öğrenciden gelen alanlar
+  (konu, isteyen) temizlenir.
 - Eval ve rapor için dışa aktarılan veri takma adlıdır ve public repoya girmez.
 - LLM'e ad, e-posta veya kimlik göndermeyiz (ADR-5).
 - Saklama süresi *dönem sonu + tanımlı bir ek süre* olarak önerilir; kesin tarih açık soru olarak aşağıda.

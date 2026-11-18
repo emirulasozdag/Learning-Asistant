@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.db.models import Conversation, Course, Message
+from app.db.models import Conversation, Course, Message, User
 from app.embeddings.base import Embedder
 from app.generation.answer import stream_answer
 from app.llm.base import ChatMessage, LLMClient
@@ -113,14 +113,21 @@ def ask_stream(
     # Sohbet üretim sürerken silindiyse ConversationNotFound; yeni sohbet burada açılır.
     conversation = get_conversation(db, course, request.conversation_id, user_id)
     response.conversation_id = conversation.id
+    logged = research_logging_now(db, user_id)
     db.add_all(
         [
-            Message(conversation_id=conversation.id, role="user", content=request.question),
+            Message(
+                conversation_id=conversation.id,
+                role="user",
+                content=request.question,
+                research_logged=logged,
+            ),
             Message(
                 conversation_id=conversation.id,
                 role="assistant",
                 content=response.answer or response.decline_reason or "",
                 meta=answer_meta(response),
+                research_logged=logged,
             ),
         ]
     )
@@ -211,6 +218,17 @@ def answer_stream(
     response.similarity_threshold = settings.retrieval_min_similarity
     response.best_similarity = retrieval.best_similarity
     yield DoneEvent(response, retrieval)
+
+
+def research_logging_now(db: Session, user_id: int | None) -> bool:
+    """Kullanıcının araştırma kaydı tercihi, mesaj yazıldığı an (ADR-4, #104).
+
+    Veritabanından taze okunur: tur sürerken tercih değiştiyse yazım anındaki geçerlidir.
+    """
+    if user_id is None:
+        return False
+    user = db.get(User, user_id, populate_existing=True)
+    return bool(user and user.research_logging)
 
 
 def answer_meta(response: AskResponse) -> dict:
