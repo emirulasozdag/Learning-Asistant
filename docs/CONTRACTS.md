@@ -181,6 +181,11 @@ GET /instructor/courses/{id}/mistakes     (instructor | ta)
 [MistakeSummary {concept, error_type: "wrong_option" | "missing_concept",
                  count, students, fixing_source_ids: list[str]}]        # en az 3 farklı öğrenci; ≤20
 
+GET /instructor/courses/{id}/practice-items   (instructor | ta; #22)
+[PracticeItemReview {id, type, topic, difficulty, prompt, options, correct_option, reference_answer,
+                     explanation, status: "released" | "withdrawn", rubric_approved, source: Citation,
+                     created_at, latest_review: {decision, correction, created_at} | null}]   # en yeni önce, ≤50
+
 POST /instructor/reviews                  (hedefin dersinde instructor)
 ReviewDecision {target_type: "message" | "practice_item", target_id, decision: "approve" | "correct",
                 correction: str | null}  # "correct" için zorunlu, ≤4000
@@ -201,7 +206,11 @@ ReviewDecision {target_type: "message" | "practice_item", target_id, decision: "
   malıdır, kalır.
 - **Koddan farklar.** `MistakeSummary.error_type` serbest metinden sabit değerlere daraldı ve `students` eklendi;
   `LearningRecord.attempts[]` alanları genişledi; `submitReview` artık `ReviewOut` döner. Önceki tüketici yoktu
-  (uçlar `501` dönüyordu); `frontend/src/api/types.ts` güncellendi, ekranlar #22'de.
+  (uçlar `501` dönüyordu); `frontend/src/api/types.ts` güncellendi.
+- **Ekranlar (#22):** öğrenci `/student/courses/{id}/learning` ve `/{rol}/account` (araştırma kaydı, `DELETE /me/data`,
+  `DELETE /me`); eğitmen `/instructor/courses/{id}/activity` (cevabı onayla/düzelt) ve `/instructor/courses/{id}/review`
+  (sık hatalar, pratik soruları). Tutor `?video=<doküman>&t=<saniye>`: oynatıcı açılır, `TutorTurnRequest.video`
+  durdurulan anla gönderilir (§4).
 
 ---
 

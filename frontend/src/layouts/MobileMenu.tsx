@@ -31,6 +31,11 @@ export default function MobileMenu({ onNavigate }: { onNavigate: () => void }) {
               </NavLink>
             </li>
           ))}
+          <li>
+            <NavLink to={`/${user.role}/account`} onClick={onNavigate} className={itemClass}>
+              Hesabım
+            </NavLink>
+          </li>
         </ul>
         <div className="border-t border-line pt-5">
           <p className="px-3 text-sm font-bold tracking-wide text-ink uppercase">Derslerim</p>

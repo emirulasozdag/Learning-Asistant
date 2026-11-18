@@ -1,6 +1,7 @@
 import { LogOut } from "lucide-react";
+import { Link } from "react-router";
 
-import { useAuth } from "../../auth/useAuth";
+import { homePath, useAuth } from "../../auth/useAuth";
 import { coursePath } from "../../layouts/navigation";
 import type { Course } from "../../services/courseService";
 import ThemeSwitcher from "../../theme/ThemeSwitcher";
@@ -65,8 +66,15 @@ export default function StudioSidebar({
         <ThemeSwitcher />
         {user && (
           <div className="flex items-center gap-2.5 px-1">
-            <Avatar name={user.name} size="sm" className="bg-accent text-on-accent" />
-            <span className="min-w-0 flex-1 truncate text-sm text-ink-2">{user.name}</span>
+            <Link
+              to={`${homePath(user.role)}/account`}
+              onClick={onNavigate}
+              aria-label={`Hesabım: ${user.name}`}
+              className="flex min-w-0 flex-1 items-center gap-2.5 rounded-control py-1 hover:bg-subtle"
+            >
+              <Avatar name={user.name} size="sm" className="bg-accent text-on-accent" />
+              <span className="min-w-0 flex-1 truncate text-sm text-ink-2">{user.name}</span>
+            </Link>
             <button
               type="button"
               onClick={() => void logout()}

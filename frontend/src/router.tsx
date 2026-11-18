@@ -14,12 +14,15 @@ import SyllabusPage from "./pages/course/SyllabusPage";
 import LoginPage from "./pages/auth/LoginPage";
 import RegisterPage from "./pages/auth/RegisterPage";
 import CourseActivityPage from "./pages/instructor/CourseActivityPage";
+import CourseReviewPage from "./pages/instructor/CourseReviewPage";
 import InstructorDashboard from "./pages/instructor/InstructorDashboard";
 import MaterialsPage from "./pages/instructor/MaterialsPage";
 import CourseMaterialsPage from "./pages/student/CourseMaterialsPage";
 import StudentDashboard from "./pages/student/StudentDashboard";
 import TutorIndex from "./pages/student/TutorIndex";
 import TutorPage from "./pages/student/TutorPage";
+import LearningRecordPage from "./pages/student/LearningRecordPage";
+import AccountPage from "./pages/account/AccountPage";
 import { NotFound, RootRedirect } from "./pages/system";
 
 /**
@@ -28,11 +31,14 @@ import { NotFound, RootRedirect } from "./pages/system";
  *   /instructor                              eğitmen: derslerim
  *   /instructor/courses/:id                  ders genel bakış
  *   /instructor/courses/:id/materials        materyaller (bilgi tabanı, yükleme)
- *   /instructor/courses/:id/activity         etkinlik ve analitik
+ *   /instructor/courses/:id/activity         etkinlik ve analitik (cevapları onayla / düzelt)
+ *   /instructor/courses/:id/review           sık hatalar ve pratik sorularının incelenmesi
  *   /student                                 öğrenci: derslerim
  *   /student/courses/:id                     ders genel bakış
  *   /student/courses/:id/materials           ders materyalleri
- *   /student/courses/:id/tutor               AI Tutor (tam ekran çalışma alanı)
+ *   /student/courses/:id/tutor               AI Tutor (tam ekran çalışma alanı; ?video=<id>&t=<s> ders videosu)
+ *   /student/courses/:id/learning            öğrenme kaydım
+ *   /student/account, /instructor/account    hesabım: araştırma kaydı, verilerimi/hesabımı sil
  * Her iki rolde ders içeriği (OCW düzeni):
  *   …/courses/:id/syllabus, /calendar        izlence, takvim
  *   …/courses/:id/videos, /lecture-notes, /quizzes, /practice-problems, /assignments
@@ -65,6 +71,7 @@ export const router = createBrowserRouter([
     ),
     children: [
       { index: true, element: <InstructorDashboard /> },
+      { path: "account", element: <AccountPage /> },
       {
         path: "courses/:courseId",
         element: <CourseShell />,
@@ -72,6 +79,7 @@ export const router = createBrowserRouter([
           { index: true, element: <CourseOverview /> },
           { path: "materials", element: <MaterialsPage /> },
           { path: "activity", element: <CourseActivityPage /> },
+          { path: "review", element: <CourseReviewPage /> },
           ...contentRoutes,
           // Eski sekme adresleri (yer imleri) genel bakışa düşer.
           { path: "*", element: <Navigate to=".." relative="path" replace /> },
@@ -101,6 +109,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <StudentDashboard /> },
       { path: "tutor", element: <TutorIndex /> },
+      { path: "account", element: <AccountPage /> },
       { path: "practice", element: <Navigate to="/student" replace /> },
       {
         path: "courses/:courseId",
@@ -108,6 +117,7 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <CourseOverview /> },
           { path: "materials", element: <CourseMaterialsPage /> },
+          { path: "learning", element: <LearningRecordPage /> },
           ...contentRoutes,
         ],
       },

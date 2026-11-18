@@ -108,6 +108,16 @@ export const authService = {
     await api.updateConsent({ research_logging: researchLogging, policy_version: PRIVACY_POLICY_VERSION });
   },
 
+  /** Sohbetleri ve pratik cevaplarını (öğrenme kaydı) siler; hesap kalır. */
+  async deleteMyData(): Promise<void> {
+    await api.deleteMyData();
+  },
+
+  /** Hesabı ve bütün kişisel veriyi kalıcı olarak siler; oturum da kapanır. */
+  async deleteAccount(): Promise<void> {
+    await api.deleteAccount();
+  },
+
   async logout(): Promise<void> {
     try {
       await api.logout();

@@ -15,10 +15,12 @@ export default function SourceViewer({
   sourceId,
   onClose,
   onSelectSource,
+  onPlayAt,
 }: {
   sourceId: string;
   onClose: () => void;
   onSelectSource?: (sourceId: string) => void;
+  onPlayAt?: (documentId: number, seconds: number) => void;
 }) {
   const desktop = useIsDesktop();
   // Render sırasında okunur: alt bileşenlerin efektleri odağı panele taşımadan önce.
@@ -39,13 +41,45 @@ export default function SourceViewer({
   if (desktop) {
     return (
       <div className="w-[min(46%,560px)] shrink-0 border-l border-line">
-        <SourcePanel key={sourceId} sourceId={sourceId} onClose={onClose} onSelectSource={onSelectSource} />
+        <SourcePanel
+          key={sourceId}
+          sourceId={sourceId}
+          onClose={onClose}
+          onSelectSource={onSelectSource}
+          onPlayAt={onPlayAt}
+        />
       </div>
     );
   }
   return (
     <ModalFrame onClose={onClose}>
-      <SourcePanel key={sourceId} sourceId={sourceId} onClose={onClose} onSelectSource={onSelectSource} modal />
+      <SourcePanel
+        key={sourceId}
+        sourceId={sourceId}
+        onClose={onClose}
+        onSelectSource={onSelectSource}
+        onPlayAt={onPlayAt}
+        modal
+      />
+    </ModalFrame>
+  );
+}
+
+/**
+ * Tutor dışındaki sayfalarda (öğrenme kaydı, eğitmen incelemesi) kaynağı sağdan açılan bir
+ * pencerede gösterir; her ekran genişliğinde aynı davranır.
+ */
+export function SourceDrawer({ sourceId, onClose }: { sourceId: string; onClose: () => void }) {
+  const [opener] = useState(() => document.activeElement as HTMLElement | null);
+  useEffect(
+    () => () => {
+      if (opener && opener !== document.body && opener.isConnected) opener.focus();
+    },
+    [opener],
+  );
+  return (
+    <ModalFrame onClose={onClose}>
+      <SourcePanel key={sourceId} sourceId={sourceId} onClose={onClose} modal />
     </ModalFrame>
   );
 }

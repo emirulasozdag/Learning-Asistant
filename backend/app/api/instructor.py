@@ -4,8 +4,14 @@ from app.api.deps import DbSession, get_course_for
 from app.auth.dependencies import AuthUser, not_found_error, require_course_role
 from app.instructor.activity import course_activity
 from app.instructor.mistakes import frequent_mistakes as build_frequent_mistakes
-from app.instructor.review import apply_review, resolve_target
-from app.schemas.instructor import CourseActivity, MistakeSummary, ReviewDecision, ReviewOut
+from app.instructor.review import apply_review, list_practice_items, resolve_target
+from app.schemas.instructor import (
+    CourseActivity,
+    MistakeSummary,
+    PracticeItemReview,
+    ReviewDecision,
+    ReviewOut,
+)
 
 router = APIRouter(prefix="/instructor", tags=["instructor"])
 
@@ -24,6 +30,16 @@ def frequent_mistakes(course_id: int, user: AuthUser, db: DbSession) -> list[Mis
     """FR-16: sınıfın sık hataları (anonim, toplu; en az üç öğrencide görülenler)."""
     get_course_for(db, user, course_id, "instructor", "ta")
     return build_frequent_mistakes(db, course_id)
+
+
+@router.get("/courses/{course_id}/practice-items", response_model=list[PracticeItemReview])
+def practice_items(course_id: int, user: AuthUser, db: DbSession) -> list[PracticeItemReview]:
+    """#22: öğrencilere sunulan son pratik soruları, cevap anahtarı ve son eğitmen kararıyla.
+
+    Eğitmen bunları onaylar ya da düzeltir (`POST /instructor/reviews`). Öğrenci bilgisi yoktur.
+    """
+    get_course_for(db, user, course_id, "instructor", "ta")
+    return list_practice_items(db, course_id)
 
 
 @router.post("/reviews", response_model=ReviewOut)

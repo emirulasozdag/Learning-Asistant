@@ -23,7 +23,7 @@ export function studioLinks(base: string): StudioLink[] {
     { label: "Ders videoları", icon: Video, to: `${base}/videos` },
     { label: "Pratik", icon: PencilLine, to: `${base}/practice-problems` },
     { label: "Materyaller", icon: FolderOpen, to: `${base}/materials` },
-    { label: "Öğrenme kaydım", icon: BarChart3 },
+    { label: "Öğrenme kaydım", icon: BarChart3, to: `${base}/learning` },
     { label: "Ders sayfası", icon: LayoutList, to: base, end: true },
   ];
 }

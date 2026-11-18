@@ -48,9 +48,16 @@ export default function CourseDocumentTable({
             </TD>
             {tutorPath && (
               <TD className="text-right">
-                <Link to={tutorPath} className="link text-sm whitespace-nowrap">
-                  AI Tutor'a sor
-                </Link>
+                {document.material_type === "video" && document.media_url ? (
+                  // Video oynatıcıyla birlikte açılır; sorular durdurulan anla gider (#22).
+                  <Link to={`${tutorPath}?video=${document.id}`} className="link text-sm whitespace-nowrap">
+                    İzle ve sor
+                  </Link>
+                ) : (
+                  <Link to={tutorPath} className="link text-sm whitespace-nowrap">
+                    AI Tutor'a sor
+                  </Link>
+                )}
               </TD>
             )}
           </TR>

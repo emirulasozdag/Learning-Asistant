@@ -1,8 +1,9 @@
-import { MessageSquareText, ServerOff } from "lucide-react";
+import { CircleCheck, MessageSquareText, ServerOff } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router";
 
 import type { CourseActivity, QuestionItem } from "../../api/types";
+import ReviewDialog, { type ReviewTarget } from "../../features/instructor/ReviewDialog";
 import { instructorService } from "../../services/instructorService";
 import { formatRelative } from "../../text";
 import Badge from "../../ui/Badge";
@@ -13,6 +14,7 @@ import PageTitle from "../../ui/PageTitle";
 import { SkeletonRows } from "../../ui/Skeleton";
 import StatRow from "../../ui/StatRow";
 import { cx } from "../../ui/cx";
+import { useToast } from "../../ui/toast/context";
 
 /** Dersin soru-cevap etkinliği: tamamı kayıtlı mesajlardan; öğrenci kimliği içermez. */
 export default function CourseActivityPage() {
@@ -103,21 +105,74 @@ function ActivityBody() {
         </section>
       </div>
 
-      <div className="grid gap-12 xl:grid-cols-2">
-        <section>
-          <SectionHeader
-            title="Materyalde bulunamayan sorular"
-            description="Bu konular için materyal eklemek öğrencilere cevap verilmesini sağlar."
-          />
-          <QuestionList items={activity.unanswered_questions} empty="Cevapsız kalan soru yok." />
-        </section>
-        <section>
-          <SectionHeader title="Son sorular" />
-          <QuestionList items={activity.recent_questions} empty="Henüz soru yok." />
-        </section>
-      </div>
+      <ReviewableQuestions activity={activity} />
     </div>
   );
+}
+
+/**
+ * Soru listeleri: her sorunun yanında asistanın cevabını onaylama ya da düzeltme (#20, #22).
+ * Karar yalnızca bu oturumda işaretlenir; kayıt sunucuda tutulur.
+ */
+function ReviewableQuestions({ activity }: { activity: CourseActivity }) {
+  const toast = useToast();
+  const [target, setTarget] = useState<ReviewTarget | null>(null);
+  const [decisions, setDecisions] = useState<Record<number, "approve" | "correct">>({});
+  const [approving, setApproving] = useState<number | null>(null);
+
+  async function approve(messageId: number) {
+    setApproving(messageId);
+    try {
+      await instructorService.review({ target_type: "message", target_id: messageId, decision: "approve" });
+      setDecisions((current) => ({ ...current, [messageId]: "approve" }));
+      toast.show({ tone: "success", title: "Cevap onaylandı" });
+    } catch {
+      toast.show({ tone: "danger", title: "Onay kaydedilemedi", description: "Bağlantını kontrol edip tekrar dene." });
+    } finally {
+      setApproving(null);
+    }
+  }
+
+  const review: ReviewControls = {
+    decisions,
+    approving,
+    onApprove: (messageId) => void approve(messageId),
+    onCorrect: (item) =>
+      item.answer_message_id != null &&
+      setTarget({ type: "message", id: item.answer_message_id, summary: item.question }),
+  };
+
+  return (
+    <div className="grid gap-12 xl:grid-cols-2">
+      <section>
+        <SectionHeader
+          title="Materyalde bulunamayan sorular"
+          description="Bu konular için materyal eklemek öğrencilere cevap verilmesini sağlar."
+        />
+        <QuestionList items={activity.unanswered_questions} empty="Cevapsız kalan soru yok." review={review} />
+      </section>
+      <section>
+        <SectionHeader title="Son sorular" description="Asistanın cevabını onayla ya da hatalıysa düzelt." />
+        <QuestionList items={activity.recent_questions} empty="Henüz soru yok." review={review} />
+      </section>
+      <ReviewDialog
+        target={target}
+        onClose={() => setTarget(null)}
+        onSaved={(saved) => {
+          setDecisions((current) => ({ ...current, [saved.target_id]: "correct" }));
+          setTarget(null);
+          toast.show({ tone: "success", title: "Düzeltme kaydedildi" });
+        }}
+      />
+    </div>
+  );
+}
+
+interface ReviewControls {
+  decisions: Record<number, "approve" | "correct">;
+  approving: number | null;
+  onApprove: (messageId: number) => void;
+  onCorrect: (item: QuestionItem) => void;
 }
 
 const OUTCOME_PARTS = [
@@ -243,7 +298,7 @@ const OUTCOME_BADGES: Record<string, { label: string; tone: "success" | "neutral
   verification_failure: { label: "Kontrol edilemedi", tone: "danger" },
 };
 
-function QuestionList({ items, empty }: { items: QuestionItem[]; empty: string }) {
+function QuestionList({ items, empty, review }: { items: QuestionItem[]; empty: string; review: ReviewControls }) {
   if (items.length === 0) return <p className="text-base text-graphite">{empty}</p>;
   return (
     <ul className="flex flex-col divide-y divide-line border-y border-line">
@@ -251,7 +306,12 @@ function QuestionList({ items, empty }: { items: QuestionItem[]; empty: string }
         const badge = OUTCOME_BADGES[item.outcome] ?? OUTCOME_BADGES.answered;
         return (
           <li key={`${item.asked_at}-${index}`} className="flex items-start gap-4 py-3">
-            <p className="min-w-0 flex-1 text-base text-ink">{item.question}</p>
+            <div className="min-w-0 flex-1">
+              <p className="text-base text-ink">{item.question}</p>
+              {item.answer_message_id != null && (
+                <ReviewActions messageId={item.answer_message_id} item={item} review={review} />
+              )}
+            </div>
             <div className="flex shrink-0 flex-col items-end gap-1">
               <Badge tone={badge.tone}>{badge.label}</Badge>
               <span className="text-xs text-graphite">{formatRelative(item.asked_at)}</span>
@@ -260,5 +320,38 @@ function QuestionList({ items, empty }: { items: QuestionItem[]; empty: string }
         );
       })}
     </ul>
+  );
+}
+
+function ReviewActions({ messageId, item, review }: { messageId: number; item: QuestionItem; review: ReviewControls }) {
+  const decision = review.decisions[messageId];
+  if (decision) {
+    return (
+      <p className={cx("mt-1 flex items-center gap-1.5 text-sm", decision === "approve" ? "text-success" : "text-warning")}>
+        <CircleCheck size={13} aria-hidden />
+        {decision === "approve" ? "Cevabı onayladın" : "Düzeltmen kaydedildi"}
+      </p>
+    );
+  }
+  return (
+    <div className="mt-1.5 flex gap-3 text-sm">
+      <button
+        type="button"
+        className="link disabled:opacity-50"
+        disabled={review.approving === messageId}
+        onClick={() => review.onApprove(messageId)}
+        aria-label={`Cevabı onayla: ${item.question}`}
+      >
+        Onayla
+      </button>
+      <button
+        type="button"
+        className="link"
+        onClick={() => review.onCorrect(item)}
+        aria-label={`Cevabı düzelt: ${item.question}`}
+      >
+        Düzelt
+      </button>
+    </div>
   );
 }

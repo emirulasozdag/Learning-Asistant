@@ -3,7 +3,7 @@
  * `ask`: yalnızca kaynaklı cevap hattı (/ask/stream).
  */
 import { api } from "../api/client";
-import type { AskStreamEvent, TutorStreamEvent } from "../api/types";
+import type { AskStreamEvent, TutorStreamEvent, VideoRef } from "../api/types";
 
 export type QuickAction = "simpler" | "example" | "quiz";
 
@@ -21,9 +21,11 @@ export const tutorService = {
     conversationId: number | null,
     onEvent: (event: TutorStreamEvent) => void,
     signal?: AbortSignal,
+    /** Öğrencinin izlediği video ve durdurduğu an: arama o ana yakın bölümleri öne alır. */
+    video?: VideoRef | null,
   ): Promise<void> {
     return api.tutorStream(
-      { course_id: courseId, message, conversation_id: conversationId },
+      { course_id: courseId, message, conversation_id: conversationId, video: video ?? null },
       onEvent,
       signal,
     );

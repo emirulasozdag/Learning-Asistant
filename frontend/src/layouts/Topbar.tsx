@@ -14,6 +14,9 @@ const SECTION_LABELS: Record<string, string> = {
   materials: "Materyaller",
   activity: "Etkinlik ve analitik",
   tutor: "AI Tutor",
+  learning: "Öğrenme kaydım",
+  review: "İnceleme ve sık hatalar",
+  account: "Hesabım",
 };
 
 /** Adresten ekmek kırıntısı: Derslerim / BLM2512 / Materyaller. */

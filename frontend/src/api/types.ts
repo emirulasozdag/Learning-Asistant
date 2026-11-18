@@ -344,6 +344,31 @@ export interface ReviewDecision {
   correction?: string | null;
 }
 
+export interface LatestReview {
+  decision: "approve" | "correct";
+  correction: string | null;
+  created_at: string;
+}
+
+/** Eğitmenin incelediği pratik sorusu (#22): cevap anahtarı dahil, öğrenci bilgisi yok. */
+export interface PracticeItemReview {
+  id: number;
+  type: PracticeType;
+  topic: string | null;
+  difficulty: Difficulty;
+  prompt: string;
+  options: string[] | null;
+  correct_option: number | null;
+  reference_answer: string | null;
+  explanation: string;
+  /** released: öğrencilere sunuluyor; withdrawn: eğitmen düzeltti, sunulmuyor. */
+  status: "released" | "withdrawn";
+  rubric_approved: boolean;
+  source: Citation;
+  created_at: string;
+  latest_review: LatestReview | null;
+}
+
 export interface ReviewOut {
   id: number;
   target_type: "message" | "practice_item";
