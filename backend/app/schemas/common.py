@@ -1,6 +1,12 @@
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+# PostgreSQL `integer` birincil anahtarlarının üst sınırı. Bunun üstündeki bir kimlik sorguya
+# girerse veritabanı hata verir (500); istek doğrulamada reddedilir.
+PG_INT_MAX = 2**31 - 1
+# İstek gövdesinde gelen bir satır kimliği.
+DbId = Annotated[int, Field(ge=1, le=PG_INT_MAX)]
 
 # Kullanıcının bir dersteki rolü. Rol ders başınadır: bir kişi bir derste eğitmen,
 # başka bir derste öğrenci olabilir.

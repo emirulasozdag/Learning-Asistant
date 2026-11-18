@@ -1,9 +1,9 @@
 from enum import StrEnum
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-from app.schemas.common import Citation
+from app.schemas.common import Citation, DbId
 
 Difficulty = Literal["easy", "medium", "hard"]
 
@@ -17,11 +17,12 @@ class PracticeType(StrEnum):
 class PracticeRequest(BaseModel):
     course_id: int
     type: PracticeType
-    topic: str | None = None
-    source_id: str | None = None
+    # Sınırlar: konu arama sorgusuna ve saklanan soruya gider (#15).
+    topic: str | None = Field(default=None, max_length=300)
+    source_id: str | None = Field(default=None, max_length=32)
     difficulty: Difficulty | None = None
     # "Bu eksik üzerine çalış": bu denemenin eksiklerine yönelik yeni soru.
-    follow_up_of_attempt_id: int | None = None
+    follow_up_of_attempt_id: DbId | None = None
 
 
 class PracticeItem(BaseModel):

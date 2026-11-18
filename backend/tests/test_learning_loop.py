@@ -1,4 +1,5 @@
-"""Öğrenme kaydı, sık hatalar ve eğitmen onayı/düzeltmesi (#20; FR-15, FR-16; ADR-4).
+"""Öğrenme kaydı, sık hatalar, eğitmen onayı/düzeltmesi ve rubrik girişi (#20, #15; FR-13, FR-15,
+FR-16; ADR-4).
 
 Sorular veritabanına doğrudan yazılır (üretim #16'nın testlerinde); çoktan seçmeli cevaplar
 gerçek `/practice/{id}/answer` ucundan geçer (model gerekmez), açık uçlu denemeler değerlendirici
@@ -14,11 +15,13 @@ from sqlalchemy import select
 from app.db.models import (
     Conversation,
     Course,
+    Enrollment,
     InstructorReview,
     Message,
     PracticeAttempt,
     PracticeQuestion,
     PracticeRubric,
+    PracticeRubricRevision,
     User,
 )
 from tests.conftest import enroll, make_pdf, make_user
@@ -295,6 +298,8 @@ def test_review_permissions_do_not_leak_targets(db, client_for, setup) -> None:
     assert outsider.status_code == 404 and outsider.json() == missing.json()
     assert missing.json()["code"] == "practice_item_not_found"
     assert not_released.status_code == 404
+    # Veritabanı aralığı dışındaki kimlik 500 değil, 422 (önceden sorguda düşüyordu).
+    assert review(client_for(s.instructor), "practice_item", 2**31, "approve").status_code == 422
 
 
 def conversation_with_answer(db, s, owner: User) -> Message:
@@ -361,3 +366,177 @@ def test_instructor_lists_practice_items_with_key_and_latest_review(db, client_f
     path = f"/instructor/courses/{s.course.id}/practice-items"
     assert client_for(s.ta).get(path).status_code == 200
     assert client_for(s.students[0]).get(path).status_code == 403
+
+
+# --- Rubrik ve referans cevap girişi (#15) ---
+
+
+RUBRIC_IN = {
+    "concept": "ikili arama",
+    "reference_answer": "Sıralı dizide her adımda aralığın yarısı atılır.",
+    "criteria": [{"description": "Yarıya inmeyi söyler", "points": 2}],
+}
+
+
+def open_question(db, s, status: str = "released"):
+    question = mcq_question(db, s, "ikili arama", status=status)
+    question.type, question.options = "short_answer", None
+    question.answer_key = {"reference_answer": "Yarıyı attığı için."}
+    db.commit()
+    return question
+
+
+def post_rubric(client, s, **changes):
+    return client.post(f"/instructor/courses/{s.course.id}/rubrics", json={**RUBRIC_IN, **changes})
+
+
+def test_instructor_rubric_replaces_and_approves_the_question_rubric(db, client_for, setup) -> None:
+    s = setup
+    question = open_question(db, s)
+    generated_id = question.rubric.id
+
+    response = post_rubric(client_for(s.instructor), s, practice_item_id=question.id)
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["id"] == generated_id  # aynı satır güncellenir (soru başına tek rubrik)
+    assert body["practice_item_id"] == question.id and body["course_id"] == s.course.id
+    assert (body["origin"], body["approved"]) == ("instructor", True)
+    db.expire_all()
+    assert question.rubric.approved_by == s.instructor.id and question.rubric.approved_at
+    # Üreticinin anahtarı kanıt olarak kalır; geçerli referans rubriğinki.
+    assert question.answer_key == {"reference_answer": "Yarıyı attığı için."}
+    assert question.status == "released"  # rubrik girmek soruyu yayımlamaz ya da geri çekmez
+    items = client_for(s.instructor).get(f"/instructor/courses/{s.course.id}/practice-items")
+    assert items.json()[0]["reference_answer"] == RUBRIC_IN["reference_answer"]
+    assert items.json()[0]["rubric_approved"] is True
+
+
+def test_concept_rubric_is_stored_with_course_sources(db, client_for, setup) -> None:
+    s = setup
+
+    # Aynı kaynak iki kez ve başında sıfırla: tekilleştirilir, olağan biçimde saklanır.
+    response = post_rubric(
+        client_for(s.instructor), s, source_ids=[str(s.chunk_id), f"00{s.chunk_id}"]
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["practice_item_id"] is None
+    assert response.json()["source_ids"] == [str(s.chunk_id)]
+    rubric = db.scalar(select(PracticeRubric).where(PracticeRubric.question_id.is_(None)))
+    assert rubric.origin == "instructor" and rubric.approved is True
+
+
+def test_rubric_entry_rejects_invalid_targets(db, client_for, setup) -> None:
+    s = setup
+    instructor = client_for(s.instructor)
+    mcq = mcq_question(db, s, "ikili arama")
+    rejected = open_question(db, s, status="rejected")
+
+    choice = post_rubric(instructor, s, practice_item_id=mcq.id)
+    hidden = post_rubric(instructor, s, practice_item_id=rejected.id)
+    missing = post_rubric(instructor, s, practice_item_id=99999)
+    foreign_source = post_rubric(instructor, s, source_ids=["99999"])
+    not_a_source = post_rubric(instructor, s, source_ids=["abc"])
+    too_many = post_rubric(instructor, s, criteria=[{"description": "x", "points": 1}] * 11)
+    zero_points = post_rubric(instructor, s, criteria=[{"description": "x", "points": 0}])
+    long_reference = post_rubric(instructor, s, reference_answer="a" * 4001)
+    # Veritabanı aralığı dışındaki ve ASCII olmayan kimlikler 500 değil, 422 olur.
+    huge_item = post_rubric(instructor, s, practice_item_id=2**31)
+    huge_source = post_rubric(instructor, s, source_ids=["9" * 25])
+    out_of_range_source = post_rubric(instructor, s, source_ids=[str(2**31)])
+    arabic_digits = post_rubric(instructor, s, source_ids=["١٢"])
+
+    assert choice.status_code == 422 and choice.json()["code"] == "validation_error"
+    assert hidden.status_code == 404 and hidden.json() == missing.json()
+    assert missing.json()["code"] == "practice_item_not_found"
+    assert foreign_source.status_code == 422 and foreign_source.json()["code"] == "source_not_found"
+    assert not_a_source.status_code == 422
+    assert {too_many.status_code, zero_points.status_code, long_reference.status_code} == {422}
+    assert {huge_item.status_code, huge_source.status_code} == {422}
+    assert out_of_range_source.json()["code"] == "source_not_found"
+    assert arabic_digits.json()["code"] == "source_not_found"
+    db.expire_all()
+    assert mcq.rubric.origin == "generated"  # hiçbiri bir şey değiştirmedi
+    assert db.scalar(select(PracticeRubric).where(PracticeRubric.question_id.is_(None))) is None
+    assert db.scalar(select(PracticeRubricRevision)) is None  # reddedilen giriş iz bırakmaz
+
+
+def test_question_from_another_course_is_not_found(db, client_for, setup) -> None:
+    s = setup
+    question = open_question(db, s)
+
+    other_course_id = db.scalar(
+        select(Enrollment.course_id).where(Enrollment.user_id == s.other.id)
+    )
+    response = client_for(s.other).post(
+        f"/instructor/courses/{other_course_id}/rubrics",
+        json={**RUBRIC_IN, "practice_item_id": question.id},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["code"] == "practice_item_not_found"
+
+
+def test_rubric_permissions_and_listing(db, client_for, setup) -> None:
+    s = setup
+    question = open_question(db, s)
+    open_question(db, s, status="rejected")  # öğrenciye hiç gitmedi: listede yok
+    path = f"/instructor/courses/{s.course.id}/rubrics"
+
+    ta_create = post_rubric(client_for(s.ta), s, practice_item_id=question.id)
+    student_create = post_rubric(client_for(s.students[0]), s)
+    outsider_create = post_rubric(client_for(s.other), s)
+    concept = post_rubric(client_for(s.instructor), s).json()
+    listed = client_for(s.ta).get(path)
+
+    assert ta_create.status_code == 403 and student_create.status_code == 403
+    assert outsider_create.status_code == 404
+    assert listed.status_code == 200, listed.text
+    assert [r["id"] for r in listed.json()] == [concept["id"], question.rubric.id]
+    assert listed.json()[1]["origin"] == "generated" and listed.json()[1]["approved"] is False
+    assert client_for(s.students[0]).get(path).status_code == 403
+
+
+def test_rubric_list_puts_the_last_changed_first(db, client_for, setup) -> None:
+    s = setup
+    older, newer = open_question(db, s), open_question(db, s)
+    instructor = client_for(s.instructor)
+    path = f"/instructor/courses/{s.course.id}/rubrics"
+    before = [r["practice_item_id"] for r in instructor.get(path).json()]
+
+    post_rubric(instructor, s, practice_item_id=older.id)
+    after = [r["practice_item_id"] for r in instructor.get(path).json()]
+
+    assert before == [newer.id, older.id]
+    assert after == [older.id, newer.id]
+
+
+def test_replaced_rubrics_keep_every_earlier_version(db, client_for, setup) -> None:
+    """Üretilen ilk hâl ve eğitmenin önceki düzeltmesi kaybolmaz; soru silinince geçmiş de gider."""
+    s = setup
+    question = open_question(db, s)
+    instructor = client_for(s.instructor)
+
+    first = post_rubric(instructor, s, practice_item_id=question.id)
+    second = post_rubric(
+        instructor,
+        s,
+        practice_item_id=question.id,
+        reference_answer="Aralık her adımda yarıya iner.",
+    )
+    post_rubric(instructor, s)  # kavram rubriği: yeni satır, geçmiş yok
+
+    assert first.status_code == 200 and second.status_code == 200
+    revisions = db.scalars(select(PracticeRubricRevision).order_by(PracticeRubricRevision.id)).all()
+    assert [(r.origin, r.approved, r.reference_answer) for r in revisions] == [
+        ("generated", False, "Yarıyı atar."),
+        ("instructor", True, RUBRIC_IN["reference_answer"]),
+    ]
+    assert {r.rubric_id for r in revisions} == {question.rubric.id}
+    assert revisions[0].criteria == [{"description": "Doğru şık", "points": 1}]
+    assert all(r.replaced_by == s.instructor.id and r.replaced_at for r in revisions)
+
+    db.delete(question)
+    db.commit()
+    assert db.scalar(select(PracticeRubricRevision)) is None

@@ -2,7 +2,7 @@ import { CircleCheck, CircleX, ClipboardCheck, Repeat, Target } from "lucide-rea
 import { useId, useState } from "react";
 
 import { api } from "../../api/client";
-import type { AnswerFeedback, PracticeItem, PracticeType } from "../../api/types";
+import { MAX_ANSWER_CHARS, type AnswerFeedback, type PracticeItem, type PracticeType } from "../../api/types";
 import Badge from "../../ui/Badge";
 import Button from "../../ui/Button";
 import { cx } from "../../ui/cx";
@@ -157,6 +157,7 @@ function PracticeCard({
           <textarea
             value={text}
             onChange={(event) => setText(event.target.value)}
+            maxLength={MAX_ANSWER_CHARS}
             disabled={!!feedback || submitting}
             rows={item.type === "code_tracing" ? 5 : 4}
             placeholder={item.type === "code_tracing" ? "Çıktıyı ya da adımları yaz" : "Cevabını yaz"}

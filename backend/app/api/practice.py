@@ -1,4 +1,6 @@
-from fastapi import APIRouter, HTTPException, status
+from typing import Annotated
+
+from fastapi import APIRouter, HTTPException, Path, status
 
 from app.api.deps import DbSession, get_course_for
 from app.api.errors import ApiError
@@ -14,6 +16,7 @@ from app.llm.gateway import LLMRole, select_client
 from app.llm.release import releasing
 from app.llm.routing import DataClass
 from app.practice import service
+from app.schemas.common import PG_INT_MAX
 from app.schemas.evaluation import AnswerFeedback, AnswerSubmission
 from app.schemas.practice import PracticeItem, PracticeRequest
 
@@ -55,7 +58,10 @@ def generate_practice(request: PracticeRequest, user: AuthUser, db: DbSession) -
 
 @router.post("/{item_id}/answer", response_model=AnswerFeedback)
 def submit_answer(
-    item_id: int, submission: AnswerSubmission, user: AuthUser, db: DbSession
+    item_id: Annotated[int, Path(ge=1, le=PG_INT_MAX)],
+    submission: AnswerSubmission,
+    user: AuthUser,
+    db: DbSession,
 ) -> AnswerFeedback:
     """FR-13: rubrik + referans cevapla değerlendir, eksikleri açıkla (resmî not değildir).
 

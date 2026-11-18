@@ -417,24 +417,11 @@ def test_ta_sees_activity_but_cannot_write_rubrics(client_for, world) -> None:
     course_id = world.course.id
 
     assert client.get(f"/instructor/courses/{course_id}/activity").status_code == 200
-    assert client.get(f"/instructor/courses/{course_id}/rubrics").status_code == 501
+    assert client.get(f"/instructor/courses/{course_id}/rubrics").status_code == 200
     assert_error(
         client.post(f"/instructor/courses/{course_id}/rubrics", json=RUBRIC),
         403,
         "insufficient_role",
-    )
-
-
-# --- 7. İskelet uçlar ---
-
-
-def test_skeleton_routes_return_501_for_authorised_members(client_for, world) -> None:
-    course_id = world.course.id
-    instructor = client_for(world.instructor)
-
-    assert instructor.get(f"/instructor/courses/{course_id}/rubrics").status_code == 501
-    assert (
-        instructor.post(f"/instructor/courses/{course_id}/rubrics", json=RUBRIC).status_code == 501
     )
 
 

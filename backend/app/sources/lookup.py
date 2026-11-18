@@ -6,17 +6,30 @@ from app.db.models import Chunk, Document, VideoFrame
 from app.ingestion.documents import document_media_url, file_url
 from app.ingestion.rendering import find_highlights, is_pdf
 from app.retrieval.frames import frames_overlapping
+from app.schemas.common import PG_INT_MAX
 from app.schemas.materials import MaterialType
 from app.schemas.sources import FrameRef, SourceAlternative, SourceDetail
 
 MAX_ALTERNATIVES = 3
 
 
+def chunk_id(source_id: str) -> int | None:
+    """Alıntı kimliğinin (chunk id) sayısı; geçerli bir parça kimliği değilse None.
+
+    Yalnızca ASCII rakamlar kabul edilir (`"١٢".isdigit()` da doğrudur) ve değer veritabanı
+    aralığında olmalıdır; yoksa sorgu 500 ile düşer.
+    """
+    # Uzunluk sınırı `int()`'ten önce: çok uzun rakam dizisi Python'da da hata verir.
+    if not (0 < len(source_id) <= 10 and source_id.isascii() and source_id.isdigit()):
+        return None
+    value = int(source_id)
+    return value if 1 <= value <= PG_INT_MAX else None
+
+
 def find_chunk(db: Session, source_id: str) -> Chunk | None:
     """Alıntı kimliğinin (chunk id) parçası. Erişimi çağıran denetler (`chunk.course_id`)."""
-    if not source_id.isdigit() or len(source_id) > 18:
-        return None
-    return db.get(Chunk, int(source_id))
+    value = chunk_id(source_id)
+    return db.get(Chunk, value) if value is not None else None
 
 
 def source_detail(db: Session, chunk: Chunk) -> SourceDetail:

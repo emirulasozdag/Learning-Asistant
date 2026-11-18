@@ -413,3 +413,68 @@ def test_quiz_me_uses_the_sources_of_the_answer_just_read(
         "Soru bağımsız çözümle kontrol ediliyor…",
     ]
     assert [name for name, _ in reranker.calls] == ["RerankOutput"]
+
+
+def test_instructor_rubric_replaces_the_generated_one_for_grading(
+    client: TestClient, db, course: Course, chunk_id: str, monkeypatch
+) -> None:
+    """#15: eğitmenin girdiği referans ve kriterler üretilmiş rubriğin yerine geçer."""
+    solution = OpenSolution(answerable=True, answer="yarıya iner")
+    item = released(client, course, chunk_id, monkeypatch, SHORT, solution)
+    entered = client.post(
+        f"/instructor/courses/{course.id}/rubrics",
+        json={
+            "concept": "ikili arama",
+            "reference_answer": "Sıralı dizide her karşılaştırma aralığı yarıya indirir.",
+            "criteria": [{"description": "Sıralılık şartını söyler", "points": 3}],
+            "practice_item_id": item["id"],
+        },
+    )
+    grader = FakeJSON(
+        "grader",
+        GradeOutput(
+            criteria=[{"index": 0, "awarded": 3, "rationale": "doğru"}],
+            understood=["sıralılık"],
+            missing_concepts=[],
+            feedback="Doğru.",
+        ),
+    )
+    use(monkeypatch, grader)
+
+    response = client.post(f"/practice/{item['id']}/answer", json={"answer_text": "Sıralı olmalı."})
+
+    assert entered.status_code == 200, entered.text
+    assert entered.json()["origin"] == "instructor" and entered.json()["approved"] is True
+    assert entered.json()["source_ids"] == [chunk_id]  # boş verilince sorunun parçası
+    body = response.json()
+    assert response.status_code == 200, response.text
+    assert (body["score"], body["max_score"]) == (3.0, 3.0)
+    assert body["reference_answer"] == "Sıralı dizide her karşılaştırma aralığı yarıya indirir."
+    assert "Sıralı dizide her karşılaştırma" in grader.calls[0][1]
+    assert "Her adımda kalan aralığın yarısı" not in grader.calls[0][1]
+
+
+def test_answer_text_is_bounded(
+    client: TestClient, course: Course, chunk_id: str, monkeypatch
+) -> None:
+    solution = OpenSolution(answerable=True, answer="yarıya iner")
+    item = released(client, course, chunk_id, monkeypatch, SHORT, solution)
+
+    response = client.post(f"/practice/{item['id']}/answer", json={"answer_text": "a" * 4001})
+
+    assert response.status_code == 422
+
+
+def test_ids_outside_the_database_range_are_rejected_not_crashing(
+    client: TestClient, course: Course
+) -> None:
+    """Çok büyük kimlikler sorguya girmeden reddedilir (önceden 500 veriyordu)."""
+    answer = client.post(f"/practice/{2**31}/answer", json={"selected_option": 0})
+    follow_up = client.post(
+        "/practice",
+        json={"course_id": course.id, "type": "mcq", "follow_up_of_attempt_id": 2**31},
+    )
+    source = client.get(f"/sources/{'9' * 12}")
+
+    assert answer.status_code == 422 and follow_up.status_code == 422
+    assert source.status_code == 404

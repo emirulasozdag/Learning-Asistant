@@ -23,7 +23,7 @@ from app.db.models import (
     PracticeQuestion,
     User,
 )
-from app.practice.service import citation
+from app.practice.service import citation, reference_answer
 from app.schemas.instructor import LatestReview, PracticeItemReview, ReviewDecision, ReviewOut
 from app.schemas.practice import PracticeType
 
@@ -146,7 +146,7 @@ def list_practice_items(db: Session, course_id: int) -> list[PracticeItemReview]
                 prompt=question.prompt,
                 options=question.options,
                 correct_option=int(question.answer_key["correct_option"]) if mcq else None,
-                reference_answer=None if mcq else question.answer_key.get("reference_answer"),
+                reference_answer=None if mcq else reference_answer(question),
                 explanation=question.explanation,
                 status=question.status,  # type: ignore[arg-type]
                 rubric_approved=bool(question.rubric and question.rubric.approved),
