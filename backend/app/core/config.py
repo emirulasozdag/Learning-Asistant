@@ -86,10 +86,22 @@ class Settings(BaseSettings):
     # (varsayılan); ocr: transkripsiyon işi medyayı silmeden önce slayt karelerini çıkarır ve
     # Tesseract ile okur. Yalnızca medya yüklemesinde çalışır (.vtt yüklemesinde video yoktur).
     frame_extraction: Literal["off", "ocr"] = "off"
+    # Ders videosu/sesi ve altyazının en uzun süresi (saniye, #25). Daha uzun medya transkripsiyon
+    # başlamadan, daha uzun altyazı yüklenirken reddedilir.
+    max_media_duration_s: float = 4 * 3600
+    # Kare yorumlayıcısı (#25, ADR-11): `ingestion/frame_interpretation.INTERPRETERS`a kayıtlı bir
+    # yorumlayıcının adı. Boşsa yorumlama kapalıdır; yorumlama işi kuyruğa alınmaz.
+    frame_interpreter: str = ""
+    # Depolama temizliği (#25): çalıştırıcı bu aralıkla sahipsiz dosyaları (çöken işten kalan
+    # medya, geçici kare klasörü, silinmiş dokümanın dosyaları) siler; 0 = kapalı.
+    storage_sweep_interval_s: float = 3600.0
+    # Bundan yeni dosya sahipsiz görünse de silinmez (yazılmakta olan yükleme korunur).
+    storage_orphan_grace_s: float = 3600.0
     # Yükleme dışındaki isteklerin gövde sınırı (JSON); aşılırsa 413 (#21).
     max_request_bytes: int = 2 * 1024 * 1024
 
-    # Uzun işler (transkripsiyon) veritabanındaki kuyruktan çalışır (ADR-9).
+    # Uzun işler (transkripsiyon, kare çıkarma ve yorumlama) veritabanındaki kuyruktan çalışır
+    # (ADR-9).
     # inline: API süreci içinde bir iş parçacığı çalıştırır (tek süreçli yerel geliştirme).
     # external: işleri ayrı süreç çalıştırır (`python -m app.jobs.worker`, docker-compose'ta
     # `worker`); API yalnızca kuyruğa yazar.

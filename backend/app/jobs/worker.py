@@ -1,4 +1,5 @@
-"""İş çalıştırıcısı (ADR-9): kuyruktan iş alır, çalıştırır, sonucu yazar.
+"""İş çalıştırıcısı (ADR-9): kuyruktan iş alır, çalıştırır, sonucu yazar. Türler: transkripsiyon,
+kare çıkarma ve kare yorumlama (#25, ADR-11); düzenli aralıkla depolama temizliği yapar.
 
 Ayrı süreç olarak: `python -m app.jobs.worker` (docker-compose'ta `worker` servisi,
 `JOB_WORKER=external`). `JOB_WORKER=inline` iken API süreci aynı döngüyü bir iş parçacığında
@@ -8,6 +9,7 @@ Ayrı süreç olarak: `python -m app.jobs.worker` (docker-compose'ta `worker` se
 import logging
 import signal
 import threading
+import time
 from collections.abc import Callable
 from types import TracebackType
 
@@ -15,11 +17,18 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.embeddings.base import Embedder
+from app.ingestion.frame_interpretation import (
+    FrameInterpreter,
+    InterpretationError,
+    get_interpreter,
+    interpretation_job,
+)
 from app.ingestion.media import frames_job, transcription_job
 from app.ingestion.transcribe import Transcriber, TranscriptionError, get_transcriber
 from app.ingestion.types import IngestionError
 from app.jobs.queue import (
     CANCELLED_MESSAGE,
+    FRAME_INTERPRETATION,
     FRAMES,
     TRANSCRIPTION,
     ClaimedJob,
@@ -32,10 +41,13 @@ from app.jobs.queue import (
     retry_later,
     settle,
 )
+from app.jobs.retention import sweep_storage
 
 logger = logging.getLogger(__name__)
 
 SessionFactory = Callable[[], Session]
+# Kalıcı hatalar: iş yeniden denenmeden başarısız olur, nedeni (Türkçe) işin `error`una yazılır.
+PERMANENT_ERRORS = (TranscriptionError, IngestionError, InterpretationError)
 
 
 class _Heartbeat:
@@ -82,6 +94,7 @@ def run_next(
     session_factory: SessionFactory,
     transcriber: Transcriber | None = None,
     embedder: Embedder | None = None,
+    interpreter: FrameInterpreter | None = None,
 ) -> bool:
     """Sıradaki bir işi çalıştırır; kuyruk boşsa False."""
     with session_factory() as db:
@@ -90,7 +103,7 @@ def run_next(
         return False
     logger.info("İş %s (%s, deneme %s) başladı", job.id, job.kind, job.attempts)
     with _Heartbeat(session_factory, job) as beat:
-        outcome = _run(session_factory, job, beat.should_stop, transcriber, embedder)
+        outcome = _run(session_factory, job, beat.should_stop, transcriber, embedder, interpreter)
     logger.info("İş %s bitti: %s", job.id, outcome)
     return True
 
@@ -99,10 +112,11 @@ def run_pending(
     session_factory: SessionFactory,
     transcriber: Transcriber | None = None,
     embedder: Embedder | None = None,
+    interpreter: FrameInterpreter | None = None,
 ) -> int:
     """Kuyruk boşalana kadar işleri sırayla çalıştırır (testler ve tek seferlik kullanım)."""
     count = 0
-    while run_next(session_factory, transcriber, embedder):
+    while run_next(session_factory, transcriber, embedder, interpreter):
         count += 1
     return count
 
@@ -113,6 +127,7 @@ def _run(
     should_stop: Callable[[], bool],
     transcriber: Transcriber | None,
     embedder: Embedder | None,
+    interpreter: FrameInterpreter | None = None,
 ) -> str:
     try:
         if job.kind == FRAMES:
@@ -121,6 +136,8 @@ def _run(
             transcription_job(
                 session_factory, job, transcriber or get_transcriber(), should_stop, embedder
             )
+        elif job.kind == FRAME_INTERPRETATION:
+            interpretation_job(session_factory, job, interpreter or get_interpreter(), should_stop)
         else:
             raise IngestionError(f"Bilinmeyen iş türü: {job.kind}")
         return "succeeded"
@@ -132,7 +149,7 @@ def _run(
         with session_factory() as db:
             settle(db, job, "cancelled", CANCELLED_MESSAGE)
         return "cancelled"
-    except (TranscriptionError, IngestionError) as exc:
+    except PERMANENT_ERRORS as exc:
         with session_factory() as db:
             settle(db, job, "failed", str(exc))
         return "failed"
@@ -157,6 +174,8 @@ class Worker:
         self.transcriber = transcriber
         self.embedder = embedder
         self.stopping = threading.Event()
+        # İlk temizlik açılıştan bir aralık sonra: yeniden başlatma döngüsünde disk taranmaz.
+        self.next_sweep = time.monotonic() + settings.storage_sweep_interval_s
 
     def stop(self) -> None:
         self.stopping.set()
@@ -167,6 +186,7 @@ class Worker:
             try:
                 with self.session_factory() as db:
                     recover_stale(db)
+                self._sweep_if_due()
                 ran = run_next(self.session_factory, self.transcriber, self.embedder)
             except Exception:
                 # Veritabanı henüz hazır değil ya da bağlantı koptu: bekleyip yeniden dene.
@@ -175,6 +195,15 @@ class Worker:
             if not ran:
                 self.stopping.wait(settings.job_poll_interval_s)
         logger.info("İş çalıştırıcısı durdu")
+
+    def _sweep_if_due(self) -> None:
+        """Sahipsiz dosyaları düzenli aralıkla siler (`STORAGE_SWEEP_INTERVAL_S`; 0 = kapalı)."""
+        interval = settings.storage_sweep_interval_s
+        if interval <= 0 or time.monotonic() < self.next_sweep:
+            return
+        self.next_sweep = time.monotonic() + interval
+        with self.session_factory() as db:
+            sweep_storage(db)
 
 
 def start_inline(session_factory: SessionFactory) -> Worker:

@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.db.models import Chunk, Course, Document, ProcessingJob, VideoFrame
 from app.embeddings.fake import FakeEmbedder
-from app.ingestion import lecture_frames
+from app.ingestion import lecture_frames, media
 from app.ingestion.documents import frame_dir
 from app.ingestion.frames import ExtractedFrame, FrameExtractionError
 from app.ingestion.ocr import OcrError, OcrResult
@@ -79,13 +79,16 @@ def frames_on(monkeypatch: pytest.MonkeyPatch) -> list[Path]:
     monkeypatch.setattr(
         lecture_frames, "extractor_identity", lambda languages: f"tesseract/test/{languages}"
     )
+    # Kare işinin süre denetimi (#25) medyayı PyAV ile açar; CI'da yoktur.
+    monkeypatch.setattr(media, "media_duration", lambda path: 705.0)
     return folders
 
 
 def processed_video(client: TestClient, db: Session, course: Course, run_jobs) -> Document:
     response = upload_media(client, course.id, data={"title": "Ders 3"})
     assert response.status_code == 201
-    assert run_jobs() == 1
+    # Kare adımı açıkken kareler ayrı bir işte çıkarılır (#25): transkripsiyon + kare çıkarma.
+    assert run_jobs() == (2 if settings.frame_extraction == "ocr" else 1)
     return refreshed(db, response.json()["id"])
 
 
@@ -234,13 +237,16 @@ def test_cancel_during_the_frame_step_writes_nothing(
 
     document = processed_video(client, db, course, run_jobs)
 
-    assert document.status == "failed"
-    assert db.scalar(select(ProcessingJob.status)) == "cancelled"
+    # Kareler ayrı işte (#25): yalnızca kare işi iptal olur, transkript ve doküman kalır.
+    assert (document.status, document.error) == ("ready", None)
+    statuses = dict(db.execute(select(ProcessingJob.kind, ProcessingJob.status)).tuples().all())
+    assert statuses == {"transcription": "succeeded", "frames": "cancelled"}
     assert frames_of(db, document) == []
     assert not frame_dir(course.id, document.id).exists()
     assert not frame_dir(course.id, document.id, staging=True).exists()
     leftovers = (settings.upload_dir / str(course.id)).rglob("*")
-    assert [path for path in leftovers if path.is_file()] == []  # medya da silindi
+    # Medya silindi; yalnızca transkript kaldı.
+    assert [path.suffix for path in leftovers if path.is_file()] == [".vtt"]
 
 
 def test_deleting_the_document_removes_frames_and_images(

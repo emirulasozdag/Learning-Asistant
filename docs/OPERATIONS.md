@@ -9,7 +9,7 @@ anlatır (#21). Teslim ve kurulum el kitabı (#61) bu belgenin üzerine kurulaca
 |---|---|---|
 | `db` | `pgvector/pgvector:pg16` | Veritabanı ve iş kuyruğu (`processing_jobs`) |
 | `api` | `uvicorn app.main:app` | HTTP API. Açılışta migration ve tohum verisi. `JOB_WORKER=external` iken uzun iş çalıştırmaz |
-| `worker` | `python -m app.jobs.worker` | Kuyruktaki uzun işleri (transkripsiyon) çalıştırır (ADR-9) |
+| `worker` | `python -m app.jobs.worker` | Kuyruktaki uzun işleri (transkripsiyon, kare çıkarma, kare yorumlama) çalıştırır (ADR-9, ADR-11); sahipsiz dosyaları temizler |
 | `web` | Vite | Arayüz |
 
 Birden çok `worker` aynı veritabanında güvenle çalışabilir: iş `FOR UPDATE SKIP LOCKED` ile alınır.
@@ -20,6 +20,7 @@ Birden çok `worker` aynı veritabanında güvenle çalışabilir: iş `FOR UPDA
 |---|---|---|---|
 | PDF/PPTX/VTT dosyası | 50 MB | `pipeline.MAX_UPLOAD_BYTES` (sabit) | `422`, kayıt ve dosya kalmaz |
 | Medya dosyası (video/ses) | 2 GB | `MAX_MEDIA_BYTES` | `422`, kayıt ve dosya kalmaz |
+| Medya / altyazı süresi (#25) | 4 saat | `MAX_MEDIA_DURATION_S` | Altyazı `422`; medya transkripsiyon başlamadan `failed`; kare videosu kare çıkarmadan önce `frames` işiyle `failed` |
 | Yükleme isteğinin gövdesi | medya sınırı + 1 MB | `MAX_MEDIA_BYTES` | `413 file_too_large`, gövde okunmaz |
 | Diğer isteklerin gövdesi (JSON) | 2 MB | `MAX_REQUEST_BYTES` | `413 file_too_large` |
 | Dosya adı / başlık | 300 karakter | sabit | `422` |
@@ -39,10 +40,11 @@ varsa onun gövde sınırı da en az medya sınırı kadar olmalı.
 Ölçülmemiş değerler: transkripsiyon süresi (CPU'da `large-v3-turbo` ile 1 saatlik ders "dakikalar", ölçüm yok) ve
 `worker`'ın bellek kullanımı (embedding modeli + whisper modeli). Pilot öncesi gerçek ders kaydıyla ölçülmeli.
 
-**Kare adımı (`FRAME_EXTRACTION=ocr`, ADR-10).** Transkripsiyondan sonra, medya silinmeden önce çalışır; kareler önce
+**Kare adımı (`FRAME_EXTRACTION=ocr`, ADR-10, ADR-11).** Transkripsiyondan sonra ayrı bir `frames` işinde aynı medyadan
+çalışır (medya o iş bitince silinir); doküman kareleri beklemeden `ready` olur. Kareler önce
 `data/uploads/<ders>/frames/<doküman>.partial/`a yazılır, sonuç yazılınca `frames/<doküman>/` olur. Kare adımı yapılamazsa
-(video çözülemedi, Tesseract yok) günlüğe uyarı yazılır ve doküman karesiz `ready` olur; iş başarısız sayılmaz. Doküman
-silinince ya da işi başarısız/iptal olunca kare klasörleri de silinir. Ölçülen: 720p sentetik slayt videosunda kare
+(video çözülemedi, Tesseract yok) `frames` işi "Videodan slayt karesi çıkarılamadı." ile `failed` olur ve doküman karesiz
+`ready` kalır. Doküman silinince ya da transkripsiyonu başarısız/iptal olunca kare klasörleri de silinir. Ölçülen: 720p sentetik slayt videosunda kare
 seçimi örnek başına ~10 ms; OCR kare başına ~1 sn (üç okuma). Kendi kayıtlarımız (PowerPoint, 1080p, `tiny`): 86 sn'lik
 Türkçe ders (5 slayt) ve 52 sn'lik İngilizce ders (5 slayt; İngilizce ve Türkçe derse ayrı ayrı yüklendi): slayt başına
 bir kare, geçişler doğru; iş ~20 sn. 72 sn'lik zor durumlar kaydı (konuşmacı kamerası açık, koyu tema, madde madde
@@ -52,13 +54,18 @@ ilk kelimesi eksik. Uzun gerçek ders kayıtlarında ölçülmedi.
 
 ## İş durumları
 
+İş türleri (`processing_jobs.kind`, ADR-11): `transcription`, `frames` (slayt kareleri + OCR; yüklenen videoda
+transkripsiyondan sonra, altyazılı videoda medya eklenince) ve `frame_interpretation` (yalnızca `FRAME_INTERPRETER`
+yapılandırılmışsa). Eğitmen bir dokümanın işlerini `GET /api/documents/{id}/jobs` ile görür, birini
+`POST /api/documents/{id}/jobs/{job_id}/cancel` ile iptal eder. Kare işlerinin hatası ya da iptali dokümanı bozmaz.
+
 Doküman: `processing → ready | failed`. İş (`processing_jobs.status`):
 
 | Durum | Anlamı |
 |---|---|
 | `queued` | Yüklendi, çalıştırıcıyı bekliyor. Medya `data/uploads/<ders>/<doküman>.<uzantı>` |
 | `running` | Bir çalıştırıcı çalıştırıyor; `heartbeat_at` en çok 15 sn eski olmalı |
-| `succeeded` | Transkript `<doküman>.vtt` olarak yazıldı, medya silindi |
+| `succeeded` | Transkript `<doküman>.vtt` olarak yazıldı (kare işi varsa medya ona kaldı), ya da kareler/betimlemeler yazıldı |
 | `failed` | Kalıcı hata ya da deneme hakkı bitti; `error` nedeni yazar, doküman `failed`, dosyalar silindi |
 | `cancelled` | Eğitmen iptal etti; doküman `failed`, dosyalar silindi |
 
@@ -67,6 +74,18 @@ Bakmak için:
 ```bash
 docker compose exec db psql -U learning learning_assistant -c "SELECT id, document_id, status, attempts, error, heartbeat_at FROM processing_jobs ORDER BY id DESC LIMIT 20"
 ```
+
+## Saklama ve temizlik (#25)
+
+- Yüklenen medya, onu okuyan son iş (transkripsiyon ya da kare işi) bitince silinir; başarısızlık ve iptal dahil.
+- Kare görüntüleri dokümanla yaşar. Gizli bir içerik yakalanmış tek kare `DELETE /api/documents/{id}/frames/{frame_id}`
+  ile silinir.
+- `worker` her `STORAGE_SWEEP_INTERVAL_S` (1 saat; 0 = kapalı) sahipsiz dosyaları siler: dokümanı olmayan
+  `data/uploads/<ders>/<id>[.frames].<uzantı>` ve `frames/<id>` klasörleri, kare işi sürmeyen `frames/<id>.partial` ve
+  `frames/<id>.previous`, hiçbir etkin işin girdisi olmayan ara medya. `STORAGE_ORPHAN_GRACE_S`'ten (1 saat) yeni
+  dosyalara dokunulmaz. Silinenlerin sayısı günlüğe yazılır ("Depolama temizliği: … silindi"). Sembolik bağlantılar
+  izlenmez; `data/uploads` dışına çıkan yol silinmez. Her silme, dokümanın satırı kilitlenip etkin işler yeniden
+  okunduktan sonra yapılır; o an kilitli doküman bir sonraki tura kalır.
 
 ## Kurtarma
 
@@ -79,8 +98,8 @@ docker compose exec db psql -U learning learning_assistant -c "SELECT id, docume
 - **Veritabanı bağlantısı koptu.** Çalıştırıcı hatayı günlüğe yazar ve yoklamaya devam eder. Bağlantı gelince süren iş
   canlılık yazamadıysa yukarıdaki gibi yeniden denenir.
 - **Disk doldu.** Medya parça parça yazılır. Yazma hatası yüklemeyi `5xx` ile bitirir; kayıt geri alınır ve yarım dosya
-  silinir. Yer açıp yeniden yükleyin. Kalmış dosya olup olmadığına bakmak için: dokümanı olmayan
-  `data/uploads/<ders>/<id>.*` dosyaları güvenle silinebilir.
+  silinir. Yer açıp yeniden yükleyin. Kalmış dosyaları çalıştırıcının temizliği bir saat içinde siler (yukarıda); elle
+  de dokümanı olmayan `data/uploads/<ders>/<id>.*` dosyaları güvenle silinebilir.
 - **Migration.** Şema yalnızca `alembic upgrade head` ile değişir (api açılışında çalışır). CI her PR'da boş bir
   veritabanında `upgrade head`, `alembic check` (modellerle migration'lar aynı mı), `downgrade base` ve yeniden
   `upgrade head` çalıştırır.

@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Protocol
 
 from app.core.config import settings
+from app.ingestion.documents import media_duration_error
 from app.ingestion.types import RawSegment
 from app.jobs.queue import JobCancelled
 
@@ -71,6 +72,9 @@ class FasterWhisperTranscriber:
         except Exception as exc:
             logger.exception("Medya çözülemedi: %s", path.name)
             raise TranscriptionError("Medya dosyası çözülemedi.") from exc
+        # Süre segmentler çözülmeden bilinir: sınırı aşan medya saatlerce işlenmeden reddedilir.
+        if too_long := media_duration_error(float(info.duration)):
+            raise TranscriptionError(too_long)
 
         segments: list[RawSegment] = []
         doubtful = 0

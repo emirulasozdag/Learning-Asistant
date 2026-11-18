@@ -425,6 +425,36 @@ OCR diyagramdaki yazıyı okur ama okları, şekli ve yerleşimi yorumlamaz; diy
 
 ---
 
+## ADR-11 — Görsel medya bağlamı: doğrulanmış kare referansı, ayrı kare işleri ve saklama
+
+**Bağlam.** #25 (S05-C): öğrencinin durdurduğu an ve baktığı kare cevaba ve kayda girecek (#26 görsel kanıt, #27
+arayüz). Kare referansı istemciden gelir; başka dersin ya da başka videonun karesine işaret edebilir. Kareler
+transkripsiyon işinin içinde çıkarılıyordu: kare adımının iptali ya da hatası dokümanı bozuyor ya da yalnızca günlükte
+kalıyordu; görsel yorumlama (VLM) için iş yoktu. Çöken işten kalan medya ve geçici klasörler elle temizleniyordu.
+
+**Karar (öneri).**
+- **Referans sunucuda doğrulanır:** `VideoRef { document_id, time_s, frame_id? }`. Kare bu videonun karesi olmalı ve o
+  anda ekranda olmalı (1 sn pay); verilmezse sunucu ekrandaki kareyi seçer. Doğrulanmış bağlam cevaba
+  (`video_context`) ve mesaj kaydına (`meta.video`: kimlikler ve zamanlar; görüntü ve türetilmiş metin değil) yazılır.
+- **Video varlığının kimliği:** doküman kimliği + yüklenen medyanın SHA-256 özeti (`media_sha256`).
+- **Kare işleri ayrıdır** (ADR-9 kuyruğu, yeni kuyruk yok): `frames` (#27'nin işi; yüklenen videoda transkripsiyondan
+  sonra da kuyruğa alınır) ve `frame_interpretation`. Hataları ve iptalleri dokümanı bozmaz. Eğitmen işleri listeler ve
+  tek tek iptal eder.
+- **Yorumlama bir arayüzdür:** `FrameInterpreter` (#24 gerçek yorumlayıcıyı kaydeder). Kayıtlı yorumlayıcı yoksa
+  yorumlama kapalıdır; sahte ya da demo betimleme üretilmez. Betimleme türetilmiştir, kanıt değildir.
+- **Saklama:** medya yalnızca onu okuyan iş bitene kadar; kareler dokümanla; eğitmen tek kareyi silebilir;
+  çalıştırıcı sahipsiz dosyaları düzenli aralıkla siler (yeni dosyalara dokunmadan).
+- **Sınır:** medya ve altyazı süresi `MAX_MEDIA_DURATION_S` (varsayılan 4 saat).
+
+**Sonuçları.** Doküman kareleri beklemeden hazır olur; kare işinin durumu görünür. Medya kare işi bitene kadar biraz
+daha uzun diskte kalır. Kayıttaki kare kimliği kare silinince boşa düşer (bilerek: görüntü kayda kopyalanmaz).
+Hosted bir yorumlayıcı ya da görsel judge, eğitmen beyanının video görüntülerini kapsadığı ekip kararından sonra
+açılmalıdır (ADR-3, ADR-5).
+
+**Durum:** Önerildi · **Karar tarihi:** — · **Katılanlar:** Emir Ulaş Özdağ (@emirulasozdag, öneren)
+
+---
+
 ## Açık sorular
 
 Bunlar ekip ya da dış taraf (eğitmen, bölüm) cevabı bekleyen konulardır. Cevaplanana kadar varsayım yapılmaz.

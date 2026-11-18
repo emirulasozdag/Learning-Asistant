@@ -42,6 +42,17 @@ def validate_media_url(url: str) -> None:
         )
 
 
+def media_duration_error(duration_s: float) -> str | None:
+    """Süre sınırını (`MAX_MEDIA_DURATION_S`, #25) aşan medya ya da altyazı için Türkçe neden;
+    sınır içindeyse None."""
+    limit = settings.max_media_duration_s
+    if duration_s <= limit:
+        return None
+    hours = limit / 3600
+    shown = f"{hours:g} saat" if hours.is_integer() else f"{round(limit / 60)} dakika"
+    return f"Medya süresi {shown} sınırını aşıyor."
+
+
 def validate_upload_fields(filename: str, title: str | None) -> None:
     """Sütuna sığmayan ad/başlık veritabanı hatası (500) yerine anlaşılır 422 olur."""
     if len(Path(filename).name) > MAX_FILENAME_LENGTH:
@@ -130,6 +141,7 @@ def to_document_out(
         transcript_model=document.transcript_model,
         frame_count=frame_count,
         frames_processing=bool(frames_processing),
+        media_sha256=document.media_sha256,
     )
 
 

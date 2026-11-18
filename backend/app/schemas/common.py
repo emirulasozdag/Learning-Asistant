@@ -43,6 +43,20 @@ ErrorCode = Literal[
     # #27: bu dokümana slayt karesi için video eklenemez (video değil, hazır değil, iş sürüyor ya
     # da kare çıkarma kapalı); `detail` nedeni söyler.
     "frames_unavailable",
+    # #25: seçilen kare bu videonun değil ya da durdurulan anda ekranda değil.
+    "invalid_frame",
+    # #25: kare yok ya da başka dokümanın.
+    "frame_not_found",
+    # #25: iş yok ya da başka dokümanın.
+    "job_not_found",
+    # #25: iş bitmiş (iptal edilecek bir şey yok).
+    "job_not_active",
+    # #25: aynı türden bir iş zaten kuyrukta ya da çalışıyor.
+    "job_already_active",
+    # #25: sunucuda kare yorumlayıcısı yapılandırılmamış (FRAME_INTERPRETER).
+    "interpreter_not_configured",
+    # #25: dokümanın yorumlanacak karesi yok.
+    "no_frames",
 ]
 
 

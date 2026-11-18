@@ -6,6 +6,11 @@ işlemde yazılır: doküman "işleniyor" görünüyorsa işi de vardır. Çalı
 
 Kural: uzun adım (transkripsiyon, vektörleştirme) açık bir veritabanı işlemi içinde
 çalışmaz. İş alınır ve işlem kapanır; uzun adım bittikten sonra sonuç kısa bir işlemle yazılır.
+
+İş türleri (#27, #25, ADR-11): `transcription` dokümanın kendisini üretir; başarısız ya da iptal
+olursa doküman `failed` olur ve dosyaları silinir. `frames` ve `frame_interpretation` hazır bir
+dokümana kare ve betimleme ekler; başarısız ya da iptal olurlarsa doküman `ready` kalır, önceki
+kareler korunur, yalnızca o işin girdi medyası silinir.
 """
 
 import logging
@@ -23,11 +28,19 @@ from app.ingestion.documents import document_files, remove_paths
 logger = logging.getLogger(__name__)
 
 TRANSCRIPTION = "transcription"
-# Altyazısı olan videoya sonradan eklenen medya: yalnızca kareler çıkarılır (#27). Doküman hazırdır
-# ve hazır kalır: bu işin hatası ya da iptali dokümanı ve transkriptini bozmaz.
+# Medyadan slayt kareleri (#27, #25): yüklenen videonun transkripsiyonundan sonra aynı medyadan
+# ya da altyazısı olan videoya sonradan eklenen medyadan. Doküman hazırdır ve hazır kalır: bu
+# işin hatası ya da iptali dokümanı ve transkriptini bozmaz.
 FRAMES = "frames"
+# Saklanan karelerin görsel yorumlayıcıyla betimlenmesi (#25, ADR-11).
+FRAME_INTERPRETATION = "frame_interpretation"
+JOB_KINDS = (TRANSCRIPTION, FRAMES, FRAME_INTERPRETATION)
+# Girdisi (yüklenen medya) işe ait olan türler: iş bitince ya da silinince girdi de silinir.
+# Yorumlama işinin girdisi dokümanın kare klasörüdür; dokümanla yaşar.
+_OWNS_INPUT = frozenset({TRANSCRIPTION, FRAMES})
 ACTIVE_STATUSES = ("queued", "running")
 INTERRUPTED_MESSAGE = "İşlem yarıda kaldı; dosyayı yeniden yükleyin."
+INTERPRETATION_INTERRUPTED_MESSAGE = "İşlem yarıda kaldı; yorumlama yeniden başlatılabilir."
 CANCELLED_MESSAGE = "İşlem eğitmen tarafından iptal edildi."
 UNEXPECTED_MESSAGE = "Beklenmeyen bir hata oluştu."
 RETRY_MESSAGE = "Önceki deneme yarıda kaldı; yeniden deneniyor."
@@ -108,7 +121,9 @@ def locked_job(db: Session, job: ClaimedJob) -> ProcessingJob:
 
 
 def settle(db: Session, job: ClaimedJob, status: str, message: str) -> None:
-    """İşi başarısız/iptal olarak bitirir: doküman `failed` olur, dokümanın dosyaları silinir."""
+    """İşi başarısız/iptal olarak bitirir ve türüne göre toparlar (`_after_failure`):
+    transkripsiyonda doküman `failed` olur ve dosyaları silinir; kare işlerinde doküman olduğu
+    gibi kalır."""
     try:
         row = locked_job(db, job)
     except JobSuperseded:
@@ -123,10 +138,10 @@ def settle(db: Session, job: ClaimedJob, status: str, message: str) -> None:
 
 
 def discard(db: Session, job: ClaimedJob) -> None:
-    """Sonucu yazılmayacak deneme. İş satırı da yoksa (doküman silindi) girdi dosyası silinir;
-    iş başka denemeye geçtiyse girdi o denemeye kalır."""
+    """Sonucu yazılmayacak deneme. İş satırı da yoksa (doküman silindi) işe ait girdi dosyası
+    silinir; iş başka denemeye geçtiyse girdi o denemeye kalır."""
     db.rollback()
-    if db.get(ProcessingJob, job.id) is None:
+    if job.kind in _OWNS_INPUT and db.get(ProcessingJob, job.id) is None:
         job.input_path.unlink(missing_ok=True)
     db.rollback()
 
@@ -147,11 +162,24 @@ def retry_later(db: Session, job: ClaimedJob, message: str) -> bool:
     return True
 
 
+def active_job(db: Session, document_id: int, kind: str | None = None) -> ProcessingJob | None:
+    """Dokümanın kuyruktaki ya da çalışan işi (verildiyse yalnızca o türden; varsa)."""
+    query = select(ProcessingJob).where(
+        ProcessingJob.document_id == document_id,
+        ProcessingJob.status.in_(ACTIVE_STATUSES),
+    )
+    if kind is not None:
+        query = query.where(ProcessingJob.kind == kind)
+    return db.scalars(query.order_by(ProcessingJob.id)).first()
+
+
 def request_cancel(db: Session, document: Document) -> bool:
-    """Dokümanın süren işini iptal eder. Etkin iş yoksa False.
+    """Dokümanın süren işini iptal eder (`POST /documents/{id}/cancel`). Etkin iş yoksa False.
 
     Kuyruktaki iş hemen iptal olur. Çalışan iş işaretlenir; çalıştırıcı bir sonraki
-    canlılık kontrolünde (en geç `job_heartbeat_interval_s`) durur ve dokümanı başarısız yapar.
+    canlılık kontrolünde (en geç `job_heartbeat_interval_s`) durur. Transkripsiyonun iptali
+    dokümanı başarısız yapar; kare işlerininki yapmaz (`_after_failure`). Belirli bir işi iptal
+    etmek için `cancel_job`.
     """
     job = db.scalars(
         select(ProcessingJob)
@@ -159,11 +187,32 @@ def request_cancel(db: Session, document: Document) -> bool:
             ProcessingJob.document_id == document.id,
             ProcessingJob.status.in_(ACTIVE_STATUSES),
         )
+        .order_by(ProcessingJob.id)
         .with_for_update()
     ).first()
     if job is None:
         db.rollback()
         return False
+    _cancel(db, job)
+    return True
+
+
+def cancel_job(db: Session, job_id: int) -> bool:
+    """Herhangi bir türdeki işi iptal eder (#25). İş yoksa ya da bitmişse False.
+
+    Kuyruktaki iş hemen biter ve türüne göre toparlanır; çalışan iş işaretlenir ve çalıştırıcı
+    bir sonraki canlılık kontrolünde durur. Transkripsiyonun iptali dokümanı da başarısız yapar.
+    """
+    job = db.get(ProcessingJob, job_id, with_for_update=True, populate_existing=True)
+    if job is None or job.status not in ACTIVE_STATUSES:
+        db.rollback()
+        return False
+    _cancel(db, job)
+    return True
+
+
+def _cancel(db: Session, job: ProcessingJob) -> None:
+    """Kilitli, etkin işi iptal eder ve işlemi kapatır."""
     files: list[Path] = []
     if job.status == "queued":
         job.status = "cancelled"
@@ -174,7 +223,6 @@ def request_cancel(db: Session, document: Document) -> bool:
         job.cancel_requested = True
     db.commit()
     _remove(files)
-    return True
 
 
 def recover_stale(db: Session) -> tuple[int, int]:
@@ -195,7 +243,7 @@ def recover_stale(db: Session) -> tuple[int, int]:
     files: list[Path] = []
     for job in stale:
         if job.cancel_requested or job.attempts >= settings.job_max_attempts:
-            message = CANCELLED_MESSAGE if job.cancel_requested else INTERRUPTED_MESSAGE
+            message = CANCELLED_MESSAGE if job.cancel_requested else _interrupted(job.kind)
             job.status = "cancelled" if job.cancel_requested else "failed"
             job.error = message
             job.finished_at = func.now()
@@ -224,24 +272,24 @@ def recover_stale(db: Session) -> tuple[int, int]:
     return requeued, failed
 
 
-def active_job(db: Session, document_id: int) -> ProcessingJob | None:
-    """Dokümanın kuyruktaki ya da çalışan işi (varsa)."""
-    return db.scalars(
-        select(ProcessingJob).where(
-            ProcessingJob.document_id == document_id,
-            ProcessingJob.status.in_(ACTIVE_STATUSES),
-        )
-    ).first()
+def _interrupted(kind: str) -> str:
+    if kind == FRAME_INTERPRETATION:
+        return INTERPRETATION_INTERRUPTED_MESSAGE
+    return INTERRUPTED_MESSAGE
 
 
 def _after_failure(db: Session, job: ProcessingJob, message: str) -> list[Path]:
     """Başarısız / iptal edilen işin sonucu; commit'ten sonra silinecek dosyalar.
 
-    Transkripsiyonda doküman `failed` olur. Kare işinde (`FRAMES`) doküman hazır kalır; yalnızca
-    işin girdi medyası silinir (#27).
+    - transcription: doküman `failed` olur, dokümanın bütün dosyaları silinir.
+    - frames: doküman hazır kalır, önceki kareler korunur; işin girdi medyası silinir (#27, #25:
+      kare çıkarılamayan medya saklanmaz).
+    - frame_interpretation: hiçbir şey silinmez; kareler ve önceki betimlemeler kalır.
     """
     if job.kind == FRAMES:
         return [Path(job.input_path)]
+    if job.kind == FRAME_INTERPRETATION:
+        return []
     return _fail_document(db, job.document_id, message)
 
 

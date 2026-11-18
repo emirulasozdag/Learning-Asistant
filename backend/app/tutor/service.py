@@ -25,6 +25,8 @@ from app.qa.service import (
     conversation_history,
     get_conversation,
     research_logging_now,
+    video_context,
+    video_trace,
 )
 from app.schemas.tutor import (
     ClarificationBlock,
@@ -86,6 +88,8 @@ def turn_stream(
         )
         meta = {
             **_summary(ctx),
+            # #25: turun doğrulanmış video bağlamı (kaynaklı cevap olmasa da kaydedilir).
+            "video": video_trace(video_context(db, request.video)),
             "tutor": True,
             "blocks": [block.model_dump(mode="json") for block in ctx.blocks],
             "trace": trace.model_dump(mode="json"),

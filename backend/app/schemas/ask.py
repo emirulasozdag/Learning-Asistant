@@ -2,24 +2,31 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from app.schemas.common import Citation
+from app.schemas.common import Citation, DbId
+from app.schemas.sources import FrameRef
 
 
 class VideoRef(BaseModel):
     """Öğrencinin izlediği ders videosu ve durdurduğu an.
 
     `document_id`: videonun `Document` kimliği (zaman damgası değil, kimlik videoyu ayırt eder).
-    `time_s`: videonun başından itibaren saniye.
+    `time_s`: videonun başından itibaren saniye. Sonlu olmalı (`inf`/`nan` 422); süreyi aşan
+    değer hata değildir, sunucu videonun süresine kırpar.
+    `frame_id`: [ekleme, #25] öğrencinin baktığı kare (`FrameRef.frame_id`). Sunucu karenin bu
+    videoya ait olduğunu ve `time_s` anında ekranda olduğunu doğrular (değilse 422
+    `invalid_frame`). Verilmezse sunucu o anda ekrandaki kareyi seçer (kare yoksa boş kalır).
     """
 
-    document_id: int
-    time_s: float = Field(ge=0)
+    document_id: DbId
+    time_s: float = Field(ge=0, allow_inf_nan=False)
+    frame_id: DbId | None = None
 
 
 class AskRequest(BaseModel):
     """Grounded Q&A isteği. video: öğrencinin izlediği video ve durdurduğu an (isteğe bağlı).
 
-    Oynatma konumu önceliği henüz uygulanmadı (#14'ün sonraki PR'ları); alan kabul edilir.
+    Video verilirse durdurulan anın bölümü cevabın başına sabitlenir (#102) ve doğrulanmış
+    bağlam (`AskResponse.video_context`) mesaj kaydına yazılır (#25).
     """
 
     course_id: int
@@ -97,6 +104,22 @@ class VideoMomentOut(BaseModel):
     deictic: bool = False
 
 
+class VideoContextOut(BaseModel):
+    """[ekleme, #25] İsteğin doğrulanmış video bağlamı: hangi video varlığı, hangi an, hangi kare.
+
+    Yalnızca istekte `video` verildiyse dolar. `time_s` videonun süresine kırpılmış konumdur;
+    `frame` o anda ekrandaki (ya da öğrencinin seçtiği) karedir, kare çıkarılmadıysa None.
+    Karenin `text`/`description` alanları türetilmiştir; kanıt kuralları #26'dadır.
+    """
+
+    document_id: int
+    # Medya dosyasının SHA-256 özeti (altyazıyla yüklenen videoda None).
+    media_sha256: str | None = None
+    duration_s: float | None = None
+    time_s: float
+    frame: FrameRef | None = None
+
+
 class AskResponse(BaseModel):
     """Cite-or-decline cevabı: ya alıntılı cevap ya da gerekçeli reddetme.
 
@@ -130,3 +153,5 @@ class AskResponse(BaseModel):
     claim_check: ClaimCheck | None = None
     # [ekleme, #102] Video durdurulmuşsa cevabın başına sabitlenen bölüm; yoksa None.
     video_moment: VideoMomentOut | None = None
+    # [ekleme, #25] İstekte video verildiyse doğrulanmış video bağlamı; yoksa None.
+    video_context: VideoContextOut | None = None

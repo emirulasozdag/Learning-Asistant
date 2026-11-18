@@ -276,6 +276,21 @@ def extract_frames(
     ]
 
 
+def media_duration(media_path: Path) -> float | None:
+    """Medya kabının bildirdiği süre (saniye); kap süre bildirmiyorsa None (#25: süre sınırı).
+    Dosya açılamazsa `FrameExtractionError`."""
+    import av
+
+    try:
+        with av.open(str(media_path)) as container:
+            if container.duration is None:
+                return None
+            return container.duration / av.time_base
+    except Exception as exc:
+        logger.exception("Medya süresi okunamadı: %s", media_path.name)
+        raise FrameExtractionError("Video dosyası açılamadı.") from exc
+
+
 def _video_stream(container: Any) -> Any:
     """Gerçek video akışı; ses dosyalarındaki kapak resmi (attached picture) sayılmaz."""
     import av
