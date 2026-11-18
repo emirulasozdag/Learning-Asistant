@@ -7,7 +7,7 @@ from collections.abc import Iterator
 
 from pydantic import BaseModel
 
-from app.llm.base import ChatMessage
+from app.llm.base import ChatMessage, ContentPart
 from app.llm.openrouter import OpenRouterLLMClient
 from app.llm.routing import LocalRouteUnavailable
 
@@ -34,6 +34,12 @@ class LocalLLMClient:
     def configured(self) -> bool:
         return self._client is not None
 
+    @property
+    def accepts_images(self) -> bool:
+        """Görüntü yalnızca yapılandırılmış yerel modele gider; modelin görüntü desteği yoksa
+        uç nokta reddeder ve `ImageInputUnsupported` olur (#26)."""
+        return self._client is not None
+
     def stream_text(self, system: str, messages: list[ChatMessage]) -> Iterator[str]:
         if self._client is None:
             raise LocalRouteUnavailable(NOT_CONFIGURED)
@@ -43,3 +49,10 @@ class LocalLLMClient:
         if self._client is None:
             raise LocalRouteUnavailable(NOT_CONFIGURED)
         return self._client.complete_json(system, prompt, schema)
+
+    def complete_json_with_images[T: BaseModel](
+        self, system: str, parts: list[ContentPart], schema: type[T]
+    ) -> T:
+        if self._client is None:
+            raise LocalRouteUnavailable(NOT_CONFIGURED)
+        return self._client.complete_json_with_images(system, parts, schema)

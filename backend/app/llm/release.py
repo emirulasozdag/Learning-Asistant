@@ -15,7 +15,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from app.llm.base import ChatMessage, ToolCall, ToolSpec
+from app.llm.base import ChatMessage, ContentPart, ImageInputUnsupported, ToolCall, ToolSpec
 
 Release = Callable[[], None]
 
@@ -35,6 +35,17 @@ class ReleasingClient:
     def complete_json[T: BaseModel](self, system: str, prompt: str, schema: type[T]) -> T:
         self._release()
         return self._inner.complete_json(system, prompt, schema)
+
+    def complete_json_with_images[T: BaseModel](
+        self, system: str, parts: list[ContentPart], schema: type[T]
+    ) -> T:
+        # `accepts_images` sarılan istemciden okunur (`__getattr__`); yöntemi olmayan istemcide
+        # görüntü gönderilmez.
+        inner = getattr(self._inner, "complete_json_with_images", None)
+        if inner is None:
+            raise ImageInputUnsupported(f"{self._inner.model} görüntü girdisi kabul etmiyor.")
+        self._release()
+        return inner(system, parts, schema)
 
     def tool_conversation(
         self, system: str, messages: list[ChatMessage], tools: list[ToolSpec]
