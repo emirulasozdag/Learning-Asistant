@@ -14,7 +14,7 @@ from app.llm.gateway import resolve_judge
 from app.retrieval.hybrid import retrieve
 from app.retrieval.rerank import rerank
 from app.retrieval.types import RetrievalResult, VideoPosition
-from app.schemas.ask import AskRequest, AskResponse, RetrievalHit, VideoRef
+from app.schemas.ask import AskRequest, AskResponse, RetrievalHit, VideoMomentOut, VideoRef
 
 # LLM'e verilen önceki soru-cevap sayısı.
 HISTORY_TURNS = 3
@@ -164,12 +164,16 @@ def answer_stream(
     )
     if release is not None:
         release()
+    # Durdurulan andaki bölüm (#102) yeniden sıralamaya girmez, her zaman başta kalır.
+    moment = retrieval.video_moment
+    pinned = [p for p in retrieval.passages if moment and p.source_id in moment.source_ids]
+    others = [p for p in retrieval.passages if not moment or p.source_id not in moment.source_ids]
     if use_rerank and retrieval.relevant:
         assert reranker is not None
         query = f"{question}\n({search_query})" if search_query else question
-        retrieval.passages = rerank(query, retrieval.passages, reranker, settings.tutor_rerank_keep)
+        retrieval.passages = pinned + rerank(query, others, reranker, settings.tutor_rerank_keep)
     elif use_rerank:
-        retrieval.passages = retrieval.passages[:5]
+        retrieval.passages = pinned + others[:5]
     yield RetrievalEvent(_hits(retrieval, cited=set()))
 
     judge, judge_error = (None, None)
@@ -178,7 +182,7 @@ def answer_stream(
     response: AskResponse | None = None
     for item in stream_answer(
         course,
-        question,
+        _with_moment(question, retrieval),
         history,
         retrieval,
         llm,
@@ -194,6 +198,14 @@ def answer_stream(
 
     cited = {c.source_id for c in response.citations}
     response.retrieval = _hits(retrieval, cited)
+    if moment is not None:
+        response.video_moment = VideoMomentOut(
+            document_id=moment.document_id,
+            document_title=moment.document_title,
+            t_start=moment.t_start,
+            t_end=moment.t_end,
+            deictic=retrieval.deictic,
+        )
     response.similarity_threshold = settings.retrieval_min_similarity
     response.best_similarity = retrieval.best_similarity
     yield DoneEvent(response, retrieval)
@@ -262,6 +274,34 @@ def _hits(retrieval: RetrievalResult, cited: set[str]) -> list[RetrievalHit]:
             dense_score=round(p.dense_score, 4) if p.dense_score is not None else None,
             lexical_rank=p.lexical_rank,
             used=p.source_id in cited,
+            video_moment=bool(
+                retrieval.video_moment and p.source_id in retrieval.video_moment.source_ids
+            ),
         )
         for p in retrieval.passages
     ]
+
+
+def _with_moment(question: str, retrieval: RetrievalResult) -> str:
+    """Modele, öğrencinin videoyu nerede durdurduğunu söyler (#102): "burası" o bölümdür.
+    Öğrenciye gösterilen soru değişmez; yalnızca üretim isteminde kullanılır."""
+    moment = retrieval.video_moment
+    if moment is None:
+        return question
+    span = f"{_clock(moment.t_start)}–{_clock(moment.t_end)}"
+    note = (
+        f'(Öğrenci "{moment.document_title}" videosunu {span} aralığında izlerken durdurdu; '
+        "ilk kaynaklar o anda anlatılan bölümdür."
+    )
+    if retrieval.deictic:
+        note += (
+            ' Sorudaki "burası, bu kısım, bunu" gibi ifadeler bu bölümü kasteder; önce onu açıkla.'
+        )
+    return f"{question}\n\n{note})"
+
+
+def _clock(seconds: float) -> str:
+    total = int(seconds)
+    hours, rest = divmod(total, 3600)
+    minutes, secs = divmod(rest, 60)
+    return f"{hours}:{minutes:02}:{secs:02}" if hours else f"{minutes}:{secs:02}"

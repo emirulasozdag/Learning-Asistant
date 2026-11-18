@@ -71,6 +71,18 @@ export interface RetrievalHit {
   /** Kelime aramasındaki sıra (1 = en iyi). */
   lexical_rank: number | null;
   used: boolean;
+  /** Öğrencinin durdurduğu andaki video bölümünden (cevabın başına sabitlenir, #102). */
+  video_moment?: boolean;
+}
+
+/** Cevabın dayandığı, öğrencinin durdurduğu andaki video bölümü (#102). */
+export interface VideoMoment {
+  document_id: number;
+  document_title: string;
+  t_start: number;
+  t_end: number;
+  /** Soru o anı işaret ediyordu ("burayı anlamadım"); arama o bölümün metniyle yapıldı. */
+  deictic: boolean;
 }
 
 /**
@@ -123,6 +135,8 @@ export interface AskResponse {
   model: string | null;
   /** İddia kontrolü; model cevap yazmadıysa null. */
   claim_check?: ClaimCheck | null;
+  /** Video durdurulmuşsa cevabın başına sabitlenen bölüm (#102). */
+  video_moment?: VideoMoment | null;
 }
 
 /**

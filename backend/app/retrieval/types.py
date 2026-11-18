@@ -30,6 +30,18 @@ class RetrievedPassage:
 
 
 @dataclass
+class VideoMoment:
+    """Cevabın başına sabitlenen, durdurulan andaki video bölümü (#102)."""
+
+    document_id: int
+    document_title: str
+    t_start: float
+    t_end: float
+    # Bölümün parçaları (cevabın ilk kaynakları).
+    source_ids: list[str] = field(default_factory=list)
+
+
+@dataclass
 class RetrievalResult:
     """Birleştirilmiş sonuç + sorunun dersle ilgili sayılıp sayılmadığı."""
 
@@ -41,3 +53,7 @@ class RetrievalResult:
     keyword_coverage: float | None = None
     # Soru tek başına kapıdan geçemedi, önceki soruyla birlikte geçti (eksik takip sorusu).
     admitted_by_context: bool = False
+    # Öğrenci videoyu durdurmuşsa o anda anlatılan bölüm; parçaları `passages`ın başındadır.
+    video_moment: VideoMoment | None = None
+    # Soru durdurulan anı işaret ediyordu ("burayı anlamadım"); arama o bölümün metniyle yapıldı.
+    deictic: bool = False

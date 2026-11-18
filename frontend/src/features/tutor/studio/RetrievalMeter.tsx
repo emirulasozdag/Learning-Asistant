@@ -13,8 +13,12 @@ function hitLocation(hit: RetrievalHit): string {
 }
 
 /** Bir parçanın durumu: cevapta kullanıldı mı, anlamsal eşiğin altında mı kaldı. */
-function hitStatus(hit: RetrievalHit, threshold: number | null): "used" | "below" | "above" | "keyword" {
+function hitStatus(
+  hit: RetrievalHit,
+  threshold: number | null,
+): "used" | "moment" | "below" | "above" | "keyword" {
   if (hit.used) return "used";
+  if (hit.video_moment) return "moment";
   if (hit.dense_score == null) return "keyword";
   if (threshold != null && hit.dense_score < threshold) return "below";
   return "above";
@@ -22,6 +26,7 @@ function hitStatus(hit: RetrievalHit, threshold: number | null): "used" | "below
 
 const STATUS_LABEL = {
   used: "kullanıldı",
+  moment: "durdurulan an",
   below: "eşik altı",
   above: "eşik üstü",
   keyword: "kelime eşleşmesi",

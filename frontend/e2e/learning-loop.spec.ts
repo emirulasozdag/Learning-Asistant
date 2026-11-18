@@ -411,6 +411,8 @@ async function mockVideoAnswer(page: Page, videoId: number): Promise<{ video?: u
       similarity_threshold: null,
       best_similarity: null,
       model: "gemini-3.8-flash",
+      // Backend durdurulan anın bölümünü bildirir (#102).
+      video_moment: { document_id: videoId, document_title: "E2E ders videosu", t_start: 125, t_end: 180, deictic: true },
     },
   };
   await page.route("**/api/tutor/turn/stream", async (route) => {
@@ -497,6 +499,16 @@ test.describe("ders videosu", () => {
     await expect.poll(() => turns.length).toBe(1);
     expect(turns[0].video).toEqual({ document_id: videoId, time_s: 30 });
 
+    // Cevap durdurulan anın bölümüne dayanır ve bunu söyler; kaynak "video" olarak sayılır (#102).
+    await expect(page.getByText("Sorunu videonun 2:05–3:00 kısmına göre anladım")).toBeVisible();
+    await expect(page.getByText("1 video", { exact: true })).toBeVisible();
+    await expect(page.getByText(/\d+ belge/)).toHaveCount(0);
+    await page.getByRole("button", { name: "Videoda 2:05–3:00 kısmına git" }).click();
+    await expect(page.getByText("Soruların videonun 2:05 anıyla birlikte gider")).toBeVisible();
+
+    await page.getByRole("button", { name: "Videoyu kapat" }).click();
+    await page.goto(`/student/courses/${algorithms.id}/tutor?video=${videoId}&t=30`);
+    await ask(page, "Burada neden yarıya iniyor?");
     await page.getByRole("list", { name: /Cevabın iddiaları/ }).getByRole("button").first().click();
     await page.getByRole("button", { name: "Videoda bu ana git" }).click();
     await expect(page.getByText("Soruların videonun 2:05 anıyla birlikte gider")).toBeVisible();

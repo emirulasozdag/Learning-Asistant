@@ -43,6 +43,8 @@ class RetrievalHit(BaseModel):
     lexical_rank: int | None = None
     # Cevapta alıntılandı mı?
     used: bool = False
+    # [ekleme, #102] Öğrencinin durdurduğu andaki video bölümünden mi (cevabın başına sabitlenir)?
+    video_moment: bool = False
 
 
 # Cevabın nasıl sonuçlandığı (arayüz her birine farklı mesaj gösterebilir):
@@ -84,6 +86,17 @@ class ClaimCheck(BaseModel):
     error: str | None = Field(default=None, exclude=True)
 
 
+class VideoMomentOut(BaseModel):
+    """[ekleme, #102] Cevabın dayandığı, öğrencinin durdurduğu andaki video bölümü."""
+
+    document_id: int
+    document_title: str
+    t_start: float
+    t_end: float
+    # Soru o anı işaret ediyordu ("burayı anlamadım"); arama o bölümün metniyle yapıldı.
+    deictic: bool = False
+
+
 class AskResponse(BaseModel):
     """Cite-or-decline cevabı: ya alıntılı cevap ya da gerekçeli reddetme.
 
@@ -115,3 +128,5 @@ class AskResponse(BaseModel):
     model: str | None = None
     # [ekleme, #10] İddia kontrolü; model cevap yazmadıysa (ret, LLM'siz mod) None.
     claim_check: ClaimCheck | None = None
+    # [ekleme, #102] Video durdurulmuşsa cevabın başına sabitlenen bölüm; yoksa None.
+    video_moment: VideoMomentOut | None = None

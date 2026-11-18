@@ -16,6 +16,7 @@ from pydantic import ValidationError
 
 from app.core.config import settings
 from app.llm.base import LLMError, LLMUsage, ToolCallingClient
+from app.retrieval.video_time import is_deictic
 from app.schemas.tutor import (
     ClarificationBlock,
     CourseAnswerBlock,
@@ -70,7 +71,9 @@ cümlesi olarak yaz (anahtar kelime listesi değil).
 3. answer_from_course "not_covered" dönerse: soru dersin alanı içindeyse ve explain_general \
 araç listesindeyse explain_general çağır; değilse finish.
 4. Mesaj, önceki konuşmayla bile ne sorulduğu anlaşılmayacak kadar belirsizse → \
-ask_clarification.
+ask_clarification. <video> etiketi varsa "burası", "bunu", "anlamadım" gibi mesajlar belirsiz \
+değildir: öğrenci videonun durdurduğu anda anlatılanı soruyor → answer_from_course; `question` \
+alanını öğrencinin sözleriyle bırak.
 5. Öğrenci soru, test, alıştırma ya da kendini sınamak isterse → generate_practice. Konu \
 belirtilmediyse konuşmadaki son ders konusunu kullan; tür belirtilmediyse mcq. \
 generate_practice araç listesinde yoksa reply_notice(unavailable).
@@ -90,6 +93,11 @@ def run_turn(
     """Turu yürütür; olayları akıtır, bitince izini (trace) döndürür. Bloklar `ctx.blocks`'ta."""
     if orchestrator is None:
         trace = TurnTrace(mode="direct", fallback_reason="no_orchestrator")
+        yield from _direct(ctx)
+    elif ctx.video is not None and is_deictic(ctx.message):
+        # "Burayı anlamadım" + durdurulmuş video (#102): belirsiz değildir, o anda anlatılanı
+        # sorar. Model netleştirme istemesin diye doğrudan kaynaklı cevap hattına gider.
+        trace = TurnTrace(mode="direct", fallback_reason="video_moment")
         yield from _direct(ctx)
     else:
         trace = TurnTrace(mode="orchestrated", orchestrator_model=orchestrator.model)
@@ -171,7 +179,7 @@ def _user_prompt(ctx: TurnContext) -> str:
         minutes, seconds = divmod(int(ctx.video.time_s), 60)
         parts.append(
             f"<video>Öğrenci bir ders videosunu {minutes}:{seconds:02d} anında durdurdu; "
-            "answer_from_course bu konumu kullanır.</video>"
+            "answer_from_course o anda anlatılan bölümü kaynak olarak kullanır.</video>"
         )
     return "\n".join(parts)
 
