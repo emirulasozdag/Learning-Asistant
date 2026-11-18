@@ -349,6 +349,24 @@ def test_activity_items_carry_the_answer_message_id(db, client_for, setup) -> No
     assert {q["answer_message_id"] for q in activity["recent_questions"]} == {a.id for a in answers}
 
 
+def test_activity_items_carry_the_latest_review_decision(db, client_for, setup) -> None:
+    # #105: onay/düzeltme kararı sayfa yenilenince de görünür; son karar geçerlidir.
+    s = setup
+    answers = [conversation_with_answer(db, s, student) for student in s.students]
+    instructor = client_for(s.instructor)
+    review(instructor, "message", answers[0].id, "approve")
+    review(instructor, "message", answers[0].id, "correct", "Sıralı dizi şartı eksik.")
+    review(instructor, "message", answers[1].id, "approve")
+
+    activity = instructor.get(f"/instructor/courses/{s.course.id}/activity").json()
+
+    by_id = {q["answer_message_id"]: q["latest_review"] for q in activity["recent_questions"]}
+    assert by_id[answers[0].id]["decision"] == "correct"
+    assert by_id[answers[0].id]["correction"] == "Sıralı dizi şartı eksik."
+    assert by_id[answers[1].id]["decision"] == "approve"
+    assert by_id[answers[2].id] is None
+
+
 def test_instructor_lists_practice_items_with_key_and_latest_review(db, client_for, setup) -> None:
     s = setup
     released = mcq_question(db, s, "ikili arama adımı")

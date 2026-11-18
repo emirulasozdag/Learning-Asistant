@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.db.models import Chunk, Document, VideoFrame
 from app.ingestion.documents import document_media_url, file_url
-from app.ingestion.rendering import find_highlights, is_pdf
+from app.ingestion.rendering import find_highlights, is_pdf, pdf_on_disk
 from app.retrieval.frames import frames_overlapping
 from app.schemas.common import PG_INT_MAX
 from app.schemas.materials import MaterialType
@@ -38,6 +38,8 @@ def source_detail(db: Session, chunk: Chunk) -> SourceDetail:
     source_id = str(chunk.id)
     document = chunk.document
     pdf = is_pdf(document) and chunk.page is not None
+    # Dosya diskte yoksa sayfa görüntüsü verilmez; arayüz alıntı metnini gösterir (#105).
+    page_view = pdf and pdf_on_disk(document)
     return SourceDetail(
         source_id=source_id,
         course_id=document.course_id,
@@ -55,10 +57,10 @@ def source_detail(db: Session, chunk: Chunk) -> SourceDetail:
         ),
         page_image_url=(
             f"{settings.public_api_prefix}/documents/{document.id}/pages/{chunk.page}.png"
-            if pdf
+            if page_view
             else None
         ),
-        highlights=find_highlights(document, chunk.page, chunk.text) if pdf else [],
+        highlights=find_highlights(document, chunk.page, chunk.text) if page_view else [],
         alternatives=(
             document_alternatives(db, chunk) if document.material_type == MaterialType.VIDEO else []
         ),

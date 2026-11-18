@@ -16,8 +16,22 @@ from datetime import UTC, date, datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.db.models import Chunk, Conversation, Document, Enrollment, Message, User
-from app.schemas.instructor import CourseActivity, DailyCount, QuestionItem, SourceUsage
+from app.db.models import (
+    Chunk,
+    Conversation,
+    Document,
+    Enrollment,
+    InstructorReview,
+    Message,
+    User,
+)
+from app.schemas.instructor import (
+    CourseActivity,
+    DailyCount,
+    LatestReview,
+    QuestionItem,
+    SourceUsage,
+)
 
 # Grafikteki gün sayısı ve listelerin uzunlukları.
 DAYS = 14
@@ -85,6 +99,9 @@ def course_activity(db: Session, course_id: int, today: date | None = None) -> C
     unanswered = [
         p for p in newest_first if p[0].outcome in {"insufficient_evidence", "unsupported"}
     ]
+    recent = _group_safe(newest_first[:RECENT])
+    open_questions = _group_safe(unanswered[:UNANSWERED])
+    _attach_reviews(db, [*recent, *open_questions])
     return CourseActivity(
         questions=len(questions),
         conversations=len(conversations),
@@ -94,9 +111,30 @@ def course_activity(db: Session, course_id: int, today: date | None = None) -> C
         unavailable=outcomes["provider_failure"] + outcomes["verification_failure"],
         daily=_daily(questions, today),
         top_sources=_top_sources(db, citations),
-        recent_questions=_group_safe(newest_first[:RECENT]),
-        unanswered_questions=_group_safe(unanswered[:UNANSWERED]),
+        recent_questions=recent,
+        unanswered_questions=open_questions,
     )
+
+
+def _attach_reviews(db: Session, items: list[QuestionItem]) -> None:
+    """Gösterilen her cevaba eğitmenin son kararı (#105); yenileyince kaybolmaz."""
+    ids = {item.answer_message_id for item in items if item.answer_message_id is not None}
+    if not ids:
+        return
+    reviews = db.scalars(
+        select(InstructorReview)
+        .where(InstructorReview.message_id.in_(ids))
+        .order_by(InstructorReview.id)
+    ).all()
+    latest = {review.message_id: review for review in reviews}
+    for item in items:
+        review = latest.get(item.answer_message_id)
+        if review is not None:
+            item.latest_review = LatestReview(
+                decision=review.decision,  # type: ignore[arg-type]
+                correction=review.correction,
+                created_at=review.created_at,
+            )
 
 
 def _empty(today: date) -> CourseActivity:

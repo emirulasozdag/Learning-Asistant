@@ -232,9 +232,10 @@ def independent_solve(
             agreement.equivalent,
             "" if agreement.equivalent else f"çözüm referansla uyuşmuyor: {agreement.reason}",
         )
-    except LLMError as exc:
-        # Kontrol yapılamadıysa soru geçmiş sayılmaz.
-        return CheckResult("independent_solve", False, f"kontrol yapılamadı: {exc}")
+    except LLMError:
+        # Kontrol yapılamadı (sağlayıcı yoğun, kota): bu sorunun kusuru değildir. Reddedilen aday
+        # sayılmaz ve hata metni üreticiye geri beslenmez; çağıran karar verir (#105).
+        raise
 
 
 def _light(text: str) -> str:

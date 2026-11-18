@@ -367,6 +367,28 @@ test.describe("eğitmen", () => {
     ]);
   });
 
+  test("etkinlik: kayıtlı karar yenileyince görünür; boş etkinliğin nedeni söylenir", async ({ page }) => {
+    const algorithms = course("A");
+    const saved = activity();
+    saved.recent_questions[1] = {
+      ...saved.recent_questions[1],
+      latest_review: { decision: "correct", correction: "Sıralı dizi şartı eksik.", created_at: new Date().toISOString() },
+    } as (typeof saved.recent_questions)[number];
+    let body: object = saved;
+    await page.route(`**/api/instructor/courses/${algorithms.id}/activity`, (route) => route.fulfill(json(body)));
+
+    await page.goto(`/instructor/courses/${algorithms.id}/activity`);
+    await expect(page.getByText("Düzeltmen kaydedildi")).toBeVisible();
+    await expect(page.getByText("“Sıralı dizi şartı eksik.”")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Cevabı düzelt: Dizi sıralı değilse ne olur?" })).toHaveCount(0);
+
+    // Sayılar sıfırsa "hiç soru yok" denmez: kayıt ve en az üç öğrenci kuralı açıklanır (#105).
+    body = { ...activity(), questions: 0, recent_questions: [] };
+    await page.reload();
+    await expect(page.getByText("Gösterilecek etkinlik yok")).toBeVisible();
+    await expect(page.getByText(/en az üç farklı öğrenci/)).toBeVisible();
+  });
+
   test("inceleme dar ekranda taşmadan kullanılır @dar-ekran", async ({ page }) => {
     const algorithms = course("A");
     await page.route(`**/api/instructor/courses/${algorithms.id}/practice-items`, (route) =>

@@ -67,11 +67,13 @@ function ActivityBody() {
   }
   if (!activity) return <SkeletonRows rows={4} />;
   if (activity.questions === 0) {
+    // Sıfır "hiç soru yok" demek değildir: analitik yalnızca araştırma kaydını açan öğrencilerden
+    // ve en az üç kişi olunca hesaplanır (ADR-4). Kaç kişinin sorduğu söylenmez (#105).
     return (
       <EmptyState
         icon={MessageSquareText}
-        title="Henüz soru sorulmadı"
-        description="Öğrenciler AI Tutor'a soru sordukça sayılar, sık kullanılan kaynaklar ve materyalde bulunamayan sorular burada görünür."
+        title="Gösterilecek etkinlik yok"
+        description="Etkinlik yalnızca araştırma kaydını açan öğrencilerin sorularından ve en az üç farklı öğrenci soru sorduğunda gösterilir; böylece kimse tek başına ayırt edilemez. Öğrenciler soru sordukça sayılar, sık kullanılan kaynaklar ve materyalde bulunamayan sorular burada görünür."
       />
     );
   }
@@ -112,7 +114,7 @@ function ActivityBody() {
 
 /**
  * Soru listeleri: her sorunun yanında asistanın cevabını onaylama ya da düzeltme (#20, #22).
- * Karar yalnızca bu oturumda işaretlenir; kayıt sunucuda tutulur.
+ * Sunucudaki son karar (`latest_review`) gösterilir; bu oturumda verilen karar onun yerine geçer.
  */
 function ReviewableQuestions({ activity }: { activity: CourseActivity }) {
   const toast = useToast();
@@ -324,12 +326,16 @@ function QuestionList({ items, empty, review }: { items: QuestionItem[]; empty: 
 }
 
 function ReviewActions({ messageId, item, review }: { messageId: number; item: QuestionItem; review: ReviewControls }) {
-  const decision = review.decisions[messageId];
+  const decision = review.decisions[messageId] ?? item.latest_review?.decision;
   if (decision) {
+    const correction = review.decisions[messageId] ? null : item.latest_review?.correction;
     return (
-      <p className={cx("mt-1 flex items-center gap-1.5 text-sm", decision === "approve" ? "text-success" : "text-warning")}>
-        <CircleCheck size={13} aria-hidden />
-        {decision === "approve" ? "Cevabı onayladın" : "Düzeltmen kaydedildi"}
+      <p className={cx("mt-1 flex items-start gap-1.5 text-sm", decision === "approve" ? "text-success" : "text-warning")}>
+        <CircleCheck size={13} aria-hidden className="mt-0.5 shrink-0" />
+        <span>
+          {decision === "approve" ? "Cevabı onayladın" : "Düzeltmen kaydedildi"}
+          {correction && <span className="text-ink-2"> “{correction}”</span>}
+        </span>
       </p>
     );
   }

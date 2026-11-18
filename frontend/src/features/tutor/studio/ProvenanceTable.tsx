@@ -5,9 +5,9 @@ import { formatTimeRange } from "../../../text";
 const DATE = new Intl.DateTimeFormat("tr-TR", { day: "2-digit", month: "2-digit", year: "numeric" });
 
 /**
- * Kaynağın künyesi (teknik çizimdeki antet gibi): hangi dersin hangi belgesi, hangi sayfa ya da
- * an, kim onayladı. Materyali yalnızca dersin eğitmeni yükler ve yükleme onay sayılır, bu yüzden
- * onay tarihi belgenin yüklendiği gündür.
+ * Kaynağın künyesi (teknik çizimdeki antet gibi): hangi dersin hangi dokümanı, hangi sayfa ya da
+ * an, dersin eğitmeni ve dokümanın eklendiği gün. Ayrı bir onay kaydı yoktur; bu yüzden "onay"
+ * ya da "onaylayan" denmez (#105).
  */
 export default function ProvenanceTable({
   course,
@@ -29,8 +29,8 @@ export default function ProvenanceTable({
     { label: "Ders", value: course.code },
     { label: "Doküman", value: source.document_title },
     ...(where ? [where] : []),
-    { label: "Onaylayan", value: course.instructor_name ?? "Ders eğitmeni", wide: true },
-    { label: "Onay", value: document ? DATE.format(new Date(document.created_at)) : "Onaylı materyal" },
+    { label: "Dersin eğitmeni", value: course.instructor_name ?? "—", wide: true },
+    ...(document ? [{ label: "Eklendi", value: DATE.format(new Date(document.created_at)) }] : []),
   ];
 
   return (

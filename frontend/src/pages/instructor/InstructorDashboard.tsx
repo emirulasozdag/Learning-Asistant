@@ -77,6 +77,8 @@ export default function InstructorDashboard() {
             {
               label: "Öğrenci sorusu",
               value: courses.reduce((sum, course) => sum + (activities[course.id]?.questions ?? 0), 0),
+              // Sıfır "soru yok" demek olmayabilir: yalnızca kaydı açık, en az üç öğrenci sayılır (#105).
+              hint: "kaydı açık, en az 3 öğrenci",
             },
           ]}
         />

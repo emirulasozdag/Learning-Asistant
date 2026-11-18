@@ -335,6 +335,10 @@ def _generate_practice(
             yield StatusEvent(GENERATE_PRACTICE_NAME, next(steps))
     except StopIteration as done:
         question = done.value
+    except practice.AIUnavailable as exc:
+        # Sağlayıcı yoğun: konu ya da materyal sorunu değildir, öyle de söylenmez (#105).
+        yield from ctx.add_block(NoticeBlock(kind="failure", text=exc.reason))
+        return ToolOutcome("provider_failure")
     except practice.NoValidItem as exc:
         yield from ctx.add_block(NoticeBlock(kind="not_covered", text=exc.reason))
         return ToolOutcome("no_valid_item")
