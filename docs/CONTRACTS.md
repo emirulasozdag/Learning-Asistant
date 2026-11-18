@@ -104,7 +104,8 @@ tiplerden başlar.
 soru yok, reddedilmiş ya da üye değilse `404 practice_item_not_found` **[ekleme]**; cevap türü uyuşmazsa `422`;
 açık uçlu cevap değerlendirilemezse `503` (deneme kaydedilmez). `AnswerFeedback`'e **[ekleme]**: `correct_option`,
 `reference_answer`, `criteria[{description, awarded, points, rationale}]` (yalnızca cevaptan sonra). Saklama:
-`practice_questions` (aday + kontrol sonuçları + gizli anahtar), `practice_rubrics` (üretilen rubrik `origin=generated`,
+`practice_questions` (aday + kontrol sonuçları + gizli anahtar; `research_logged` isteyenin o anki onayı, konu
+yalnızca bu açıksa ve takip sorusu değilse eğitmene gösterilir, #104), `practice_rubrics` (üretilen rubrik `origin=generated`,
 onaysız), `practice_attempts` (`research_logged` cevap anındaki onay; analitik yalnızca bunları kullanır).
 Kaynak politikası: not verilen ödevler (`material_type=assignment`, çözümleri dahil) pratik kaynağı olmaz
 (`source_id` ile istenirse `422`); pratik problemleri ve yayımlanmış eski sınavlar kullanılır.

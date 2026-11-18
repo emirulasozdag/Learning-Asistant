@@ -297,6 +297,9 @@ class Message(Base):
     content: Mapped[str] = mapped_column(Text)
     # Asistan mesajı: alıntılanan chunk id'leri, ret durumu (değerlendirme ve hata analizi için).
     meta: Mapped[dict | None] = mapped_column(JSONB)
+    # Mesaj yazıldığı anda araştırma kaydı açık mıydı (ADR-4, #104). Eğitmen ekranlarına yalnızca
+    # bunlar girer; sonradan açılan kayıt eski mesajları göstermez.
+    research_logged: Mapped[bool] = mapped_column(Boolean, server_default="false")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     conversation: Mapped[Conversation] = relationship(back_populates="messages")
@@ -325,6 +328,9 @@ class PracticeQuestion(Base):
     chunk_id: Mapped[int] = mapped_column(ForeignKey("chunks.id", ondelete="CASCADE"), index=True)
     # İsteyen kullanıcı (tutor sohbetinden ya da pratik ekranından); hesap silinirse boşalır.
     requested_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    # İsteyenin araştırma kaydı soru üretilirken açık mıydı (#104). Kapalıysa öğrencinin yazdığı
+    # konu eğitmene gösterilmez.
+    research_logged: Mapped[bool] = mapped_column(Boolean, server_default="false")
     # "mcq" | "short_answer" | "code_tracing"
     type: Mapped[str] = mapped_column(String(20))
     topic: Mapped[str | None] = mapped_column(String(300))

@@ -617,6 +617,27 @@ def test_opting_out_removes_questions_from_activity(db, client_for, world) -> No
     assert activity(client_for(world.instructor), world.course.id)["questions"] == 0
 
 
+def test_questions_asked_before_opting_in_stay_out_of_activity(db, client_for, world) -> None:
+    # #104: kayıt kapalıyken sorulanlar, öğrenci kaydı sonradan açsa da eğitmene gitmez.
+    students = add_students(db, world.course, 3, research_logging=False)
+    for student in students:
+        ask(client_for(student), world.course.id)
+    for student in students:
+        client_for(student).put(
+            "/me/consent",
+            json={"policy_version": settings.privacy_policy_version, "research_logging": True},
+        )
+    instructor = client_for(world.instructor)
+
+    assert activity(instructor, world.course.id)["questions"] == 0
+
+    # Kayıt açıkken sorulan yeni sorular sayılır.
+    for student in students:
+        ask(client_for(student), world.course.id)
+    assert activity(instructor, world.course.id)["questions"] == 3
+    assert count(db, Message, Message.research_logged.is_(False)) == 6
+
+
 # --- 13. CSRF origin denetimi ---
 
 

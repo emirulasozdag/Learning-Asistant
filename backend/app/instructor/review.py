@@ -2,8 +2,9 @@
 
 - Pratik sorusu: `approve` soruyu ve rubriğini eğitmen onaylı yapar (geri çekilmişse yeniden
   yayımlar); `correct` soruyu geri çeker (`withdrawn`), öğrenciye artık sunulmaz.
-- Asistan cevabı: karar ve düzeltme saklanır. Yalnızca araştırma kaydını açmış, derste öğrenci
-  olan birinin sohbetindeki cevap incelenebilir (eğitmen ancak bu cevapları görür; ADR-4).
+- Asistan cevabı: karar ve düzeltme saklanır. Yalnızca araştırma kaydı açıkken yazılmış
+  (`research_logged`, #104) ve kaydı hâlâ açık, derste öğrenci olan birinin cevabı incelenebilir
+  (eğitmen ancak bu cevapları görür; ADR-4).
 
 Her karar ayrı satırdır; son karar geçerlidir, geçmiş korunur.
 """
@@ -51,7 +52,7 @@ def resolve_target(db: Session, decision: ReviewDecision) -> ReviewTarget | None
         return ReviewTarget(course_id=question.course_id, question=question)
 
     message = db.get(Message, decision.target_id)
-    if message is None or message.role != "assistant":
+    if message is None or message.role != "assistant" or not message.research_logged:
         return None
     row = db.execute(
         select(Conversation.course_id)
@@ -133,6 +134,7 @@ def list_practice_items(db: Session, course_id: int) -> list[PracticeItemReview]
             .order_by(InstructorReview.id)
         ).all()
         latest = {review.question_id: review for review in reviews if review.question_id}
+    consenting = _consenting_requesters(db, questions)
     items = []
     for question in questions:
         mcq = question.type == PracticeType.MCQ
@@ -141,7 +143,7 @@ def list_practice_items(db: Session, course_id: int) -> list[PracticeItemReview]
             PracticeItemReview(
                 id=question.id,
                 type=PracticeType(question.type),
-                topic=question.topic,
+                topic=question.topic if _topic_visible(question, consenting) else None,
                 difficulty=question.difficulty,  # type: ignore[arg-type]
                 prompt=question.prompt,
                 options=question.options,
@@ -164,3 +166,22 @@ def list_practice_items(db: Session, course_id: int) -> list[PracticeItemReview]
             )
         )
     return items
+
+
+def _consenting_requesters(db: Session, questions: list[PracticeQuestion]) -> set[int]:
+    """Soruları isteyenlerden araştırma kaydı şu an açık olanlar."""
+    ids = {q.requested_by for q in questions if q.requested_by is not None}
+    if not ids:
+        return set()
+    return set(db.scalars(select(User.id).where(User.id.in_(ids), User.research_logging.is_(True))))
+
+
+def _topic_visible(question: PracticeQuestion, consenting: set[int]) -> bool:
+    """Konu öğrenciden gelir (yazdığı konu ya da takip sorusunda eksik kavramları); ADR-4 (#104).
+
+    - Takip sorusunun konusu öğrencinin eksikleridir: hiç gösterilmez.
+    - Öğrencinin istediği konu yalnızca soru üretilirken ve şu an araştırma kaydı açıksa görünür.
+    """
+    if question.follow_up_of_attempt_id is not None:
+        return False
+    return question.research_logged and question.requested_by in consenting

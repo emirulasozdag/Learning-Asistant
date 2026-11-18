@@ -316,6 +316,7 @@ def _store(
         course_id=course.id,
         chunk_id=int(passage.source_id),
         requested_by=user.id,
+        research_logged=user.research_logging,
         type=question_type.value,
         topic=(topic or generated.concept)[:300],
         difficulty=difficulty,

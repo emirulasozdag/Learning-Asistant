@@ -305,11 +305,14 @@ def test_review_permissions_do_not_leak_targets(db, client_for, setup) -> None:
 def conversation_with_answer(db, s, owner: User) -> Message:
     conversation = Conversation(course_id=s.course.id, user_id=owner.id)
     conversation.messages = [
-        Message(role="user", content="Ikili arama neden hizli?"),
+        Message(
+            role="user", content="Ikili arama neden hizli?", research_logged=owner.research_logging
+        ),
         Message(
             role="assistant",
             content="Her adimda yarisini atar [1].",
             meta={"outcome": "answered", "cited_source_ids": [str(s.chunk_id)]},
+            research_logged=owner.research_logging,
         ),
     ]
     db.add(conversation)
@@ -366,6 +369,62 @@ def test_instructor_lists_practice_items_with_key_and_latest_review(db, client_f
     path = f"/instructor/courses/{s.course.id}/practice-items"
     assert client_for(s.ta).get(path).status_code == 200
     assert client_for(s.students[0]).get(path).status_code == 403
+
+
+def requested_question(db, s, requester: User, topic: str, **fields) -> PracticeQuestion:
+    question = mcq_question(db, s, topic)
+    question.requested_by = requester.id
+    question.research_logged = requester.research_logging
+    for name, value in fields.items():
+        setattr(question, name, value)
+    db.commit()
+    return question
+
+
+def test_practice_item_topics_reach_instructors_only_with_consent(db, client_for, setup) -> None:
+    # #104: konu öğrenciden gelir; yalnızca kaydı açık öğrencinin istediği konu görünür.
+    s = setup
+    shown = requested_question(db, s, s.students[0], "ikili arama sınırları")
+    private = requested_question(db, s, s.private, "gizli konu")
+    gap = open_attempt(db, s, s.students[1], "ikili arama", 1.0, ["sıralı dizi şartı"])
+    follow_up = requested_question(
+        db, s, s.students[1], "sıralı dizi şartı", follow_up_of_attempt_id=gap.id
+    )
+    opted_out = requested_question(db, s, s.students[2], "sonradan kapatılan konu")
+    s.students[2].research_logging = False
+    db.commit()
+
+    items = client_for(s.instructor).get(f"/instructor/courses/{s.course.id}/practice-items")
+
+    topics = {item["id"]: item["topic"] for item in items.json()}
+    assert topics[shown.id] == "ikili arama sınırları"
+    assert topics[private.id] is None
+    assert topics[follow_up.id] is None
+    assert topics[opted_out.id] is None
+
+
+def test_delete_my_data_forgets_requested_question_topics(db, client_for, setup) -> None:
+    s = setup
+    mine = requested_question(db, s, s.students[0], "benim konum")
+    theirs = requested_question(db, s, s.students[1], "onun konusu")
+
+    assert client_for(s.students[0]).delete("/me/data").status_code == 204
+
+    db.expire_all()
+    # Soru dersin malıdır, kalır; öğrenciden gelen alanlar temizlenir.
+    assert db.get(PracticeQuestion, mine.id) is not None
+    assert (mine.topic, mine.requested_by, mine.research_logged) == (None, None, False)
+    assert (theirs.topic, theirs.requested_by) == ("onun konusu", s.students[1].id)
+
+
+def test_delete_account_forgets_requested_question_topics(db, client_for, setup) -> None:
+    s = setup
+    mine = requested_question(db, s, s.students[0], "benim konum")
+
+    assert client_for(s.students[0]).delete("/me").status_code == 204
+
+    db.expire_all()
+    assert (mine.topic, mine.requested_by) == (None, None)
 
 
 # --- Rubrik ve referans cevap girişi (#15) ---

@@ -20,7 +20,12 @@ from app.db.models import Conversation, Course, Message, User
 from app.embeddings.base import Embedder
 from app.llm.base import LLMClient, ToolCallingClient
 from app.llm.release import releasing
-from app.qa.service import answer_meta, conversation_history, get_conversation
+from app.qa.service import (
+    answer_meta,
+    conversation_history,
+    get_conversation,
+    research_logging_now,
+)
 from app.schemas.tutor import (
     ClarificationBlock,
     CourseAnswerBlock,
@@ -85,14 +90,21 @@ def turn_stream(
             "blocks": [block.model_dump(mode="json") for block in ctx.blocks],
             "trace": trace.model_dump(mode="json"),
         }
+        logged = research_logging_now(db, user_id)
         db.add_all(
             [
-                Message(conversation_id=conversation.id, role="user", content=request.message),
+                Message(
+                    conversation_id=conversation.id,
+                    role="user",
+                    content=request.message,
+                    research_logged=logged,
+                ),
                 Message(
                     conversation_id=conversation.id,
                     role="assistant",
                     content=transcript(ctx.blocks),
                     meta=meta,
+                    research_logged=logged,
                 ),
             ]
         )
