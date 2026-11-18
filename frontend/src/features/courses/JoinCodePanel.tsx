@@ -52,6 +52,7 @@ export default function JoinCodePanel({ courseId }: { courseId: number }) {
   return (
     <section>
       <PageTitle
+        level={2}
         title="Katılım kodu"
         description="Öğrenciler bu kodla derse katılır. Kod sızdıysa yenile; var olan öğrenciler derste kalır."
       />

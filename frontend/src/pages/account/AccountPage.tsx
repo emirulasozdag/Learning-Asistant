@@ -10,6 +10,7 @@ import { SectionHeader } from "../../ui/PageHeader";
 import PageTitle from "../../ui/PageTitle";
 import { useToast } from "../../ui/toast/context";
 import { ROLE_LABELS } from "../../layouts/navigation";
+import ThemeSwitcher from "../../theme/ThemeSwitcher";
 
 type Pending = "data" | "account" | null;
 
@@ -74,7 +75,8 @@ export default function AccountPage() {
   }
 
   return (
-    <div className="page mx-auto max-w-3xl">
+    <div className="page">
+      <div className="max-w-3xl">
       <PageTitle title="Hesabım" description={`${user.name} · ${user.email} · ${ROLE_LABELS[user.role]}`} />
 
       <div className="flex flex-col gap-10">
@@ -98,6 +100,11 @@ export default function AccountPage() {
               </span>
             </span>
           </label>
+        </section>
+
+        <section>
+          <SectionHeader title="Görünüm" description="Renk teması bütün sayfalarda geçerlidir." />
+          <ThemeSwitcher />
         </section>
 
         <section>
@@ -141,10 +148,11 @@ export default function AccountPage() {
         description="Bu işlem geri alınamaz."
         footer={
           <>
-            <Button variant="ghost" onClick={() => setPending(null)} disabled={deleting}>
+            {/* Geri alınamaz işlemde odak "Vazgeç"te başlar; Enter'a basmak silmez (#106). */}
+            <Button variant="ghost" onClick={() => setPending(null)} disabled={deleting} data-autofocus>
               Vazgeç
             </Button>
-            <Button variant="danger" onClick={() => void confirmDelete()} loading={deleting} data-autofocus>
+            <Button variant="danger" onClick={() => void confirmDelete()} loading={deleting}>
               {pending === "account" ? "Hesabımı kalıcı olarak sil" : "Verilerimi kalıcı olarak sil"}
             </Button>
           </>
@@ -161,6 +169,7 @@ export default function AccountPage() {
           </p>
         )}
       </Dialog>
+      </div>
     </div>
   );
 }

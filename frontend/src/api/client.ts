@@ -1,9 +1,6 @@
 import type {
   AnswerFeedback,
   AnswerSubmission,
-  AskRequest,
-  AskResponse,
-  AskStreamEvent,
   ChunkPreview,
   CourseActivity,
   CourseCreate,
@@ -108,18 +105,6 @@ async function errorBody(response: Response): Promise<{ detail: string; code?: s
   return { detail: `İstek başarısız (${response.status})` };
 }
 
-/**
- * /ask/stream: Server-Sent Events akışını okur, her olayı `onEvent` ile bildirir.
- * `signal` ile iptal edilebilir.
- */
-function askStream(
-  body: AskRequest,
-  onEvent: (event: AskStreamEvent) => void,
-  signal?: AbortSignal,
-): Promise<void> {
-  return readSse("/ask/stream", body, parseAskEvent, onEvent, signal);
-}
-
 /** /tutor/turn/stream: AI Tutor turu (CONTRACTS.md §9). */
 function tutorStream(
   body: TutorTurnRequest,
@@ -188,21 +173,6 @@ function parseSseBlock(block: string): { name: string; payload: SsePayload } | n
   }
 }
 
-function parseAskEvent(name: string, payload: SsePayload): AskStreamEvent | null {
-  switch (name) {
-    case "retrieval":
-      return { type: "retrieval", hits: payload };
-    case "delta":
-      return { type: "delta", text: payload.text };
-    case "done":
-      return { type: "done", response: payload };
-    case "error":
-      return { type: "error", detail: payload.detail };
-    default:
-      return null;
-  }
-}
-
 function parseTutorEvent(name: string, payload: SsePayload): TutorStreamEvent | null {
   switch (name) {
     case "status":
@@ -268,15 +238,10 @@ export const api = {
   courseOutline: (courseId: number, signal?: AbortSignal) =>
     request<CourseOutline>(`/courses/${courseId}/outline`, { signal }),
 
-  askStream,
-
   tutorStream,
 
   source: (sourceId: string, signal?: AbortSignal) =>
     request<SourceDetail>(`/sources/${encodeURIComponent(sourceId)}`, { signal }),
-
-  ask: (body: AskRequest) =>
-    request<AskResponse>("/ask", { method: "POST", body: JSON.stringify(body) }),
 
   generatePractice: (body: PracticeRequest) =>
     request<PracticeItem>("/practice", { method: "POST", body: JSON.stringify(body) }),

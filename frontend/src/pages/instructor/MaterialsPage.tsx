@@ -313,10 +313,10 @@ export default function MaterialsPage() {
         }
         footer={
           <>
-            <Button variant="ghost" onClick={() => setToCancel(null)}>
+            <Button variant="ghost" onClick={() => setToCancel(null)} data-autofocus>
               Vazgeç
             </Button>
-            <Button variant="danger" loading={cancelling} onClick={() => void confirmCancel()} data-autofocus>
+            <Button variant="danger" loading={cancelling} onClick={() => void confirmCancel()}>
               İptal et
             </Button>
           </>
@@ -336,10 +336,10 @@ export default function MaterialsPage() {
         }
         footer={
           <>
-            <Button variant="ghost" onClick={() => setToDelete(null)}>
+            <Button variant="ghost" onClick={() => setToDelete(null)} data-autofocus>
               Vazgeç
             </Button>
-            <Button variant="danger" loading={deleting} onClick={() => void confirmDelete()} data-autofocus>
+            <Button variant="danger" loading={deleting} onClick={() => void confirmDelete()}>
               Sil
             </Button>
           </>

@@ -7,6 +7,9 @@ export interface PlayerHandle {
   /** Videonun başından itibaren saniye (bilinmiyorsa 0). */
   currentTime(): number;
   seek(seconds: number): void;
+  /** Soru yazılırken durdurur; "Videoya devam et" ile sürer (#103). */
+  pause(): void;
+  play(): void;
 }
 
 /**
@@ -55,6 +58,12 @@ const FilePlayer = forwardRef<
       video.currentTime = seconds;
       void video.play().catch(() => undefined);
     },
+    pause() {
+      videoRef.current?.pause();
+    },
+    play() {
+      void videoRef.current?.play().catch(() => undefined);
+    },
   }));
   return (
     <video
@@ -88,6 +97,12 @@ const YouTubePlayer = forwardRef<PlayerHandle, { videoId: string; title: string;
       seek(seconds) {
         time.current = seconds;
         post(frameRef.current, "seekTo", [seconds, true]);
+        post(frameRef.current, "playVideo", []);
+      },
+      pause() {
+        post(frameRef.current, "pauseVideo", []);
+      },
+      play() {
         post(frameRef.current, "playVideo", []);
       },
     }));

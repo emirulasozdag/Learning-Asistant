@@ -155,7 +155,7 @@ function PaletteDialog({ onClose, courseId, base, onAsk }: Omit<CommandPalettePr
           ))}
           {commands.length === 0 && (
             <p className="px-4 py-6 text-center text-base text-graphite">
-              {loading ? "Belgeler yükleniyor…" : "Eşleşen bir sonuç yok."}
+              {loading ? "Dokümanlar yükleniyor…" : "Eşleşen bir sonuç yok."}
             </p>
           )}
         </div>

@@ -20,6 +20,10 @@ export interface StudioContextValue {
   /** Komut paletinden gelen soru; sayfa sorup temizler. */
   queuedQuestion: string | null;
   queueQuestion: (question: string | null) => void;
+  /** Materyal aramasını (komut paleti) açar. */
+  openSearch: () => void;
+  /** Dersin AI Tutor adresi: paletten soru sorulunca oraya gidilir. */
+  tutorPath: string;
 }
 
 export const StudioContext = createContext<StudioContextValue | null>(null);

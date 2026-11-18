@@ -581,6 +581,9 @@ export interface ChunkPreview {
   ordinal: number;
   page: number | null;
   text: string;
+  /** Video parçasında aralık (saniye). */
+  t_start?: number | null;
+  t_end?: number | null;
 }
 
 export interface SourceDetail {

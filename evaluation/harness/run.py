@@ -467,14 +467,14 @@ def _run_config(
     repo: Path,
 ) -> RunConfig:
     from app.core.config import settings
-    from app.generation.answer import SYSTEM_PROMPT
+    from app.generation.answer import ANSWER_STYLE, SYSTEM_PROMPT
     from app.retrieval import fusion, hybrid
 
     commit, dirty = git_state(repo)
     prompt = {
         Condition.NO_RAG: conditions.CLOSED_BOOK_PROMPT,
         Condition.BASIC_RAG: conditions.BASIC_RAG_PROMPT,
-    }.get(condition, SYSTEM_PROMPT)
+    }.get(condition, SYSTEM_PROMPT.replace("{style}", ANSWER_STYLE))
     return RunConfig(
         condition=condition.value,
         condition_settings=conditions.SETTINGS[condition],

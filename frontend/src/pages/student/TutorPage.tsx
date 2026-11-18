@@ -6,6 +6,8 @@ import {
   Library,
   MessageSquareText,
   ServerOff,
+  Maximize2,
+  Minimize2,
   SquarePen,
   Video,
   X,
@@ -32,6 +34,7 @@ import EvidencePanel from "../../features/tutor/studio/EvidencePanel";
 import EvidenceThread from "../../features/tutor/studio/EvidenceThread";
 import RetrievalMeter from "../../features/tutor/studio/RetrievalMeter";
 import { courseSuggestions } from "../../features/tutor/suggestions";
+import { loadSession, saveSession } from "../../features/tutor/sessionTurns";
 import { answerOf, entryState } from "../../features/tutor/turns";
 import TurnExtras from "../../features/tutor/TutorTurnView";
 import type { Segment, TutorTurn } from "../../features/tutor/types";
@@ -46,11 +49,12 @@ import Button from "../../ui/Button";
 import EmptyState from "../../ui/EmptyState";
 import FileBadge from "../../ui/FileBadge";
 import IconButton from "../../ui/IconButton";
+import { cx } from "../../ui/cx";
 import { SkeletonRows } from "../../ui/Skeleton";
 
 /**
- * AI Tutor: dersin materyalinden, kaynaklı ve akışlı cevaplar. Ürünün ana ekranı; çalışma
- * alanının (StudioShell) içinde açılır. Ders yükleme durumları kabukta çözülür.
+ * AI Tutor: dersin materyalinden, kaynaklı ve akışlı cevaplar. Ürünün ana ekranı; ders
+ * çerçevesinin (CourseShell) içinde açılır. Ders yükleme durumları kabukta çözülür.
  */
 export default function TutorPage() {
   const courseId = Number(useParams().courseId);
@@ -89,11 +93,13 @@ function TutorSession({ course }: { course: Course }) {
   const [materials, setMaterials] = useState<DocumentOut[] | null>(null);
   const [materialsFailed, setMaterialsFailed] = useState(false);
   const [materialsAttempt, setMaterialsAttempt] = useState(0);
-  const [turns, setTurns] = useState<TutorTurn[]>([]);
+  // Ders içinde başka sayfaya gidip dönünce sohbet yerinde olsun (#106).
+  const [restored] = useState(() => loadSession(courseId));
+  const [turns, setTurns] = useState<TutorTurn[]>(restored.turns);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [selection, setSelection] = useState<Selection>(NO_SELECTION);
   const [question, setQuestion] = useState("");
-  const [conversationId, setConversationId] = useState<number | null>(null);
+  const [conversationId, setConversationId] = useState<number | null>(restored.conversationId);
   const [busy, setBusy] = useState(false);
   const [claimElement, setClaimElement] = useState<HTMLElement | null>(null);
   const [anchorElement, setAnchorElement] = useState<HTMLElement | null>(null);
@@ -109,6 +115,8 @@ function TutorSession({ course }: { course: Course }) {
   const startParam = Math.max(0, Number(searchParams.get("t")) || 0);
   const videoDoc = playableVideo(materials, videoParam);
   const [videoTime, setVideoTime] = useState(startParam);
+  // Oynatıcı boyutu: soru yokken büyük; ilk sorudan sonra küçük (öğrenci değiştirebilir).
+  const [playerSize, setPlayerSize] = useState<"auto" | "large" | "small">("auto");
 
   useEffect(() => {
     const controller = new AbortController();
@@ -125,6 +133,8 @@ function TutorSession({ course }: { course: Course }) {
 
   // Sayfadan ya da dersten ayrılırken süren soruyu iptal et.
   useEffect(() => () => abortRef.current?.abort(), []);
+
+  useEffect(() => saveSession(courseId, turns, conversationId), [courseId, turns, conversationId]);
 
   // Durdurulan anı her saniye okur: composer'ın altındaki "videonun 12:34 anı" notu için.
   useEffect(() => {
@@ -374,36 +384,63 @@ function TutorSession({ course }: { course: Course }) {
     });
   }
 
+  // Geniş ekranda video sağ sütunda durur; orta sütun yalnızca soru ve cevaba kalır (#103).
+  const videoAside = desktop && Boolean(videoDoc);
+  const playerSmall = !videoAside && (playerSize === "small" || (playerSize === "auto" && turns.length > 0));
   const noMaterials = materials !== null && materials.length === 0;
   // Dar ekranda kaynak tam ekran açılır; yalnızca öğrenci açıkça istediğinde.
   const mobileSource = !desktop && current.sourceOverride;
   const evidenceOpen = desktop && sourceId && (current.claim != null || current.sourceOverride);
 
+  const playerBlock = videoDoc ? (
+    <div
+      data-lecture-player
+      className={cx(
+        "shrink-0",
+        videoAside ? "w-full" : playerSmall ? "mb-3 w-full max-w-sm" : "mx-auto mb-3 w-full max-w-3xl",
+      )}
+    >
+      <div className="mb-2 flex items-center gap-2">
+        <Video size={16} aria-hidden className="shrink-0 text-accent" />
+        <p className="min-w-0 flex-1 truncate text-sm font-medium text-ink">{videoDoc.title}</p>
+        {!videoAside && (
+          <IconButton
+            icon={playerSmall ? Maximize2 : Minimize2}
+            label={playerSmall ? "Videoyu büyüt" : "Videoyu küçült"}
+            size="sm"
+            onClick={() => setPlayerSize(playerSmall ? "large" : "small")}
+          />
+        )}
+        <IconButton icon={X} label="Videoyu kapat" size="sm" onClick={closeVideo} />
+      </div>
+      {/* Soru sorulunca oynatıcı küçülür: cevap ekranda kalır, video yine oynar (#103). */}
+      <div
+        className={cx(
+          "overflow-hidden rounded-panel",
+          playerSmall ? "max-h-[24vh] [&>*]:max-h-[24vh]" : "max-h-[32vh] [&>*]:max-h-[32vh]",
+        )}
+      >
+        <LecturePlayer
+          // Başka video seçilince oynatıcı baştan kurulur.
+          key={videoDoc.id}
+          ref={playerRef}
+          mediaUrl={videoDoc.media_url!}
+          title={videoDoc.title}
+          start={startParam}
+          captionsUrl={videoDoc.file_url}
+          captionsLang={course.language}
+        />
+      </div>
+    </div>
+  ) : null;
+
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div ref={workspaceRef} className="relative flex min-h-0 flex-1 gap-8 px-4 sm:px-6">
-        <section className="flex min-w-0 flex-1 flex-col">
-          {videoDoc && (
-            <div data-lecture-player className="mx-auto mb-3 w-full max-w-3xl shrink-0">
-              <div className="mb-2 flex items-center gap-2">
-                <Video size={16} aria-hidden className="shrink-0 text-accent" />
-                <p className="min-w-0 flex-1 truncate text-sm font-medium text-ink">{videoDoc.title}</p>
-                <IconButton icon={X} label="Videoyu kapat" size="sm" onClick={closeVideo} />
-              </div>
-              <div className="max-h-[38vh] overflow-hidden rounded-panel [&>*]:max-h-[38vh]">
-                <LecturePlayer
-                  // Başka video seçilince oynatıcı baştan kurulur.
-                  key={videoDoc.id}
-                  ref={playerRef}
-                  mediaUrl={videoDoc.media_url!}
-                  title={videoDoc.title}
-                  start={startParam}
-                  captionsUrl={videoDoc.file_url}
-                  captionsLang={course.language}
-                />
-              </div>
-            </div>
-          )}
+        {/* Yer yetmezse bölüm kayar; oynatıcı, soru şeridi ve cevap üst üste binmez (#103). */}
+        <section className="flex min-w-0 flex-1 flex-col overflow-y-auto">
+          {/* Dar ekranda video sohbetin üstünde; geniş ekranda sağ sütunda, kaynağın üstünde (#103). */}
+          {videoDoc && !videoAside && playerBlock}
           {turns.length > 0 && (
             <div className="flex shrink-0 items-center gap-2 pb-2">
               <span className="font-mono text-xs text-graphite">
@@ -438,7 +475,7 @@ function TutorSession({ course }: { course: Course }) {
                 moveClaim(event.key === "ArrowDown" ? 1 : -1);
               }
             }}
-            className="min-h-0 flex-1 overflow-y-auto pr-1 pb-6"
+            className={cx("flex-1 overflow-y-auto pr-1 pb-6", videoDoc ? "min-h-[16rem]" : "min-h-0")}
           >
             {!activeTurn ? (
               <TutorWelcome
@@ -518,8 +555,10 @@ function TutorSession({ course }: { course: Course }) {
           </div>
         </section>
 
-        {evidenceOpen && sourceId && (
-          <div className="w-[min(42%,34rem)] shrink-0 overflow-y-auto pb-6">
+        {(videoAside || (evidenceOpen && sourceId)) && (
+          <div className="flex w-[min(42%,34rem)] shrink-0 flex-col gap-4 overflow-y-auto pb-6">
+            {videoAside && playerBlock}
+            {evidenceOpen && sourceId && (
             <EvidencePanel
               key={sourceId}
               sourceId={sourceId}
@@ -531,6 +570,7 @@ function TutorSession({ course }: { course: Course }) {
               onSelectSource={switchSource}
               onPlayAt={playAt}
             />
+            )}
           </div>
         )}
 
@@ -551,7 +591,8 @@ function TutorSession({ course }: { course: Course }) {
             response={response}
             selectedSourceId={sourceId}
             onSelectSource={selectSource}
-            initiallyOpen={desktop}
+            // Video açıkken kapalı başlar: oynatıcıyla birlikte cevabın yerini daraltmasın.
+            initiallyOpen={desktop && !videoDoc}
           />
         )}
         <Composer

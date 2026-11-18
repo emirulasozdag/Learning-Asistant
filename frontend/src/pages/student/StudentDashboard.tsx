@@ -51,7 +51,7 @@ export default function StudentDashboard() {
       </section>
 
       <div className="page">
-        <PageTitle title="Derslerim" />
+        <PageTitle level={2} title="Derslerim" />
         {!loading && !error && courses.length > 0 && (
           <div className="mb-6">
             <JoinCourseForm />

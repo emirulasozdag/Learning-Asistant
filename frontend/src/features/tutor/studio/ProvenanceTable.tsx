@@ -27,7 +27,7 @@ export default function ProvenanceTable({
 
   const cells: { label: string; value: string; wide?: boolean }[] = [
     { label: "Ders", value: course.code },
-    { label: "Belge", value: source.document_title },
+    { label: "Doküman", value: source.document_title },
     ...(where ? [where] : []),
     { label: "Onaylayan", value: course.instructor_name ?? "Ders eğitmeni", wide: true },
     { label: "Onay", value: document ? DATE.format(new Date(document.created_at)) : "Onaylı materyal" },

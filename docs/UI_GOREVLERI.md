@@ -1,14 +1,9 @@
-# Arayüz: tasarım sistemi ve ekip görevleri
+# Arayüz: tasarım sistemi ve ekranlar
 
-> **Güncelleme:** Ürün sürümünde mock veriler ve "geliştiriliyor" sayfaları kaldırıldı (plan
-> kuralı #6). Görev A ve C gerçek materyal verisiyle yapıldı. Görev B ve D'nin sayfaları,
-> route'ları ve mock dosyaları silindi. Bu ekranlar, backend API'leri hazır olunca ilgili sprint
-> issue'larıyla (#12, #17, #22…) gerçek veriyle eklenecek. Aşağıdaki görev listesi geçmiş kayıt
-> olarak duruyor; tasarım kuralları (bölüm 1) geçerli.
-
-Uygulamanın ilk profesyonel sürümünde tasarım sistemi, iskelet, giriş/kayıt, **AI Tutor** ve
-**Materyaller** ekranları hazır. Aşağıdaki dört ekran ekibe kaldı. Her biri için sayfa dosyası,
-route'u ve mock verisi hazır; yeni bir şey kurmanıza gerek yok, yalnızca sayfanın içini doldurun.
+> **Güncelleme (#103, #106):** Uygulamada tek bir çerçeve var: üst bar (kurum + ürün), konum şeridi ve ders
+> sayfalarında ortak ders çerçevesi (`CourseShell`: ders şeridi, sol ders menüsü, içerik). AI Tutor da bu çerçevenin
+> içinde açılır; ayrı "çalışma alanı" kabuğu (`StudioShell`) kaldırıldı. Mock veri yoktur; her ekran gerçek API'yi kullanır.
+> Eski görev listesi (A–D) tamamlandı ya da gerçek ekranlarla değiştirildi; güncel ekran listesi bölüm 2'de.
 
 ## 1. Tasarım sistemi — kurallar
 
@@ -33,67 +28,43 @@ route'u ve mock verisi hazır; yeni bir şey kurmanıza gerek yok, yalnızca say
 - **Katmanlar:** `Dialog`, `Drawer`
 - **Diğer:** `Avatar`, `FileBadge`, `Logo`
 
-**Veri:** Bileşenler `src/mock/` dosyalarını **doğrudan içe aktarmaz**; her zaman `src/services/` üzerinden okur. Backend hazır olunca yalnızca servis fonksiyonunun içi değişir.
+**Veri:** Bileşenler API'yi doğrudan çağırmaz; `src/services/` üzerinden okur (`api/client.ts` → servis → sayfa).
+
+**Tutarlılık kuralları (#103, #106):**
+- Ders bölümlerinin adları tek yerde: `features/courses/sections.ts` (menü, sekmeler ve konum şeridi aynı listeden okur).
+- Sayfada tek `h1`: bölüm sayfasının başlığı (`PageTitle`); aynı sayfadaki diğer başlıklar `PageTitle level={2}` ya da `SectionHeader`. Ders adı şerittir, başlık değildir.
+- Terimler: "doküman" (belge değil), "video" (ders videosu ve transkripti), "Beni bu konuda test et".
+- Geri alınamaz işlem pencerelerinde ilk odak "Vazgeç"tedir.
+- Sabit renk yok (`text-white`, `fill="white"` gibi); tema değişkenleri kullanılır. Tema seçici Hesabım sayfasındadır.
 
 **Kontrol:** Bir PR'dan önce `npm run lint && npm run build` çalıştırın, ekranı hem masaüstünde hem 375px genişlikte kontrol edin.
 
-## 2. Görevler
+## 2. Ekranlar
 
-### Görev A — Eğitmen ana sayfası
-- **Dosya:** `src/pages/instructor/InstructorDashboard.tsx` (karşılama ve "Derslerim" hazır)
-- **Veri:** `dashboardService.instructorSummary()` (mock: `src/mock/dashboard.ts`)
-- **Eklenecekler:**
-  - Karşılamanın altına sade bir özet satırı: Dersler · Öğrenciler · Sorulan sorular · Pratik oturumları (4 sayı, kartsız, ince ayraçlarla).
-  - "Bu hafta en çok sorulan konular" listesi: konu, soru sayısı, ilgili derse bağlantı.
-  - Ders satırına materyal sayısı (`courseService.materials(id)`).
-- **Grafik eklemeyin**; sayılar ve listeler yeterli.
-- **Bitti:** Yükleniyor / boş / hata durumları var, 375px'te düzgün.
+| Rol | Adres | Sayfa |
+|---|---|---|
+| Her ikisi | `/{rol}/account` | `pages/account/AccountPage.tsx`: araştırma kaydı, tema, verilerimi/hesabımı sil |
+| Öğrenci | `/student` | `pages/student/StudentDashboard.tsx` |
+| Öğrenci | `/student/courses/:id/tutor` | `pages/student/TutorPage.tsx` (ders çerçevesinde; `?video=&t=` ile ders videosu) |
+| Öğrenci | `/student/courses/:id/learning` | `pages/student/LearningRecordPage.tsx` |
+| Öğrenci | `/student/courses/:id/watch/:documentId` | `pages/student/VideoStudyPage.tsx`: video çalışma ekranı (büyük video, akan transkript, yanda soru-cevap; cevabın video kısmı işaretlenir). "Ders videoları"ndaki "İzle ve sor" buraya açılır |
+| Eğitmen | `/instructor` | `pages/instructor/InstructorDashboard.tsx` |
+| Eğitmen | `/instructor/courses/:id/materials` | `pages/instructor/MaterialsPage.tsx` |
+| Eğitmen | `/instructor/courses/:id/activity` | `pages/instructor/CourseActivityPage.tsx` (cevabı onayla/düzelt) |
+| Eğitmen | `/instructor/courses/:id/review` | `pages/instructor/CourseReviewPage.tsx` (sık hatalar, pratik soruları) |
+| Her ikisi | `…/courses/:id/{syllabus,calendar,videos,lecture-notes,…}` | `pages/course/*` |
 
-### Görev B — Ders sayfası sekmeleri (Genel bakış, Öğrenciler, Analitik)
-- **Dosya:** `src/pages/instructor/CourseSections.tsx` (şu an "geliştiriliyor" yer tutucuları)
-- **Genel bakış:**
-  - İçerik: materyal özeti (doküman / sayfa / parça), son öğrenci soruları, "materyalde bulunamayan" sorular. Bu sonuncusu eğitmen için en değerli bilgi: hangi konuyu eklemesi gerektiğini gösterir.
-  - Bittiğinde `src/router.tsx` içindeki ders `index` yönlendirmesini `materials` yerine `overview` yapın ve `CourseLayout`'taki `upcoming` işaretini kaldırın.
-- **Öğrenciler:** `ui/Table` ile öğrenci, soru sayısı, son etkinlik.
-- **Analitik:** sık hatalar ve kullanılan kaynaklar (FR-16).
-- **Veri:** yeni mock dosyası + servis fonksiyonu. Gerçek kaynak `messages` tablosu (`meta.declined`, `meta.cited_source_ids`).
-
-### Görev C — Öğrenci ana sayfası
-- **Dosya:** `src/pages/student/StudentDashboard.tsx` (karşılama ve "Derslerim" hazır)
-- **Veri:** `dashboardService.recentQuestions()`, `practiceProgress()`
-- **Eklenecekler:**
-  - "Kaldığın yerden devam et": son sorulan soru ve dersi, AI Tutor'a dönüş bağlantısı.
-  - "Son sorular" listesi.
-  - "Pratik ilerlemesi": ders başına tamamlanan, ortalama puan, zayıf konu ve "Bu konuyu çalış" bağlantısı.
-- **Not:** Eğitmen ana sayfasının kopyası olmasın; odak "öğrenmeye devam etmek".
-
-### Görev D — Pratik çalışma alanı
-- **Dosya:** `src/pages/student/PracticePage.tsx`. AI Tutor'daki "Bu konuyu çalış" buraya `?course=&topic=` ile gelir.
-- **Veri:** `practiceService.nextQuestion()` / `submit()` (mock: `src/mock/practice.ts`)
-- **Soru durumu:** temiz bir çalışma alanı (soru kartı değil):
-  - soru metni
-  - zorluk
-  - kaynak (`Notlar, sayfa 2`; tıklanınca kaynak açılsın; AI Tutor'daki `features/tutor/SourcePanel` yeniden kullanılabilir)
-  - cevap alanı ve "Gönder"
-- **Geri bildirim durumu:**
-  - Puan (`8/10`)
-  - Anladıkların
-  - Eksik kavram
-  - Açıklama
-  - Kaynak
-  - "Bu eksik üzerine çalış" (yeni soru)
-- **Gerçek API:** `POST /practice`, `POST /practice/{id}/answer` (backend'de şu an 501; FR-11–13).
+Ctrl/⌘+K materyal araması (öğrenci) her ders sayfasında açılır (`features/studio/StudioProvider.tsx`).
 
 ## 3. Klasör haritası
 
 ```
 src/
 ├── ui/          tasarım sistemi bileşenleri (yalnızca görünüm; veri bilmez)
-├── layouts/     AppShell (sidebar + topbar), AuthLayout, menü tanımları
+├── layouts/     AppShell (üst bar + konum şeridi), CourseShell (ders çerçevesi), AuthLayout
 ├── auth/        oturum (AuthProvider, useAuth, RequireRole)
-├── services/    veri katmanı: gerçek API + mock
-├── mock/        örnek veri (yalnızca services/ kullanır)
-├── features/    ekranlara özel bileşenler (tutor/, materials/, courses/)
+├── services/    veri katmanı (gerçek API)
+├── features/    ekranlara özel bileşenler (tutor/, video/, studio/, materials/, courses/, instructor/)
 ├── pages/       route başına sayfa
 └── router.tsx   tüm adresler
 ```

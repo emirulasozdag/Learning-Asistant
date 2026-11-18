@@ -4,20 +4,12 @@ import { Link, useLocation, useParams } from "react-router";
 
 import { useAuth } from "../auth/useAuth";
 import { useCourse } from "../features/courses/context";
+import { SECTION_LABELS } from "../features/courses/sections";
 
 interface Crumb {
   label: string;
   to?: string;
 }
-
-const SECTION_LABELS: Record<string, string> = {
-  materials: "Materyaller",
-  activity: "Etkinlik ve analitik",
-  tutor: "AI Tutor",
-  learning: "Öğrenme kaydım",
-  review: "İnceleme ve sık hatalar",
-  account: "Hesabım",
-};
 
 /** Adresten ekmek kırıntısı: Derslerim / BLM2512 / Materyaller. */
 function useBreadcrumbs(): Crumb[] {

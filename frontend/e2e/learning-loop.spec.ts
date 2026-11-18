@@ -482,17 +482,11 @@ test.describe("ders videosu", () => {
     await loginAsStudent(page);
   });
 
-  test("video oynatıcıyla açılır; soru durdurulan anla gider; video alıntısından o ana atlanır", async ({ page }) => {
+  test("Tutor'da video: soru durdurulan anla gider; video alıntısından o ana atlanır", async ({ page }) => {
     const algorithms = course("A");
     const turns = await mockVideoAnswer(page, videoId);
 
-    await page.goto(`/student/courses/${algorithms.id}/videos`);
-    await page.getByRole("link", { name: "İzle ve sor" }).click();
-    await expect(page).toHaveURL(new RegExp(`/tutor\\?video=${videoId}$`));
-    await expect(page.getByLabel("E2E ders videosu")).toBeVisible();
-    await expect(page.getByText("Soruların videonun 0:00 anıyla birlikte gider")).toBeVisible();
-
-    // Belirli bir andan açılan video (ör. paylaşılan bağlantı): soru o anla gider.
+    // AI Tutor'da da video açılabilir (alıntıdaki "Videoda göster"): soru o anla gider.
     await page.goto(`/student/courses/${algorithms.id}/tutor?video=${videoId}&t=30`);
     await expect(page.getByText("Soruların videonun 0:30 anıyla birlikte gider")).toBeVisible();
     await ask(page, "Burada neden yarıya iniyor?");
@@ -547,5 +541,89 @@ test.describe("ders videosu", () => {
     await source.getByRole("button", { name: "Videoda bu ana git" }).click();
     await expect(source).toHaveCount(0);
     await expect(page.getByText("Soruların videonun 2:05 anıyla birlikte gider")).toBeVisible();
+  });
+});
+
+
+test.describe("video çalışma ekranı", () => {
+  let instructor: APIRequestContext;
+  let videoId: number;
+
+  test.beforeAll(async () => {
+    instructor = await request.newContext({ baseURL: BASE_URL });
+    await apiLogin(instructor, INSTRUCTOR);
+    const vtt =
+      "WEBVTT\n\n00:00:00.000 --> 00:01:00.000\nIkili arama sirali dizide ortadaki elemana bakar.\n\n" +
+      "00:02:00.000 --> 00:03:00.000\nHer adimda aralik yariya iner, bu yuzden O(log n) zaman alir.\n";
+    const uploaded = await instructor.post(`/api/courses/${course("A").id}/materials`, {
+      multipart: {
+        material_type: "video",
+        declaration: "true",
+        title: "E2E ders videosu",
+        media_url: "https://example.org/e2e-ders.mp4",
+        file: { name: "e2e-ders.vtt", mimeType: "text/vtt", buffer: Buffer.from(vtt) },
+      },
+    });
+    expect(uploaded.ok(), await uploaded.text()).toBeTruthy();
+    videoId = ((await uploaded.json()) as { id: number }).id;
+  });
+
+  test.afterAll(async () => {
+    await instructor.delete(`/api/documents/${videoId}`);
+    await instructor.dispose();
+  });
+
+  test.beforeEach(async ({ page }) => {
+    await loginAsStudent(page);
+  });
+
+  test("izle ve sor: video, transkript ve sohbet bir arada; cevabın video kısmı işaretlenir", async ({ page }) => {
+    const algorithms = course("A");
+    const turns = await mockVideoAnswer(page, videoId);
+
+    await page.goto(`/student/courses/${algorithms.id}/videos`);
+    await page.getByRole("link", { name: "İzle ve sor" }).click();
+    await expect(page).toHaveURL(new RegExp(`/student/courses/${algorithms.id}/watch/${videoId}$`));
+    await expect(page.getByLabel("E2E ders videosu")).toBeVisible();
+
+    // Transkript kapalı başlar; açılınca zamanlarıyla gelir, satıra tıklayınca video o ana gider.
+    const transcript = page.getByRole("region", { name: "Transkript" });
+    const toggle = transcript.getByRole("button", { name: /Transkript/ });
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await expect(transcript.getByText("Her adimda aralik yariya iner", { exact: false })).toBeHidden();
+    await toggle.click();
+    await expect(transcript.getByText("Her adimda aralik yariya iner", { exact: false })).toBeVisible();
+    await transcript.getByRole("button", { name: /2:00/ }).click();
+    await expect(page.getByText("Sorun videonun 2:00 anıyla gider.")).toBeVisible();
+
+    // Kapalıyken gelen cevap videoya dayanıyorsa transkript kendiliğinden açılır.
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await ask(page, "Burayı anlamadım");
+    await expect.poll(() => turns.length).toBe(1);
+    expect(turns[0].video).toEqual({ document_id: videoId, time_s: 120 });
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+
+    const chat = page.getByRole("complementary", { name: "Videoya soru sor" });
+    await expect(chat.getByRole("button", { name: "Videodan · 2:05–3:00" })).toBeVisible();
+    await expect(page.getByText(/işaretli: cevabın dayandığı kısım/)).toBeVisible();
+    await expect(chat.getByRole("button", { name: "Videoya devam et" })).toBeVisible();
+
+    // Cevaptaki video alıntısı videoyu o ana götürür (sayfadan çıkmadan).
+    await chat.getByRole("button", { name: "Videodan · 2:05–3:00" }).click();
+    await expect(page.getByText("Sorun videonun 2:05 anıyla gider.")).toBeVisible();
+    await expect(page).toHaveURL(new RegExp(`/watch/${videoId}$`));
+  });
+
+  test("video çalışma ekranı dar ekranda sığar @dar-ekran", async ({ page }) => {
+    await page.goto(`/student/courses/${course("A").id}/watch/${videoId}`);
+    await expect(page.getByLabel("E2E ders videosu")).toBeInViewport();
+    await expect(page.getByRole("textbox", { name: "Sorun" })).toBeVisible();
+    // Sayfanın içerik alanı yana taşmaz (video, zaman çizgisi, sohbet, transkript alt alta).
+    const overflow = await page.evaluate(() => {
+      const main = document.querySelector("main");
+      return main ? main.scrollWidth - main.clientWidth : 0;
+    });
+    expect(overflow).toBeLessThanOrEqual(0);
   });
 });

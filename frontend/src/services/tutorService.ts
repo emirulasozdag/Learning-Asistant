@@ -1,9 +1,8 @@
 /**
- * AI Tutor — gerçek API. `turn`: orkestratörlü tur (/tutor/turn/stream, CONTRACTS.md §9);
- * `ask`: yalnızca kaynaklı cevap hattı (/ask/stream).
+ * AI Tutor — gerçek API. `turn`: orkestratörlü tur (/tutor/turn/stream, CONTRACTS.md §9).
  */
 import { api } from "../api/client";
-import type { AskStreamEvent, TutorStreamEvent, VideoRef } from "../api/types";
+import type { TutorStreamEvent, VideoRef } from "../api/types";
 
 export type QuickAction = "simpler" | "example" | "quiz";
 
@@ -26,20 +25,6 @@ export const tutorService = {
   ): Promise<void> {
     return api.tutorStream(
       { course_id: courseId, message, conversation_id: conversationId, video: video ?? null },
-      onEvent,
-      signal,
-    );
-  },
-
-  ask(
-    courseId: number,
-    question: string,
-    conversationId: number | null,
-    onEvent: (event: AskStreamEvent) => void,
-    signal?: AbortSignal,
-  ): Promise<void> {
-    return api.askStream(
-      { course_id: courseId, question, conversation_id: conversationId },
       onEvent,
       signal,
     );

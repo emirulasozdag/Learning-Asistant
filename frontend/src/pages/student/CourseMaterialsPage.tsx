@@ -16,7 +16,7 @@ export default function CourseMaterialsPage() {
   return (
     <div>
       <PageTitle
-        title="Ders materyalleri"
+        title="Tüm materyaller"
         description="AI Tutor bu dersteki sorulara yalnızca buradaki dokümanlardan cevap verir."
       />
       {documentsFailed ? (

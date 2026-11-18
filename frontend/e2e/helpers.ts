@@ -50,10 +50,14 @@ export function firstClaim(page: Page) {
   return page.getByRole("list", { name: /Cevabın iddiaları/ }).getByRole("button").first();
 }
 
-/** Kenar çubuğundaki ders seçiciyle başka derse geçer. */
+/** Sol menünün "Derslerim" listesiyle başka derse geçer; aynı bölümde (ör. AI Tutor) kalınır (#103). */
 export async function switchCourse(page: Page, from: SetupCourse, to: SetupCourse) {
-  await page.locator("button[aria-expanded]").filter({ hasText: from.name }).click();
-  await page.getByRole("link", { name: to.name }).click();
+  await expect(page.getByRole("link", { name: new RegExp(escapeRegExp(from.name)) }).first()).toBeVisible();
+  await page.getByRole("link", { name: new RegExp(escapeRegExp(to.name)) }).first().click();
+}
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 /** Cevap tamamlanana kadar bekler: "Durdur" kaybolur. */

@@ -128,7 +128,7 @@ test("Durdur süren cevabı iptal eder; Tekrar sor yeniden sorar", async ({ page
   await expect(page.getByText("Durduruldu")).toHaveCount(0);
 });
 
-test("ders değiştirince sohbet ve kaynak sıfırlanır; yeni derste ilk soru hatasız gider", async ({ page }) => {
+test("ders değiştirince her dersin kendi sohbeti görünür; yeni derste ilk soru hatasız gider", async ({ page }) => {
   const algorithms = course("A");
   const dataStructures = course("B");
   await openTutor(page, algorithms);
@@ -156,7 +156,10 @@ test("ders değiştirince sohbet ve kaynak sıfırlanır; yeni derste ilk soru h
   await ask(page, "Kuyruk nasıl çalışır?");
   await expect(page.getByRole("button", { name: "Durdur" })).toBeVisible();
   await switchCourse(page, dataStructures, algorithms);
-  await expect(page.getByRole("heading", { name: `${algorithms.name} dersine sor` })).toBeVisible();
+  // İlk dersin bitmiş sohbeti geri gelir (#106); süren istek iptal edilmiştir.
+  await expect(page).toHaveURL(new RegExp(`/student/courses/${algorithms.id}/tutor$`));
+  await expect(page.getByText("İkili arama nasıl çalışır?").first()).toBeVisible();
+  await expect(page.getByText("Kuyruk nasıl çalışır?")).toHaveCount(0);
   await expect(page.getByText("Mesajın inceleniyor")).toHaveCount(0);
   await expect(questionBox(page)).toBeEnabled();
   await expect(page.getByRole("button", { name: "Durdur" })).toHaveCount(0);
@@ -250,4 +253,23 @@ test("kod ve sayılar yüklemeden kaynak görünümüne kadar korunur", async ({
     }
     await teacherContext.close();
   }
+});
+
+
+test("Tutor ders çerçevesinde açılır; başka bölüme gidip dönünce sohbet yerinde durur", async ({ page }) => {
+  const algorithms = course("A");
+  await openTutor(page, algorithms);
+  // Aynı üst bar, konum şeridi ve ders menüsü (#103).
+  await expect(page.getByRole("navigation", { name: "Konum" })).toContainText("AI Tutor");
+  await expect(page.getByRole("navigation", { name: "Ders araçları" })).toBeVisible();
+  await ask(page, "İkili arama nasıl çalışır?");
+  await waitForAnswer(page);
+
+  await page.getByRole("navigation", { name: "Ders içeriği" }).getByRole("link", { name: "Takvim" }).click();
+  await expect(page.getByRole("navigation", { name: "Konum" })).toContainText("Takvim");
+  await page.getByRole("navigation", { name: "Ders araçları" }).getByRole("link", { name: "AI Tutor" }).click();
+
+  await expect(page.getByText("İkili arama nasıl çalışır?").first()).toBeVisible();
+  await expect(firstClaim(page)).toBeVisible();
+  await expect(page.getByRole("list").filter({ hasText: "İkili arama nasıl çalışır?" }).first()).toBeVisible();
 });

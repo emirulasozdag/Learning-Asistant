@@ -72,3 +72,6 @@ class ChunkPreview(BaseModel):
     ordinal: int
     page: int | None
     text: str
+    # [ekleme, #103] Video parçasında aralık (saniye): video çalışma ekranının transkripti.
+    t_start: float | None = None
+    t_end: float | None = None
