@@ -112,6 +112,13 @@ def to_document_out(document: Document, chunk_count: int) -> DocumentOut:
 
 def chunk_previews(document: Document) -> list[ChunkPreview]:
     return [
-        ChunkPreview(id=chunk.id, ordinal=chunk.ordinal, page=chunk.page, text=chunk.text)
+        ChunkPreview(
+            id=chunk.id,
+            ordinal=chunk.ordinal,
+            page=chunk.page,
+            text=chunk.text,
+            t_start=chunk.t_start,
+            t_end=chunk.t_end,
+        )
         for chunk in document.chunks
     ]

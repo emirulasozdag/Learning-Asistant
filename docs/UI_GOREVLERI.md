@@ -47,6 +47,7 @@
 | Öğrenci | `/student` | `pages/student/StudentDashboard.tsx` |
 | Öğrenci | `/student/courses/:id/tutor` | `pages/student/TutorPage.tsx` (ders çerçevesinde; `?video=&t=` ile ders videosu) |
 | Öğrenci | `/student/courses/:id/learning` | `pages/student/LearningRecordPage.tsx` |
+| Öğrenci | `/student/courses/:id/watch/:documentId` | `pages/student/VideoStudyPage.tsx`: video çalışma ekranı (büyük video, akan transkript, yanda soru-cevap; cevabın video kısmı işaretlenir). "Ders videoları"ndaki "İzle ve sor" buraya açılır |
 | Eğitmen | `/instructor` | `pages/instructor/InstructorDashboard.tsx` |
 | Eğitmen | `/instructor/courses/:id/materials` | `pages/instructor/MaterialsPage.tsx` |
 | Eğitmen | `/instructor/courses/:id/activity` | `pages/instructor/CourseActivityPage.tsx` (cevabı onayla/düzelt) |

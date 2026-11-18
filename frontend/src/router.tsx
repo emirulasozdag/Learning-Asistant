@@ -20,6 +20,7 @@ import CourseMaterialsPage from "./pages/student/CourseMaterialsPage";
 import StudentDashboard from "./pages/student/StudentDashboard";
 import TutorIndex from "./pages/student/TutorIndex";
 import TutorPage from "./pages/student/TutorPage";
+import VideoStudyPage from "./pages/student/VideoStudyPage";
 import LearningRecordPage from "./pages/student/LearningRecordPage";
 import AccountPage from "./pages/account/AccountPage";
 import { NotFound, RootRedirect } from "./pages/system";
@@ -37,6 +38,7 @@ import { NotFound, RootRedirect } from "./pages/system";
  *   /student/courses/:id/materials           ders materyalleri
  *   /student/courses/:id/tutor               AI Tutor (ders çerçevesinde; ?video=<id>&t=<s> ders videosu)
  *   /student/courses/:id/learning            öğrenme kaydım
+ *   /student/courses/:id/watch/:documentId   video çalışma ekranı (video + transkript + soru-cevap)
  *   /student/account, /instructor/account    hesabım: araştırma kaydı, verilerimi/hesabımı sil
  * Her iki rolde ders içeriği (OCW düzeni):
  *   …/courses/:id/syllabus, /calendar        izlence, takvim
@@ -97,6 +99,8 @@ export const router = createBrowserRouter([
       { index: true, element: <StudentDashboard /> },
       { path: "tutor", element: <TutorIndex /> },
       { path: "account", element: <AccountPage /> },
+      // Video çalışma ekranı: büyük video, akan transkript, yanda soru-cevap (#103).
+      { path: "courses/:courseId/watch/:documentId", element: <VideoStudyPage /> },
       { path: "practice", element: <Navigate to="/student" replace /> },
       {
         path: "courses/:courseId",

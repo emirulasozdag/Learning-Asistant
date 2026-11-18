@@ -1,5 +1,6 @@
 """Video: VTT yükleme akışı ve oynatma konumu önceliği (gerçek veritabanı, sahte embedder)."""
 
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -606,3 +607,58 @@ def test_rerank_never_drops_the_paused_moment(
     done = events[-1]
     assert moment in [p.source_id for p in done.retrieval.passages]
     assert done.response.video_moment is not None
+
+
+def test_video_chunk_list_carries_time_ranges(
+    client: TestClient, db: Session, course: Course, upload_dir: Path
+) -> None:
+    video = add_video(db, course)
+
+    chunks = client.get(f"/documents/{video.id}/chunks").json()
+
+    assert [(c["t_start"], c["t_end"]) for c in chunks[:2]] == [(0, 5), (100, 105)]
+
+
+class _PromptRecorder:
+    """Sistem istemini kaydeden, sabit bir alıntılı cevap akıtan sahte LLM."""
+
+    name = "fake"
+    model = "fake-model"
+
+    def __init__(self) -> None:
+        self.systems: list[str] = []
+
+    def stream_text(self, system: str, messages: list) -> Iterator[str]:
+        self.systems.append(system)
+        yield "Hoca bu anda bölümü anlatıyor. [S1]"
+
+    def complete_json(self, system: str, prompt: str, schema: type) -> object:
+        raise NotImplementedError
+
+
+@pytest.mark.parametrize(
+    ("question", "explains"), [("burayı anlamadım", True), ("ikili arama nedir", False)]
+)
+def test_not_understood_moment_gets_a_step_by_step_explanation(
+    db: Session, course: Course, upload_dir: Path, question: str, explains: bool
+) -> None:
+    from app.qa import service as qa_service
+
+    video = add_video(db, course)
+    llm = _PromptRecorder()
+
+    list(
+        qa_service.answer_stream(
+            db,
+            course,
+            question,
+            [],
+            llm,
+            video=qa_service.VideoRef(document_id=video.id, time_s=210),
+            embedder=FakeEmbedder(),
+        )
+    )
+
+    assert llm.systems, "LLM çağrılmadı"
+    assert ("### Adım adım" in llm.systems[0]) is explains
+    assert ("Kısa ve öğretici ol" in llm.systems[0]) is not explains

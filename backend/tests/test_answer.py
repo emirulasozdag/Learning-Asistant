@@ -336,3 +336,28 @@ def test_short_fragments_and_introductions_are_not_claims() -> None:
 
     assert result.text == "Evet. Kisaca anlatayim:\n\nSag yari elenir [1]."
     assert result.supported_claims == 1 and result.dropped_claims == []
+
+
+def test_step_by_step_explanation_keeps_headings_and_paragraph_level_citations() -> None:
+    # Video anı açıklaması (#103): etiket paragraf / madde sonunda; aradaki cümleler o kaynağa
+    # bağlanır, başlıklar iddia sayılmaz. Hiçbir cümle çıkarılmamalı.
+    explanation = (
+        "### Bu anda ne anlatılıyor\n"
+        "Hoca ikili aramayı anlatıyor. Amacı aramayı hızlandırmak. [S1]\n\n"
+        "### Adım adım\n"
+        "1. Önce ortadaki elemana bakılır. Aranan daha büyükse sol yarı bırakılır. [S1]\n"
+        "2. Her adımda alan yarıya iner. Bu yüzden adım sayısı az kalır. [S2]\n\n"
+        "### Neden önemli\n"
+        "Büyük listelerde bile az adımda sonuca varılır. [S2]"
+    )
+    llm = FakeLLM([explanation])
+
+    items = list(stream_answer(COURSE, "burayı anlamadım", [], RELEVANT, llm, explain=True))
+    final = items[-1]
+
+    assert isinstance(final, AskResponse)
+    assert "### Adım adım" in llm.calls[0][0]
+    assert final.unsupported_removed == 0
+    assert final.answer is not None
+    assert "### Adım adım" in final.answer and "Bu yüzden adım sayısı az kalır." in final.answer
+    assert [c.source_id for c in final.citations] == ["11", "12"]

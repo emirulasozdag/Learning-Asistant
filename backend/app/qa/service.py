@@ -189,6 +189,8 @@ def answer_stream(
         judge=judge,
         claim_check=settings.claim_check,
         judge_error=judge_error,
+        # "Burayı anlamadım" + durdurulan an: özet değil, o anı öğreten açıklama (#103).
+        explain=moment is not None and retrieval.deictic,
     ):
         if isinstance(item, AskResponse):
             response = item
