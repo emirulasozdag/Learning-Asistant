@@ -8,6 +8,11 @@ etiketler [1], [2]... olarak numaralanır; yeterli kapsama kalmazsa cevap göste
 Akan metin (str parçaları) yalnızca taslaktır; son AskResponse her zaman onun yerini alır.
 İddia kontrolü zorunluyken (CLAIM_CHECK=required, #10) taslak hiç akıtılmaz: öğrenciye yalnızca
 judge'ın kontrol ettiği metin gider.
+
+Görsel kanıt (#26): `visual` verilirse video kareleri parçalardan sonraki etiketlerle ([S6]…)
+modele gider (türetilmiş metin, konuşma, zaman). Kareye dayanan iddialar karenin görüntüsüyle
+kontrol edilir (`verification/visual.py`). Sahne belirsizse model "NETLEŞTİR:" ile netleştirme
+sorusu sorar; cevap verilmez. `visual` verilmezse (ya da kare yoksa) istem ve akış önceki gibidir.
 """
 
 import logging
@@ -15,12 +20,13 @@ import re
 from collections.abc import Iterator
 
 from app.db.models import Course
+from app.generation.visual import VisualContext, VisualEvidence, format_frames
 from app.llm.base import ChatMessage, LLMClient, LLMError, LLMRefusal
 from app.retrieval.types import RetrievalResult, RetrievedPassage
 from app.schemas.ask import AskOutcome, AskResponse, ClaimCheck
 from app.schemas.common import Citation
 from app.verification.citations import verify_answer
-from app.verification.claims import check_claims
+from app.verification.claims import CheckedText, check_claims
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +34,12 @@ NOT_COVERED = "Bu konu ders materyalinde yer almıyor; cevap uydurmamak için ya
 UNSUPPORTED = "Cevap ders kaynaklarıyla doğrulanamadı; bu yüzden gösterilmedi."
 REFUSED = "Model bu soruyu yanıtlamadı."
 DECLINE_PREFIX = "YOK:"
+# Görsel bağlamda sahne belirsizse modelin netleştirme sorusu (#26); cevap yerine gösterilir.
+CLARIFY_PREFIX = "NETLEŞTİR:"
+CLARIFY = (
+    "Sorduğun kısmı videodaki görüntüde tam olarak seçemedim. Slaytın hangi bölümünü (ör. hangi "
+    "diyagramı, formülü ya da kod satırını) kastettiğini yazar mısın?"
+)
 # Kısmi cevapta kaynakların kapsamadığı kısmı bildiren satır; iddia sayılmaz, ayrı gösterilir.
 GAP_PREFIX = "EKSİK:"
 _GAP_LINE = re.compile(r"^\s*(?:\*\*)?EKS[İI]K:(?:\*\*)?\s*(.*)$", re.MULTILINE | re.IGNORECASE)
@@ -90,6 +102,23 @@ olmayan yeni bir bilgi, tanım ya da örnek ekleme.\
 """
 
 
+# Görsel bağlam verildiğinde sistem istemine eklenir (#26); yalnızca metinde istem değişmez.
+VISUAL_RULES = """
+Video kareleri:
+- <kareler> içindeki her <kare>, ders videosundan alınmış bir görüntüdür; etiketi kaynak \
+etiketleriyle aynı biçimdedir ve aynı şekilde alıntılanır. <türetilmiş_metin> görüntüden OCR ile \
+makinece okunmuştur; hatalı ya da eksik olabilir. <konuşma> o kare ekrandayken söylenendir.
+- Slayttaki diyagram, formül, kod ya da yazı hakkındaki her cümleye o karenin etiketini koy. Bu \
+cümleler karenin görüntüsüyle ayrıca kontrol edilir; türetilmiş metinde olmayanı (okları, \
+şekli, yerleşimi) tahmin etme.
+- Konuşmadaki ya da ders metnindeki bilgiyi ilgili kaynağın etiketiyle yaz; kare etiketini \
+yalnızca görüntüde görünen bilgi için kullan.
+- Soru ekrandaki bir şeye işaret ediyor ama neyi kastettiği belli değilse (karede birden fazla \
+diyagram ya da formül var, durdurulan anda kare yok, kare okunamıyor) cevap yazma: cevabına tam \
+olarak "{clarify}" ile başla ve ardından öğrenciye tek bir kısa netleştirme sorusu sor.\
+"""
+
+
 def stream_answer(
     course: Course,
     question: str,
@@ -100,6 +129,7 @@ def stream_answer(
     claim_check: str = "off",
     judge_error: str | None = None,
     explain: bool = False,
+    visual: VisualContext | None = None,
 ) -> Iterator[str | AskResponse]:
     """Cevabı üretir: önce metin parçaları (str), en sonda doğrulanmış AskResponse.
 
@@ -110,6 +140,10 @@ def stream_answer(
       kontrol edilir; kontrol yapılamazsa üretilen metin yerine alıntı gösterilir
       (`verification_failure`). Taslak akıtılmaz.
     - `explain`: video anı açıklaması (#103); başlıklı, adım adım, öğretici biçim.
+    - `visual`: video kareleri (#26). Kapı ve LLM'siz alıntı yalnızca metin parçalarına bakar;
+      kareler cevaba ek kanıttır ve kareye dayanan iddialar görüntüyle kontrol edilir. Kare
+      verildiğinde taslak hiç akıtılmaz (`CLAIM_CHECK=off` iken de): görüntüyle kontrol edilmemiş
+      kare iddiası öğrenciye ulaşmaz.
     """
     stream_drafts = claim_check != "required"
     passages = retrieval.passages
@@ -127,16 +161,24 @@ def stream_answer(
         return
 
     labels = {f"S{index}": passage for index, passage in enumerate(passages, start=1)}
-    messages: list[ChatMessage] = [
-        *history,
-        {"role": "user", "content": _build_prompt(question, labels)},
-    ]
     system = SYSTEM_PROMPT.format(
         course_name=course.name,
         decline=DECLINE_PREFIX,
         gap=GAP_PREFIX,
         style=EXPLAIN_STYLE if explain else ANSWER_STYLE,
     )
+    # Kareler parçalardan sonraki etiketleri alır; alıntı doğrulaması ikisini birlikte görür.
+    frames = _frame_labels(course, visual, start=len(passages) + 1)
+    if frames:
+        stream_drafts = False
+    focus = visual.focus if visual else None
+    prompt = _build_prompt(question, labels, format_frames(frames, focus) if frames else "")
+    prefixes = (DECLINE_PREFIX,)
+    if frames:
+        labels = {**labels, **{label: frame.as_passage() for label, frame in frames.items()}}
+        system += VISUAL_RULES.format(clarify=CLARIFY_PREFIX)
+        prefixes = (DECLINE_PREFIX, CLARIFY_PREFIX)
+    messages: list[ChatMessage] = [*history, {"role": "user", "content": prompt}]
 
     text = ""
     declined: bool | None = None
@@ -146,9 +188,12 @@ def stream_answer(
             if declined is None:
                 # "YOK:" kararı ilk birkaç karakterde belli olur; o zamana kadar tampon tut.
                 stripped = text.lstrip()
-                if len(stripped) < len(DECLINE_PREFIX) and DECLINE_PREFIX.startswith(stripped):
+                if any(
+                    len(stripped) < len(prefix) and prefix.startswith(stripped)
+                    for prefix in prefixes
+                ):
                     continue
-                declined = stripped.startswith(DECLINE_PREFIX)
+                declined = stripped.startswith(prefixes)
                 if not declined and stream_drafts:
                     yield text
                 continue
@@ -171,12 +216,19 @@ def stream_answer(
         yield fallback
         return
 
-    if declined or text.lstrip().startswith(DECLINE_PREFIX):
-        reason = text.lstrip()[len(DECLINE_PREFIX) :].strip() or NOT_COVERED
+    stripped = text.lstrip()
+    if frames and stripped.startswith(CLARIFY_PREFIX):
+        # Sahne belirsiz: cevap yerine netleştirme sorusu (#26).
+        question_back = stripped[len(CLARIFY_PREFIX) :].strip() or CLARIFY
+        response = _decline(question_back, passages, "insufficient_evidence")
+    elif declined or stripped.startswith(DECLINE_PREFIX):
+        reason = stripped[len(DECLINE_PREFIX) :].strip() or NOT_COVERED
         response = _decline(reason, passages, "insufficient_evidence")
     else:
         text, gap = split_gap_note(text)
-        response = _verified_response(text, gap, labels, passages, judge, claim_check, judge_error)
+        response = _verified_response(
+            text, gap, labels, passages, judge, claim_check, judge_error, frames
+        )
     response.model = llm.model
     yield response
 
@@ -189,13 +241,15 @@ def _verified_response(
     judge: LLMClient | None,
     claim_check: str,
     judge_error: str | None,
+    frames: dict[str, VisualEvidence] | None = None,
 ) -> AskResponse:
     """Alıntı doğrulaması, ardından iddia kontrolü; sonuca göre cevap, ret ya da alıntı."""
     verification = verify_answer(text, labels)
     check: ClaimCheck | None = None
+    checked: CheckedText | None = None
     judge_removed = 0
     if verification.accepted:
-        checked = check_claims(text, labels, judge, claim_check, judge_error)
+        checked = check_claims(text, labels, judge, claim_check, judge_error, frames)
         check = checked.check
         if not checked.usable:
             # Üretilen metin kontrol edilmeden gösterilmez; kaynaktan aynen alıntı verilir.
@@ -203,8 +257,8 @@ def _verified_response(
             fallback.outcome = "verification_failure"
             fallback.claim_check = check
             return fallback
-        if check.unsupported:
-            judge_removed = check.unsupported
+        if checked.removed:
+            judge_removed = checked.removed
             verification = verify_answer(checked.text, labels)
             verification.extra_dropped = judge_removed
     if verification.dropped_claims:
@@ -227,6 +281,13 @@ def _verified_response(
     if gap and not verification.text:
         # Model yalnızca eksik satırını yazdı: materyal soruyu karşılamıyor demektir.
         return _decline(gap, passages, "insufficient_evidence")
+    if checked is not None and checked.ambiguous:
+        # Kareye dayanan iddialar görüntüde belirsiz kaldı ve kalan cevap yetmedi: tahmin yerine
+        # öğrenciden neyi kastettiğini netleştirmesi istenir (#26).
+        response = _decline(CLARIFY, passages, "insufficient_evidence")
+        response.unsupported_removed = len(verification.dropped_claims) + judge_removed
+        response.claim_check = check
+        return response
     response = _decline(UNSUPPORTED, passages, "unsupported")
     response.unsupported_removed = len(verification.dropped_claims) + judge_removed
     response.claim_check = check
@@ -272,13 +333,30 @@ def _decline(reason: str, passages: list[RetrievedPassage], outcome: AskOutcome)
     )
 
 
-def _build_prompt(question: str, labels: dict[str, RetrievedPassage]) -> str:
+def _frame_labels(
+    course: Course, visual: VisualContext | None, start: int
+) -> dict[str, VisualEvidence]:
+    """Karelerin etiketleri (parçalardan sonra: S{start}, …). Başka derse ait kare alınmaz;
+    bağdaştırıcı (`StoredFrameSource`) bunu zaten süzer, burada savunma amaçlı denetlenir."""
+    if visual is None:
+        return {}
+    own = [frame for frame in visual.frames if frame.course_id == course.id]
+    if len(own) < len(visual.frames):
+        logger.warning("Başka derse ait %d kare cevaba alınmadı", len(visual.frames) - len(own))
+    return {f"S{index}": frame for index, frame in enumerate(own, start=start)}
+
+
+def _build_prompt(
+    question: str, labels: dict[str, RetrievedPassage], frames_block: str = ""
+) -> str:
+    """Kaynaklar, varsa kareler (#26) ve soru. Kare yoksa istem önceki gibidir."""
     sources = "\n".join(
         f'<kaynak etiket="{label}" doküman="{p.document_title}" {_location(p)}>\n'
         f"{p.text}\n</kaynak>"
         for label, p in labels.items()
     )
-    return f"<kaynaklar>\n{sources}\n</kaynaklar>\n\nSoru: {question}"
+    frames = f"{frames_block}\n\n" if frames_block else ""
+    return f"<kaynaklar>\n{sources}\n</kaynaklar>\n\n{frames}Soru: {question}"
 
 
 def _location(passage: RetrievedPassage) -> str:
