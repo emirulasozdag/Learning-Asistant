@@ -1,5 +1,8 @@
 """Demo dersini oluşturur (yoksa). Kullanım: python -m app.scripts.seed_demo
 
+SEED_DEMO_COURSE=false ise demo dersi oluşturulmaz (silinmişse geri gelmez); geliştirme
+hesapları yine oluşturulur ama hiçbir derse eklenmez.
+
 Geliştirme hesapları yalnızca SEED_DEV_ACCOUNTS=true iken ve şifreleri .env'de verilmişse
 oluşturulur (DEV_INSTRUCTOR_PASSWORD, DEV_STUDENT_PASSWORD). Üretimde bu ayar kapalı kalır;
 çalışma zamanında demo/mock hesap yoktur (ADR-1).
@@ -19,19 +22,27 @@ DEMO_COURSE = {"code": "BLM2512", "name": "Veri Yapıları ve Algoritmalar", "la
 
 def main() -> None:
     with SessionLocal() as db:
-        course = db.scalar(select(Course).where(Course.code == DEMO_COURSE["code"]))
-        if course is None:
-            course = Course(**DEMO_COURSE)
-            db.add(course)
-            db.commit()
-            print(f"Ders oluşturuldu: {course.code} — {course.name} (id={course.id})")
-        else:
-            print(f"Ders zaten var: {course.code} (id={course.id})")
+        course = demo_course(db)
         if settings.seed_dev_accounts:
             seed_dev_accounts(db, course)
 
 
-def seed_dev_accounts(db: Session, course: Course) -> None:
+def demo_course(db: Session) -> Course | None:
+    if not settings.seed_demo_course:
+        print("Demo dersi kapalı (SEED_DEMO_COURSE=false); oluşturulmadı")
+        return None
+    course = db.scalar(select(Course).where(Course.code == DEMO_COURSE["code"]))
+    if course is None:
+        course = Course(**DEMO_COURSE)
+        db.add(course)
+        db.commit()
+        print(f"Ders oluşturuldu: {course.code} — {course.name} (id={course.id})")
+    else:
+        print(f"Ders zaten var: {course.code} (id={course.id})")
+    return course
+
+
+def seed_dev_accounts(db: Session, course: Course | None) -> None:
     accounts: list[tuple[str, str | None, str, str, Role]] = [
         (
             settings.dev_instructor_name,
@@ -69,13 +80,14 @@ def seed_dev_accounts(db: Session, course: Course) -> None:
             # Bu e-postayla başkası kayıt olmuş olabilir: var olan hesaba rol verilmez.
             print(f"{email}: aynı e-postayla şifresi farklı bir hesap var; yetki verilmedi")
             continue
-        enrolled = db.scalar(
-            select(Enrollment).where(
-                Enrollment.user_id == user.id, Enrollment.course_id == course.id
+        if course is not None:
+            enrolled = db.scalar(
+                select(Enrollment).where(
+                    Enrollment.user_id == user.id, Enrollment.course_id == course.id
+                )
             )
-        )
-        if enrolled is None:
-            db.add(Enrollment(user_id=user.id, course_id=course.id, role=role))
+            if enrolled is None:
+                db.add(Enrollment(user_id=user.id, course_id=course.id, role=role))
         db.commit()
 
 

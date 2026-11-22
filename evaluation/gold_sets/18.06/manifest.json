@@ -1,0 +1,418 @@
+{
+  "schema_version": 1,
+  "course_code": "18.06",
+  "approved_by": null,
+  "documents": [
+    {
+      "sha256": "6b5486a2f40a6a6bde5fa5b0dba2ac10c175bff00e139c0db435ee192a3d9db7",
+      "title": "Problem Set 1 Solutions",
+      "material_type": "assignment",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "e8d01d249fff0ea7d9a8f85a672a74ee498e1464264cefd87fdc94c4eb55a6f8",
+      "title": "Problem Set 2 Solutions",
+      "material_type": "assignment",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "59019949974ac56bda750b5879d9860507803392a384db2f12037a5954827fd9",
+      "title": "Problem Set 3 Solutions",
+      "material_type": "assignment",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "a0ee7322f100b7559082145ab06bdef2b3b2e4d72d0169fc176936fe2d443dbb",
+      "title": "Problem Set 4 Solutions",
+      "material_type": "assignment",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "87e6312572339b0bec0f82cfc493611ed15d3cc38d4b8bc2c1fb97c297b5a2dc",
+      "title": "Problem Set 5 Solutions",
+      "material_type": "assignment",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "9126b0f204142e3f6e4cfa853ef571092c6d21e27e68ae4707be4955319c363f",
+      "title": "Problem Set 6 Solutions",
+      "material_type": "assignment",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "147450302a4d79502d789426939e171b7ce8dfebad4aa2fbc666e0508d3e0f3f",
+      "title": "Problem Set 7 Solutions",
+      "material_type": "assignment",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "a0f081d62d0091ee7dcc2a7b05958f3153ba2d47e775624d42426ada3f030290",
+      "title": "Problem Set 8 Solutions",
+      "material_type": "assignment",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "055bb017b5133ea480ebe2f8f4e6c384d966eb642938f3ccf9843ad93fee4993",
+      "title": "Problem Set 9 Solutions",
+      "material_type": "assignment",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "780940ab2945b211a071dba2a81a66ebb41fcb7b19df838f2833112047300f7c",
+      "title": "Problem Set 10 Solutions",
+      "material_type": "assignment",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "b5f28732378182d884e9cf7dcc711ea7c8bdba288c7933975697a1db10a2fff2",
+      "title": "Exam 1",
+      "material_type": "past_exam",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "d263d3417d722e3f0f93b67aeff95bb7ae7d896554114e3af0d86363f2258d59",
+      "title": "Exam 1 solutions",
+      "material_type": "past_exam",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "ca54e2175f51c144e678668e7e3aee3c6cfc8be229ccdf06f57bcc238a8fa842",
+      "title": "Exam 2",
+      "material_type": "past_exam",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "bba3056cc2f8e29b5656f95fec248bcfe0cd79a3d2c9157a895fb3518c5dafc4",
+      "title": "Exam 2 solutions",
+      "material_type": "past_exam",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "a2388d7d6506b111d12f9c61d79511f7d4577bf9c0d7040633444e102f57dc6d",
+      "title": "Exam 3",
+      "material_type": "past_exam",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "ae83b5f53fbbcb2253ae8a14b6c69f154ffe8ef7695dd00489dfcab040259e40",
+      "title": "Exam 3 solutions",
+      "material_type": "past_exam",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "b00f7875413fe86fd6d33ecb7b5e959d76a9e3f3e93c4bca51716dbb2133d151",
+      "title": "Final Exam",
+      "material_type": "past_exam",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "5cd631db8dfbc266d766c9fc2eb8e0e7a52226083dc317379825b9aaae5048aa",
+      "title": "Final exam with solutions",
+      "material_type": "past_exam",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "2db27a4cdcb59f4e3fc71247dbbefaa90d833bf2b648e6235fd1b3644caf768d",
+      "title": "An Interview with Gilbert Strang on Teaching Linear Algebra",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "9fa6200af463b9e099735faf930e08ff55d4f9e13e09e107be19fe870d6e3d93",
+      "title": "Lecture 1: The geometry of linear equations",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "24691acb19c79d716f8801ee15f67acb46bee004171fea3b43ea03f8ae32bd48",
+      "title": "Lecture 2: Elimination with matrices",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "4ba30e88b21da7203eb9af5a43b1f6362b71d31b82bcc63ee6fe9cad52db87fa",
+      "title": "Lecture 3: Multiplication and inverse matrices",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "35a13f92e91bb530903fedb3b8679c091c503f7f1e6ce079996d8ec9c32242eb",
+      "title": "Lecture 4: Factorization into A = LU",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "c08f1885227b7376eec462a9914caf351f67f5ab0e1778b66db8869caa3da35b",
+      "title": "Lecture 5: Transposes, permutations, spaces R^n",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "00eba62e991f5a717141ec186bc772a22507e561ffe534116ab8c6bd9b74616a",
+      "title": "Lecture 6: Column space and nullspace",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "10230c7f0759185e7233ac868b71286d678e26c173fa5e86a2e9826d9d32be8c",
+      "title": "Lecture 7: Solving Ax = 0: pivot variables, special solutions",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "c8664649dbcd815c844183c891ca517dd6ba0df93ab9653cec8febe71213fc17",
+      "title": "Lecture 8: Solving Ax = b: row reduced form R",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "5240e8fb54055ffbc184abfcf5b6f69579ad124513c5f7c7e60db4a70c1217de",
+      "title": "Lecture 9: Independence, basis, and dimension",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "5cb51ce60c6352f0526dd69c549b5d86fd19bb8d52ccf635f5b8250d804281c9",
+      "title": "Lecture 10: The four fundamental subspaces",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "1bc2bbde9906aefa857a3b8b22504b83e904746318941f54d4546dd7ada794c4",
+      "title": "Lecture 11: Matrix spaces; rank 1; small world graphs",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "37437ea370da7f39b8a15979e054df73ce45fa4652c197b746982ae0e3dc2a37",
+      "title": "Lecture 12: Graphs, networks, incidence matrices",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "91ba42ea47ea5d535747284e4e2952a6d43e59b55db8102b414b97180f7448e4",
+      "title": "Lecture 13: Quiz 1 review",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "cd1bbefb9d48470ef9ae11e9ec74102cd3315f9902249f814118930a6fdc9dd7",
+      "title": "Lecture 14: Orthogonal vectors and subspaces",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "a2dfef77d0da73a61d6828fa3ce28d158e7f091ac68e4f1455eef33392d24a1c",
+      "title": "Lecture 15: Projections onto subspaces",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "d3f252f38a2b176ff50c2f6255e319a51ba523e9a4035a377a9acc7ce2029c52",
+      "title": "Lecture 16: Projection matrices and least squares",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "c9248619ff7b64c25c83a3971163624744e77efc0e638b1a71c738bd1b161160",
+      "title": "Lecture 17: Orthogonal matrices and Gram-Schmidt",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "f438ba6d69153802e5504ee24e797230d966254d19a65a7518505cd2053b7264",
+      "title": "Lecture 18: Properties of determinants",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "c5e8691bc7e6d70f6a3794544a1a8ac79474271a9dea1971ff7c6701e3980c13",
+      "title": "Lecture 19: Determinant formulas and cofactors",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "a6766cd301cf0622b94598c034283b5c22ef7b5501b6a08d646b1108f650d77d",
+      "title": "Lecture 20: Cramer's rule, inverse matrix, and volume",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "7103652e4d376c02407ac34dbf2c89fb09abf27a951ef88289332c0675c7b8f0",
+      "title": "Lecture 21: Eigenvalues and eigenvectors",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "bc93260e4f58ffbafbc7d3d30be6c82ab90db161175af6a2099acaaf6b3086ed",
+      "title": "Lecture 22: Diagonalization and powers of A",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "61e6c1ec75dd9d63100708a2d90d34e17a2de29f89d977580e5a6148b362e8c9",
+      "title": "Lecture 23: Differential equations and exp(At)",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "4fbca4e89b433606871f28fda72ae0a7e5081d10dadc7b974da2782cca5fd848",
+      "title": "Lecture 24: Markov matrices; fourier series",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "48cde500afb1edf73f851e17c6eb53839c1fdce637d428b130576a23cb0e4570",
+      "title": "Lecture 24b: Quiz 2 review",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "d24aa5e299f35350bb3c4613f3757babccfd23ab68cef5238a75d21d585c31a2",
+      "title": "Lecture 25: Symmetric matrices and positive definiteness",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "6230ced0e9e480de51ebe0965e2781561cf772e9ff21f6d98db54a60f9e05024",
+      "title": "Lecture 26: Complex matrices; fast fourier transform",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "d0f98e300059fc90c6ef40905af6c3e312ceb2f8d9315446ac8883b582635a08",
+      "title": "Lecture 27: Positive definite matrices and minima",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "2448454638693e1b70acce2f642bab8343babf08124b48d59ab062579f47eac3",
+      "title": "Lecture 28: Similar matrices and Jordan form",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "c7fe0b37cf3d82b53ce8306f4d553fb2f915a5a4beffa7fcab2a63dfa0e6e9e4",
+      "title": "Lecture 29: Singular value decomposition",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "ee21e56feac3ae32733f051da4c8fb6b06dbff821637fc113ed357c47ab14a5a",
+      "title": "Lecture 30: Linear transformations and their matrices",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "37313dd4e7a87e1966b113eb63a8fbab1a300282d29c0332332d20cc22f32de6",
+      "title": "Lecture 31: Change of basis; image compression",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "abf72a92d1f5f142240378e8dd4a6b14fb429984308fa3e67dbfe0be33e6d09b",
+      "title": "Lecture 32: Quiz 3 review",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "5c7b8461e753abb15b771d23793f6a1f855af2f53e2b263b7f51294c6b80bb8b",
+      "title": "Lecture 33: Left and right inverses; pseudoinverse",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "a7a248dfea7554c061686b53fc2a11f8bcc83364913d8fd4472e94b500934d2a",
+      "title": "Lecture 34: Final course review",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/); ekip kaydı 2026-11-18"
+    }
+  ],
+  "missing_inputs": [
+    {
+      "what": "Kare çıkarılacak 18.06 ders videolarının mp4 dosyaları (archive.org, CC BY-NC-SA); indirme ekip onayıyla",
+      "owner": "Ekip",
+      "blocking": [
+        "#28"
+      ]
+    },
+    {
+      "what": "Görsel soruların ve referans cevapların eğitmen/TA incelemesi (review); ekip taslakları onaysız koşulmaz",
+      "owner": "Ekip → eğitmen/TA",
+      "blocking": [
+        "#28",
+        "#33"
+      ]
+    },
+    {
+      "what": "Ayrılmış görsel soru setinin tamamı (her derste en az 30 soru, altın kare zamanıyla) ve bağımsız etiketler",
+      "owner": "Ekip + eğitmen/TA",
+      "blocking": [
+        "#28",
+        "#29",
+        "#33"
+      ]
+    },
+    {
+      "what": "Görsel koşulun (karelerin cevaba kanıt olması) uygulaması; o zamana kadar yalnızca transkript koşulu koşulur",
+      "owner": "#26",
+      "blocking": [
+        "#33"
+      ]
+    }
+  ]
+}

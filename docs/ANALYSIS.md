@@ -223,6 +223,20 @@ Kimlik, üyelik ve onay alanlarının önerisi: [DECISIONS.md](DECISIONS.md), [C
 
 **Tasarım gereği uygulanabilir:** Toplamda yaklaşık 200 insan etiketi gerekiyor; geri kalan her şey otomatik ve yeniden koşulabilir. Judge'a ancak insanla uyumu **κ ≥ 0,6** olursa güvenilir.
 
+**İki ders ve görsel değerlendirme (#28).** Aynı protokol iki derste koşulur: 6.006 (algoritmalar; notlar, slayt
+ve tahta) ve 18.06 (lineer cebir; tahtada formül ve matris, ders notu yok, ağırlık video transkriptinde). İkisi de MIT
+OCW paketinden derse özel kod olmadan içe aktarılır (`app/scripts/import_ocw.py`); envanter ve izin kaydı
+`evaluation/gold_sets/<ders>/manifest.json`'da.
+- **Görsel soru:** tahtadaki çizime dayanır ("burada çizdiği…"). Gold item'da `playback` (durdurulan an) ve kanıt
+  olarak video aralığı vardır. Altın kare, o andaki karedir. Referans cevap dersin transkriptinden alınır.
+- **Koşullar:** `transcript_only` mevcut `full_video_time` koşuludur (cevap transkriptten, kare gösterilir ama kanıt
+  değildir, ADR-10). `visual` ise karelerin kanıt olduğu koşuldur; #26 gelene kadar tanımlıdır ama koşulmaz.
+  Karşılaştırma (görselin katkısı) #33'te raporlanır.
+- **Eksikler:** ekip taslağı sorular eğitmen/TA incelemesinden geçmeden koşulmaz. Her derste en az 30 görsel soru ve
+  bağımsız etiket gerekir. Durum `manifest.json` → `missing_inputs`'ta.
+- **Ayrışma:** iki ders aynı veritabanında; arama, kare, video anı ve kaynak her zaman yalnızca kendi dersinden döner
+  (backend ayrışma testleri, Playwright'ta ders değişimi).
+
 **Literatür dayanağı:** RAG [1] · ALCE alıntı recall/precision [8] · RAGAs geliştirme-zamanı regresyon [9] · FActScore atomik iddia [10] · RAGTruth etiketleme şeması [11] · LLM-as-a-Judge yanlılıkları [16].
 
 ---

@@ -124,6 +124,8 @@ class Settings(BaseSettings):
     # Geliştirme hesapları (`python -m app.scripts.seed_demo`). Varsayılan kapalı; üretimde
     # açılmaz. Şifreler yalnızca .env'den gelir; boşsa hesap oluşturulmaz.
     seed_dev_accounts: bool = False
+    # Demo dersi (BLM2512) API açılırken oluşturulsun mu? Kapatılırsa silinen ders geri gelmez.
+    seed_demo_course: bool = True
     dev_instructor_email: str = "egitmen@example.com"
     dev_instructor_password: str = ""
     dev_instructor_name: str = "Geliştirme Eğitmeni"

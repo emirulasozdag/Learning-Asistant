@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "course_code": "6.006",
+  "manifest": "manifest.json",
+  "items": [
+    {
+      "id": "alg-v-01",
+      "split": "heldout",
+      "kind": "answerable",
+      "question": "Tahtada çizdiği ağaçta düğümlerin işaretçileri ne, anlamadım.",
+      "topic": "binary tree node",
+      "reference_answer": "Tahtadaki ikili ağaçta her düğüm (ör. A, B, C) bir öğe (item) taşır ve bir düğüm X'in üst düğüme (parent), sol çocuğa (left) ve sağ çocuğa (right) işaretçileri vardır; bağlantılar bağlı listedeki gibidir.",
+      "evidence": [
+        {
+          "document_sha256": "a19c6ae66b4b243b7a8cff782bc0a38d2f7b0b94e0a8188d286dd623a33040f1",
+          "t_start": 259,
+          "t_end": 320
+        }
+      ],
+      "origin": "team_draft",
+      "notes": "Görsel soru (#28): tahtadaki çizime dayanır. Referans cevap dersin transkriptinden alınmıştır; altın kare = playback anındaki kare. Koşullar: transcript_only = full_video_time; visual = #26.",
+      "playback": {
+        "document_sha256": "a19c6ae66b4b243b7a8cff782bc0a38d2f7b0b94e0a8188d286dd623a33040f1",
+        "time_s": 280
+      }
+    }
+  ]
+}

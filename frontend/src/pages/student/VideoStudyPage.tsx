@@ -34,15 +34,18 @@ export default function VideoStudyPage() {
   const courseId = Number(params.courseId);
   const documentId = Number(params.documentId);
   const course = useCourse(courseId);
-  const [materials, setMaterials] = useState<DocumentOut[] | null>(null);
+  // Liste, yüklendiği dersle birlikte tutulur: ders değişince eski dersin listesi (ve onunla
+  // açılan sohbet) yeni dersin sayfasında bir an bile görünmez (#28).
+  const [loaded, setLoaded] = useState<{ courseId: number; list: DocumentOut[] } | null>(null);
   const [failed, setFailed] = useState(false);
+  const materials = loaded?.courseId === courseId ? loaded.list : null;
 
   useEffect(() => {
     const controller = new AbortController();
     courseService
       .materials(courseId, controller.signal)
       .then((list) => {
-        if (!controller.signal.aborted) setMaterials(list);
+        if (!controller.signal.aborted) setLoaded({ courseId, list });
       })
       .catch(() => {
         if (!controller.signal.aborted) setFailed(true);
@@ -53,9 +56,10 @@ export default function VideoStudyPage() {
   const videos = useMemo(
     () =>
       (materials ?? []).filter(
-        (doc) => doc.material_type === "video" && doc.status === "ready" && Boolean(doc.media_url),
+        (doc) =>
+          doc.course_id === courseId && doc.material_type === "video" && doc.status === "ready" && Boolean(doc.media_url),
       ),
-    [materials],
+    [materials, courseId],
   );
   const video = videos.find((doc) => doc.id === documentId);
   const back = `/student/courses/${courseId}/videos`;
@@ -94,8 +98,10 @@ export default function VideoStudyPage() {
       />
     );
   }
-  // `key`: başka video seçilince sohbet ve oynatıcı o videoya göre baştan kurulur.
-  return <StudySession key={video.id} courseId={courseId} video={video} videos={videos} back={back} />;
+  // `key`: başka ders ya da video seçilince sohbet ve oynatıcı baştan kurulur (#28).
+  return (
+    <StudySession key={`${courseId}-${video.id}`} courseId={courseId} video={video} videos={videos} back={back} />
+  );
 }
 
 function StudySession({
