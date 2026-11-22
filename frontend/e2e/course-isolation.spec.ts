@@ -42,14 +42,18 @@ async function mockFramesOfA(page: Page, videoId: number) {
 }
 
 /** Bu sekmenin sessionStorage'ındaki tutor oturumları: anahtar → içerik. */
-function tutorStorage(page: Page): Promise<Record<string, string>> {
-  return page.evaluate(() =>
-    Object.fromEntries(
-      Object.keys(sessionStorage)
-        .filter((key) => key.startsWith("la.tutor."))
-        .map((key) => [key, sessionStorage.getItem(key) ?? ""]),
-    ),
+/**
+ * Sekmedeki Tutor kayıtları. Anahtarlar kullanıcıya bağlıdır (`la.tutor.u<kullanıcı>.<ders>…`, #134);
+ * karşılaştırma kolay olsun diye kullanıcı kısmı çıkarılır (`la.tutor.<ders>…`).
+ */
+async function tutorStorage(page: Page): Promise<Record<string, string>> {
+  const entries = await page.evaluate(() =>
+    Object.keys(sessionStorage)
+      .filter((key) => key.startsWith("la.tutor."))
+      .map((key) => [key, sessionStorage.getItem(key) ?? ""] as const),
   );
+  for (const [key] of entries) expect(key).toMatch(/^la\.tutor\.u\d+\./);
+  return Object.fromEntries(entries.map(([key, value]) => [key.replace(/^la\.tutor\.u\d+\./, "la.tutor."), value]));
 }
 
 /** Bir dersin anahtarlarında geçen içerik (`la.tutor.<id>` ve `la.tutor.<id>.<kapsam>`). */

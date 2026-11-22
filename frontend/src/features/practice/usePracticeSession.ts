@@ -10,6 +10,8 @@ import type {
   PracticeType,
 } from "../../api/types";
 import { practiceService } from "../../services/practiceService";
+import { studyCacheKey } from "../../auth/studyCache";
+import { useAuth } from "../../auth/useAuth";
 
 export interface PracticeSettings {
   type: PracticeType;
@@ -39,11 +41,11 @@ interface Stored {
   view: SessionView;
 }
 
-const STORAGE_PREFIX = "la.practice.";
-
-function load(courseId: number): Stored | null {
+function load(userId: number | null | undefined, courseId: number): Stored | null {
+  const storageKey = studyCacheKey("la.practice.", userId, `${courseId}`);
+  if (!storageKey) return null;
   try {
-    const raw = sessionStorage.getItem(STORAGE_PREFIX + courseId);
+    const raw = sessionStorage.getItem(storageKey);
     if (!raw) return null;
     const stored = JSON.parse(raw) as Stored;
     return Array.isArray(stored.entries) ? stored : null;
@@ -52,12 +54,14 @@ function load(courseId: number): Stored | null {
   }
 }
 
-function save(courseId: number, stored: Stored) {
+function save(userId: number | null | undefined, courseId: number, stored: Stored) {
+  const storageKey = studyCacheKey("la.practice.", userId, `${courseId}`);
+  if (!storageKey) return;
   try {
     if (stored.entries.length === 0 && stored.view === "setup") {
-      sessionStorage.removeItem(STORAGE_PREFIX + courseId);
+      sessionStorage.removeItem(storageKey);
     } else {
-      sessionStorage.setItem(STORAGE_PREFIX + courseId, JSON.stringify(stored));
+      sessionStorage.setItem(storageKey, JSON.stringify(stored));
     }
   } catch {
     // Saklanamazsa oturum yalnızca bu sayfada yaşar; sorun değil.
@@ -80,7 +84,9 @@ export function describeFailure(reason: unknown): PracticeFailure {
  * yalnızca cevaptan sonra gelen geri bildirimdedir.
  */
 export function usePracticeSession(courseId: number) {
-  const [initial] = useState(() => load(courseId));
+  // Kayıt kullanıcıya bağlı (#134): aynı tarayıcıda başka öğrencinin oturumu açılmaz.
+  const userId = useAuth().user?.id;
+  const [initial] = useState(() => load(userId, courseId));
   const [settings, setSettings] = useState<PracticeSettings | null>(initial?.settings ?? null);
   const [entries, setEntries] = useState<PracticeEntry[]>(initial?.entries ?? []);
   const [view, setView] = useState<SessionView>(initial?.view ?? "setup");
@@ -89,7 +95,7 @@ export function usePracticeSession(courseId: number) {
   const [lastRequest, setLastRequest] = useState<PracticeRequest | null>(null);
   const controllerRef = useRef<AbortController | null>(null);
 
-  useEffect(() => save(courseId, { settings, entries, view }), [courseId, settings, entries, view]);
+  useEffect(() => save(userId, courseId, { settings, entries, view }), [userId, courseId, settings, entries, view]);
   // Sayfadan çıkınca süren istek iptal edilir.
   useEffect(() => () => controllerRef.current?.abort(), []);
 

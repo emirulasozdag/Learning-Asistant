@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { TutorStreamEvent, VideoRef } from "../../api/types";
+import { useAuth } from "../../auth/useAuth";
 import { tutorService } from "../../services/tutorService";
 import { classifyFailure } from "./outcome";
 import { loadSession, saveSession } from "./sessionTurns";
@@ -18,7 +19,8 @@ function withSegment(turn: TutorTurn, index: number, change: (segment: Segment) 
  * Video çalışma ekranı kullanır (#103). Sohbet ders + anahtar başına sekme oturumunda saklanır.
  */
 export function useTutorTurns(courseId: number, sessionKey: string) {
-  const [restored] = useState(() => loadSession(courseId, sessionKey));
+  const userId = useAuth().user?.id;
+  const [restored] = useState(() => loadSession(userId, courseId, sessionKey));
   const [turns, setTurns] = useState<TutorTurn[]>(restored.turns);
   const [conversationId, setConversationId] = useState<number | null>(restored.conversationId);
   const [busy, setBusy] = useState(false);
@@ -26,8 +28,8 @@ export function useTutorTurns(courseId: number, sessionKey: string) {
 
   useEffect(() => () => abortRef.current?.abort(), []);
   useEffect(
-    () => saveSession(courseId, turns, conversationId, sessionKey),
-    [courseId, turns, conversationId, sessionKey],
+    () => saveSession(userId, courseId, turns, conversationId, sessionKey),
+    [userId, courseId, turns, conversationId, sessionKey],
   );
 
   const updateTurn = useCallback((id: string, change: (turn: TutorTurn) => TutorTurn) => {
