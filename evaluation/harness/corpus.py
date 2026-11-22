@@ -54,7 +54,6 @@ class Locator:
             t_end=chunk.t_end if has_time else None,
         )
 
-
     def _locate_frame(self, frame_id: str) -> SourceLocator | None:
         if not frame_id.isdigit():
             return None

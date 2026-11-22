@@ -636,7 +636,11 @@ def _run_config(
         claim_check=settings.claim_check if checked else None,
         judge_model=(settings.judge_model or None) if checked else None,
         judge_prompt_version=(
-            (f"{JUDGE_PROMPT_VERSION}+{VISUAL_JUDGE_PROMPT_VERSION}" if visual else JUDGE_PROMPT_VERSION)
+            (
+                f"{JUDGE_PROMPT_VERSION}+{VISUAL_JUDGE_PROMPT_VERSION}"
+                if visual
+                else JUDGE_PROMPT_VERSION
+            )
             if checked
             else None
         ),
