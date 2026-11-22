@@ -128,6 +128,8 @@ export interface VideoMoment {
  * - provider_failure: modele ulaşılamadı; en ilgili parça alıntılandı
  * - verification_failure: cevap üretildi ama iddia kontrolü yapılamadı (#10); üretilen metin
  *   gösterilmez, en ilgili parça alıntılandı
+ * - needs_clarification: videodaki sahne belirsiz (#26); `decline_reason` öğrenciye sorulan
+ *   netleştirme sorusudur
  */
 export type AskOutcome =
   | "answered"
@@ -135,7 +137,8 @@ export type AskOutcome =
   | "unsupported"
   | "model_refusal"
   | "provider_failure"
-  | "verification_failure";
+  | "verification_failure"
+  | "needs_clarification";
 
 /** İddia kontrolünün özeti (#10); ayrıntılı kayıt yalnızca backend'de tutulur. */
 export interface ClaimCheck {
@@ -367,6 +370,8 @@ export interface CourseActivity {
   not_generated: number;
   /** Modele ulaşılamadı. */
   unavailable: number;
+  /** Videodaki sahne belirsizdi; öğrenciden netleştirme istendi (#26). */
+  clarification: number;
   daily: { day: string; questions: number }[];
   top_sources: { source_id: string; document_title: string; page: number | null; citations: number }[];
   recent_questions: QuestionItem[];

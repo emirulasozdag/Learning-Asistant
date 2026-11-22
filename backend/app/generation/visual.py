@@ -8,8 +8,8 @@ Cevap üreticisi ve iddia kontrolü için kare sözleşmesi (CONTRACTS.md §4.2)
   `transcript` kare ekrandayken konuşulan metindir (aynı videonun zamanlı parçaları).
 - `FrameLocator`: istekteki kare referansı: video (`document_id`) ve ya kare kimliği ya da an.
 - `FrameEvidenceSource`: referansları yetkili kanıta çeviren bağdaştırıcı. `StoredFrameSource`
-  #24'ün `video_frames` kayıtlarından okur; #25 isteğe ve izlere kare referansı eklediğinde
-  çağıran (`qa/service.py`) bu arayüzle `VisualContext` kurar ve `stream_answer(visual=…)`a verir.
+  #24'ün `video_frames` kayıtlarından okur; `qa/service.answer_stream` isteğin doğrulanmış video
+  bağlamından (#25) bununla `VisualContext` kurar ve `stream_answer(visual=…)`a verir (ADR-12).
 - `VisualContext`: cevaba giren kareler ve öğrencinin durdurduğu an (varsa).
 
 Kareler ayrı bir alıntı kimliği taşır (`frame:<kare kimliği>`); `chunks` kimlikleriyle karışmaz.
@@ -192,16 +192,33 @@ class StoredFrameSource:
         video: VideoPosition,
         before_s: float = MOMENT_BEFORE_S,
         after_s: float = MOMENT_AFTER_S,
+        frame_id: int | None = None,
     ) -> VisualContext:
         """Durdurulan anın etrafındaki kareler: o anda ekrandaki kare önce, sonra ana yakınlığa
-        göre (en çok `MAX_FRAMES`). Video erişilebilir değilse kare yok, an korunur."""
+        göre (en çok `MAX_FRAMES`). Video erişilebilir değilse kare yok, an korunur.
+
+        `frame_id`: öğrencinin baktığı kare (#25'te doğrulanmış `VideoRef.frame_id`). Bu videonun
+        karesiyse her zaman alınır ve an ona odaklanır: kare durdurulan anda ekranda değilse
+        (doğrulamadaki 1 sn pay) odak karenin başına alınır. Başka videonun karesi yok sayılır.
+        """
         document = self._video(video.document_id)
         if document is None:
             return VisualContext(focus=video)
         start = max(video.time_s - before_s, 0.0)
         frames = frames_overlapping(self._db, document.id, start, video.time_s + after_s)
+        selected = self._db.get(VideoFrame, frame_id) if frame_id is not None else None
+        focus = video
+        if selected is not None and selected.document_id == document.id:
+            if all(frame.id != selected.id for frame in frames):
+                frames.append(selected)
+            if not selected.t_start <= video.time_s < selected.t_end:
+                focus = VideoPosition(video.document_id, selected.t_start)
+        else:
+            selected = None
 
         def distance(frame: VideoFrame) -> float:
+            if selected is not None and frame.id == selected.id:
+                return -1.0
             if frame.t_start <= video.time_s < frame.t_end:
                 return 0.0
             return min(abs(frame.t_start - video.time_s), abs(frame.t_end - video.time_s))
@@ -209,7 +226,7 @@ class StoredFrameSource:
         nearest = sorted(frames, key=lambda frame: (distance(frame), frame.ordinal))[:MAX_FRAMES]
         nearest.sort(key=lambda frame: frame.ordinal)
         return VisualContext(
-            frames=[self._evidence(frame, document) for frame in nearest], focus=video
+            frames=[self._evidence(frame, document) for frame in nearest], focus=focus
         )
 
     def _video(self, document_id: int) -> Document | None:

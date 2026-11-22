@@ -439,20 +439,49 @@ def test_frame_citation_validated_from_the_image_is_kept() -> None:
 # --- Belirsiz sahne: netleştirme ---
 
 
+UNCHECKED_CLAIM = "Diyagramda A, B'yi engelliyor."
+
+
 def test_generator_asks_for_clarification_when_the_scene_is_ambiguous() -> None:
     judge = FakeVisionJudge()
-    deltas, result = run(
-        FakeLLM(["NETLE", "ŞTİR: Hangi diyagrami soruyorsun, soldakini mi sagdakini mi?"]),
-        judge,
-        visual=VISUAL,
-        mode="off",
-    )
+    for mode in ("off", "required"):
+        deltas, result = run(
+            FakeLLM(["NETLE", f"ŞTİR: {UNCHECKED_CLAIM} Hangi oku kastediyorsun?"]),
+            judge,
+            visual=VISUAL,
+            mode=mode,
+        )
 
-    assert deltas == []  # netleştirme taslak olarak akmaz
-    assert result.declined and result.answer is None
-    assert result.decline_reason == "Hangi diyagrami soruyorsun, soldakini mi sagdakini mi?"
-    assert result.outcome == "insufficient_evidence"
+        assert deltas == []  # netleştirme taslak olarak akmaz
+        assert result.declined and result.answer is None
+        assert result.outcome == "needs_clarification"
+        # Modelin NETLEŞTİR'den sonra yazdığı metin kontrol edilmedi: öğrenciye sabit soru gider.
+        assert result.decline_reason == CLARIFY
+        assert "engelliyor" not in result.model_dump_json()
     assert judge.prompts == [] and judge.vision_calls == []
+
+
+def test_images_are_recorded_only_when_the_visual_request_is_sent() -> None:
+    labels = {"S1": PASSAGES[0], "S3": frame().as_passage()}
+    answer = "Arama her adimda yariya iner [S1]. Diyagramda kaynaktan kuyruga ok var [S3]."
+
+    # Metin judge'ı önce hata verir: görsel istek hiç gitmez, görüntü gönderilmiş sayılmaz.
+    text_fails = FakeVisionJudge()
+    text_fails.error = LLMError("metin judge'i erisilemedi")
+    checked = check_claims(answer, labels, text_fails, "required", frames={"S3": frame()})
+    assert checked.check.status == "failed"
+    assert text_fails.vision_calls == [] and checked.images_sent == []
+
+    # Görsel istek gönderildi, sonra hata verdi: görüntü gönderilmiştir, kayda girer.
+    vision_fails = FakeVisionJudge(error=LLMError("ag hatasi"))
+    checked = check_claims(answer, labels, vision_fails, "required", frames={"S3": frame()})
+    assert checked.check.status == "failed"
+    assert len(vision_fails.vision_calls) == 1 and checked.images_sent == [7]
+
+    # Görüntü yok ya da judge görüntü almıyor: istek gitmez.
+    for judge, frames in ((FakeVisionJudge(), {"S3": frame(image=False)}), (FakeJudge(), None)):
+        checked = check_claims(answer, labels, judge, "required", frames=frames or {"S3": frame()})
+        assert checked.images_sent == []
 
 
 def test_clarify_prefix_is_not_special_without_visual_context() -> None:
@@ -472,7 +501,7 @@ def test_checker_ambiguity_leads_to_a_clarification_request() -> None:
     _, result = run(FakeLLM([answer]), judge, visual=VISUAL)
 
     assert result.declined and result.decline_reason == CLARIFY
-    assert result.outcome == "insufficient_evidence"
+    assert result.outcome == "needs_clarification"
     assert result.unsupported_removed == 2
     assert [r["reason"] for r in result.claim_check.records] == ["ambiguous_scene"] * 2  # type: ignore[union-attr]
     assert result.claim_check.unsupported == 0  # type: ignore[union-attr]

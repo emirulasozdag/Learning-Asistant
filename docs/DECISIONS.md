@@ -18,7 +18,8 @@ hukuk birimi onayı alınmalıdır (bkz. ANALYSIS §13.1, "KVKK" riski).
 | 5 | Hosted modelle veri paylaşımı | Kabul edildi | 2026-10-20 | Nisanur İlhan (öneren), Emir Ulaş Özdağ (@emirulasozdag), Mehmet Akif Kurt (@saintpeterslibiri) |
 | 6 | Transkripsiyon: yerel faster-whisper | Önerildi | — | — |
 | 7 | AI Tutor mimarisi, köken politikası ve Gemini | **Önerildi** | — | Mehmet Akif Kurt (@saintpeterslibiri, öneren) |
-| 10 | Ders videosu kareleri: yerel çıkarma, yerel OCR ve ayrı indeks | Kabul edildi | 2026-11-17 | Nisanur İlhan (öneren), Ceyda Yıldız (@ceydayildizz, PR #98 onayı) |
+| 10 | Ders videosu kareleri: yerel çıkarma, yerel OCR ve ayrı indeks | Kabul edildi (ADR-12 ile değişti) | 2026-11-17 | Nisanur İlhan (öneren), Ceyda Yıldız (@ceydayildizz, PR #98 onayı) |
+| 12 | Ders videosu karelerinin hosted modele gönderilmesi | Kabul edildi | 2026-11-22 | Emir Ulaş Özdağ (@emirulasozdag, #26 sahibi) |
 
 ---
 
@@ -406,7 +407,8 @@ erişimi herkeste yok.
   kamerası) karşılaştırmaya katılmaz; ekranın büyük kısmı hareketliyse (kamera görüntüsü) kare alınmaz. Video başına
   kare sayısı sınırlıdır.
 - **Okuma: yerel Tesseract** (Türkçe + İngilizce dil paketleri, Docker imajında). Hosted görsel model bu kararın
-  parçası değildir; isteğe bağlı ikinci yol olarak ayrıca önerilir (ADR-5, ADR-8 rotasıyla).
+  parçası değildir; isteğe bağlı ikinci yol olarak ayrıca önerilir (ADR-5, ADR-8 rotasıyla). *Not: ADR-12 ile
+  değişti. Kare görüntüleri metin ders kanıtıyla aynı kurallarla hosted judge'a gidebilir; OCR yine yereldir.*
 - **Açık durum:** her karenin durumu `readable | partial | unreadable | no_text`. Okunamayan ve yazısız kareler
   saklanır ama aranmaz; içerik uydurulmaz.
 - **Ayrı indeks:** kareler ve türetilmiş metin `video_frames` tablosundadır, `chunks`a girmez. Kendi vektörü
@@ -451,9 +453,46 @@ kalıyordu; görsel yorumlama (VLM) için iş yoktu. Çöken işten kalan medya 
 **Sonuçları.** Doküman kareleri beklemeden hazır olur; kare işinin durumu görünür. Medya kare işi bitene kadar biraz
 daha uzun diskte kalır. Kayıttaki kare kimliği kare silinince boşa düşer (bilerek: görüntü kayda kopyalanmaz).
 Hosted bir yorumlayıcı ya da görsel judge, eğitmen beyanının video görüntülerini kapsadığı ekip kararından sonra
-açılmalıdır (ADR-3, ADR-5).
+açılmalıdır (ADR-3, ADR-5). *Not: bu karar ADR-12 ile verildi.*
 
 **Durum:** Önerildi · **Karar tarihi:** — · **Katılanlar:** Emir Ulaş Özdağ (@emirulasozdag, öneren)
+
+---
+
+## ADR-12 — Ders videosu karelerinin hosted modele gönderilmesi
+
+**Bağlam.** #26 (S05-B): slayttaki diyagram, formül ya da kod hakkındaki iddia ancak karenin görüntüsüne bakılarak
+kontrol edilebilir; OCR metni ya da modelin yazdığı açıklama kanıt değildir (ADR-10). Görsel judge ve sağlayıcı
+istemcileri koda geçti (#26, PR #116), doğrulanmış kare referansı da (#25, ADR-11). Bağlantı açılmadı, çünkü ADR-10
+kare görüntüsünü sunucuda tutuyor ve hosted görsel modeli ayrı bir öneriye bırakıyordu; ADR-11 de görsel judge'ın
+eğitmen beyanının video görüntülerini kapsadığı kararından sonra açılmasını istiyordu. Metin ders materyali zaten
+hosted üreticiye ve judge'a gidiyor (ADR-5 A, ADR-8).
+
+**Karar.**
+- **Kare görüntüleri metin ders kanıtıyla aynı kurallarla gider.** Onaylı ders videosunun kare görüntüsü hosted
+  judge'a (görsel iddia kontrolü), karenin türetilmiş metni (OCR) ve o sırada konuşulan transkript hosted üreticiye
+  gönderilebilir. Ayrı bir izin, bayrak ya da rota yoktur.
+- **Eğitmen beyanı (ADR-3) video görüntülerini kapsar.** Yüklenen video dosyası beyanın konusudur; ondan çıkarılan
+  kareler de aynı beyanla hosted modele gidebilir. Yükleme formundaki beyan metni bunu açıkça yazar.
+- **Veri sınıfı rotası (ADR-8) değişmeden uygulanır.** Kare yükü `DataClass.COURSE_EVIDENCE`'tır ve metin judge'ıyla
+  aynı rotayı izler. Metin için hosted'a gitmesine izin verilmeyen hiçbir şey kare için de gitmez: kimlik, öğrenci
+  verisi ve ders dışı içerik kare yüküne girmez. Rota yerele dönerse kareler de yerele gider; sessiz geri düşme yoktur.
+- **Yalnızca aynı dersin onaylı ve hazır videoları.** Kareler isteğin doğrulanmış video bağlamından (`checked_video`,
+  ADR-11) kurulur ve `StoredFrameSource` yalnızca isteğin dersindeki onaylı (`approved_at`) ve `ready` video
+  dokümanlarının karelerini okur. Başka dersin, onaysız ya da işlenmekte olan videonun karesi hiçbir modele gitmez.
+  Bir cevaba en çok 4 kare girer (durdurulan andaki kare önce).
+- **Kayıtlara görüntü girmez.** Uygulama günlüklerine ve mesaj kaydına kare görüntüsü, OCR metni ve betimleme
+  yazılmaz; kayıtta yalnızca hangi karelerin cevaba girdiği, hangilerinin görüntüsünün judge'a gittiği ve hangi kare
+  alıntılarının cevapta kaldığı (kimlikler ve zamanlar) tutulur.
+
+**Sonuçları.** `/ask` ve AI Tutor'un kaynaklı cevabı durdurulan anın karelerini kullanır (CONTRACTS.md §4.2, §4.3).
+Görsel judge'ın maliyeti ve gecikmesi cevap başına en çok 4 görüntüyle sınırlıdır. ADR-10'un "hosted görsel model bu
+kararın parçası değildir; ayrıca önerilir" kısmı bu kararla değişir (OCR yine yereldir). ADR-11'in hosted görsel
+judge için beklediği karar budur; hosted bir kare yorumlayıcısı (`FrameInterpreter`) da aynı kurallara tabidir.
+ADR-5'teki sağlayıcı saklama ayarlarının kaydı açık kalır ve kareler için de geçerlidir.
+
+**Durum:** Kabul edildi · **Karar tarihi:** 2026-11-22 · **Katılanlar:** Emir Ulaş Özdağ (@emirulasozdag, #26
+sahibi, karar veren)
 
 ---
 

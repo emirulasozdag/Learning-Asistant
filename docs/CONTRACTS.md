@@ -565,9 +565,11 @@ davranış değişmedi (`FRAME_EXTRACTION=off` iken transkripsiyon işi önceki 
 
 ### 4.2 Görsel kanıtla cevap ve iddia kontrolü (#26)
 
-**Durum:** üretici, judge ve sağlayıcı tarafı koda geçti (#26): `generation/visual.py` (tipler, bağdaştırıcı),
-`verification/visual.py` (görsel judge), `llm/base.py` (`VisionClient`). İstek ve iz bağlantısı #25'i bekler:
-`qa/service.py` henüz `visual` vermez, bu yüzden çalışma zamanında `/ask` ve AI Tutor davranışı değişmedi.
+**Durum:** koda geçti ve çalışma zamanında açık (#26, ADR-12): `generation/visual.py` (tipler, bağdaştırıcı),
+`verification/visual.py` (görsel judge), `llm/base.py` (`VisionClient`). `/ask` ve AI Tutor'un kaynaklı cevabı,
+istekte doğrulanmış video bağlamı (#25) varsa `qa/service.answer_stream` içinde `StoredFrameSource(db, course)
+.moment(VideoPosition, frame_id=VideoRef.frame_id)` ile `VisualContext` kurar ve `stream_answer(visual=…)`a verir;
+`stream_answer` kareleri `check_claims(frames=…)`a geçirir. Video verilmeyen istek önceki gibidir.
 
 **Sözleşme.**
 
@@ -589,10 +591,19 @@ VisualContext  { frames: VisualEvidence[] (≤ 4), focus: VideoPosition | null }
 FrameEvidenceSource.load(locators: FrameLocator[]) -> VisualEvidence[]   # bağdaştırıcı arayüzü
 StoredFrameSource(db, course)                       # #24'ün video_frames kayıtlarından
   .load(locators)                                   # yetkisiz / bulunamayan referans atlanır
-  .moment(VideoPosition, before_s=90, after_s=20) -> VisualContext   # #102 penceresi, ekrandaki kare önce
+  .moment(VideoPosition, before_s=90, after_s=20, frame_id=None) -> VisualContext
+      # #102 penceresi; seçilen kare (frame_id) her zaman alınır, sonra ekrandaki kare, sonra yakınlık
 
 stream_answer(..., visual: VisualContext | None = None)
 check_claims(..., frames: {etiket: VisualEvidence} | None = None)
+qa.service.frame_context(db, course, VideoRef | None) -> VisualContext | None   # answer_stream kullanır
+
+AskOutcome += "needs_clarification"                 # §5
+AskResponse.visual: VisualTrace | null              # API yanıtına girmez; meta.visual olarak kaydedilir
+VisualTrace { frames: FrameTrace[],                 # üreticiye verilen kareler
+              judge_images: int[],                  # görüntüsü judge'a gönderilen kare kimlikleri
+              cited: int[] }                        # cevapta kalan kare alıntılarının kimlikleri
+FrameTrace  { frame_id, document_id, t_start, t_end, t_frame }
 VisionClient { accepts_images: bool,
                complete_json_with_images(system, parts: (TextPart | ImagePart)[], schema) -> schema }
 supports_images(client) -> bool;  ImageInputUnsupported(LLMError)
@@ -628,39 +639,48 @@ supports_images(client) -> bool;  ImageInputUnsupported(LLMError)
   olarak `frames` (her kare için `source_id, frame_id, document_id, t_start, t_end, t_frame, status, derived_by,
   image_sent`), `dropped_frame_citations` ve `prompt_version` taşır; atomik bilgilerde `observed` vardır. Kayıtlardaki `claim_id` cevaptaki
   sıradır (C1, C2…).
-- **Netleştirme.** Model sahneyi belirsiz bulursa cevabına `NETLEŞTİR:` ile başlar: `declined = true`,
-  `outcome = "insufficient_evidence"`, `decline_reason` = modelin netleştirme sorusu; judge çağrılmaz, taslak akmaz.
-  Judge kareli iddiaları `ambiguous` bulur ve kalan cevap kapsamaya yetmezse aynı biçimde sabit bir netleştirme sorusu
-  döner (`answer.CLARIFY`). Kare verilmeyen cevapta `NETLEŞTİR:` özel değildir.
+- **Netleştirme.** Model sahneyi belirsiz bulursa yalnızca `NETLEŞTİR:` yazar: `declined = true`,
+  `outcome = "needs_clarification"`, `decline_reason` = içerik taşımayan sabit soru (`answer.CLARIFY`); judge
+  çağrılmaz, taslak akmaz. Modelin `NETLEŞTİR:`den sonra yazdığı metin judge'dan geçmediği için (kontrol edilmemiş
+  kare iddiası taşıyabilir) öğrenciye, tutor bloğuna ve kayda girmez. Judge kareli iddiaları `ambiguous` bulur ve
+  kalan cevap kapsamaya yetmezse aynı sabit soru döner. Kare verilmeyen cevapta `NETLEŞTİR:` özel değildir.
 - **Sağlayıcılar ve rota.** Görüntü kabul edenler: Gemini, Anthropic, OpenRouter (model görüntü almıyorsa uç noktanın
   4xx yanıtı `ImageInputUnsupported` olur) ve yapılandırılmış yerel model; `ReleasingClient` (#88) aynı yeteneği
   taşır. Diğer istemciler görüntü almaz; kareli iddialar `unverifiable` olur. Kare görüntüsü onaylı ders materyalidir:
   yük `DataClass.COURSE_EVIDENCE`, judge'ın metin yüküyle aynı rota (ADR-5 A, ADR-8); kimlik ve öğrenci verisi
-  gitmez. ADR-10 OCR'ı yerel tutar ve hosted görsel modeli ayrı bir öneriye bırakır: #25 bağlantısı açılmadan önce
-  eğitmen beyanının (ADR-3) video görüntülerini kapsadığı ekip kararıyla kaydedilmelidir.
-- **Yalnızca metin.** `visual` verilmezse ya da kare yoksa üretici istemi, judge isteği, kayıt alanları ve sayımlar
-  önceki gibidir (`tests/test_visual_grounding.py` regresyon testleri; mevcut testler değişmeden geçer).
+  gitmez. Eğitmen beyanı (ADR-3) video görüntülerini kapsar ve kareler metin ders kanıtıyla aynı kurallarla hosted
+  modele gider (ADR-12; OCR yine yereldir, ADR-10).
+- **Kayıt** (`meta.visual`, yalnızca cevaba kare girdiyse): `{frames: [{frame_id, document_id, t_start, t_end,
+  t_frame}], judge_images: [kare kimliği], cited: [kare kimliği]}`. `judge_images` görüntüsü judge'a gönderilen
+  karelerdir: görsel istek gönderilirken yazılır (istek sonra hata verse de); istek hiç gitmediyse (metin judge'ı
+  önce hata verdi, görüntü yok, judge görüntü almıyor) boştur. `cited` cevapta kalan kare alıntılarıdır. Görüntü baytı, OCR metni,
+  konuşma ve betimleme kayda ve günlüklere girmez.
+- **Yalnızca metin.** `visual` verilmezse ya da kare yoksa (videosuz istek, altyazıyla yüklenmiş karesiz video, LLM'siz
+  mod, alakasızlık kapısı) üretici istemi, judge isteği, akış, kayıt alanları ve sayımlar önceki gibidir; `meta.visual`
+  yazılmaz (`tests/test_visual_grounding.py`, `tests/test_visual_answers.py` regresyon testleri; mevcut testler
+  değişmeden geçer).
 
-**#25 / #27 için devir.**
-1. İstek ve izler (#25): kare referansları `FrameLocator` karşılığı alanlarla taşınır, API'de doğrulanır; servis
-   `StoredFrameSource(db, course).load(...)` ya da durdurulan an için `.moment(VideoPosition)` ile `VisualContext`
-   kurar ve `qa/service.answer_stream` içinde `stream_answer(..., visual=…)`a verir. Kareli iddia kayıtları mesaj
-   meta'sına mevcut `meta.claim_check` ile girer (migration gerekmez).
-2. `GET /sources/{source_id}` bugün `frame:<id>` kimliğine `404` döner; #25 bu kimliği kareye (`FrameRef`) çözmeli
-   ya da #27 alıntıdaki kareyi `GET /documents/{id}/frames` üzerinden açmalıdır.
-3. Öneri **[ekleme]**: `AskOutcome += "needs_clarification"` (#25, `schemas/ask.py`). Gelene kadar netleştirme
-   `insufficient_evidence` + `decline_reason` ile döner.
+**Bağlantı (#25 ile, açık).**
+1. İstek: `/ask`, `/ask/stream`, `/tutor/turn` ve `/tutor/turn/stream` `VideoRef`'i API'de doğrular (`checked_video`);
+   `answer_stream` doğrulanmış `VideoRef`'ten `frame_context` ile kareleri kurar (model cevap yazacaksa: LLM var,
+   kapı geçti). Seçilen kare (`frame_id`) her zaman girer; an o kareye odaklanır.
+2. Alıntı: kare alıntısı `Citation.source_id = "frame:<id>"` ile döner ve `GET /sources/frame:<id>` ile açılır (§4.3).
+3. AI Tutor: `answer_from_course` aracı `needs_clarification` sonucunu orkestratöre `needs_clarification` olarak
+   bildirir (genel bilgi açıklaması önerilmez, tur biter); blok `course_answer` olarak kalır.
+4. Frontend: `needs_clarification` netleştirme sorusu olarak gösterilir (`outcome.ts` → `clarification`).
 
 **Koddan farklar.** Hepsi **[ekleme]**: yeni tipler ve modüller, `stream_answer(visual=)`, `check_claims(frames=)`,
-`CheckedText.removed/ambiguous` (iç API), sağlayıcılarda `complete_json_with_images` ve `accepts_images`,
-`ClaimLabel.label/reason` için genişletilmiş değer kümeleri (metin kayıtlarının değerleri aynı kaldı).
+`CheckedText.removed/ambiguous/images_sent` (iç API), sağlayıcılarda `complete_json_with_images` ve `accepts_images`,
+`ClaimLabel.label/reason` için genişletilmiş değer kümeleri (metin kayıtlarının değerleri aynı kaldı),
+`StoredFrameSource.moment(frame_id=)`, `AskOutcome.needs_clarification`, `AskResponse.visual` ve `meta.visual`,
+`CourseActivity.clarification`. Netleştirme önceden `insufficient_evidence` dönüyordu; artık `needs_clarification`
+döner (kare verilmeyen cevapta hiç üretilmediği için yalnızca metin davranışı değişmez).
 
 ### 4.3 Görsel medya bağlamı, işler ve saklama (#25, ADR-11)
 
 **Durum:** koda geçti (#25). İstekteki video bağlamı doğrulanır, cevaba (`video_context`) ve mesaj kaydına
-(`meta.video`) yazılır; kare çıkarma ve yorumlama kalıcı işlerdir; sahipsiz dosyalar temizlenir. #26'nın görsel kanıt
-sözleşmesi (§4.2, `generation/visual.py`) henüz `main`'de değil: `qa/service.answer_stream` kareleri üreticiye
-**vermez**. İkisi birleşince bağlantı tek adımdır (aşağıda "#26 ile bağlantı").
+(`meta.video`) yazılır; kare çıkarma ve yorumlama kalıcı işlerdir; sahipsiz dosyalar temizlenir. #26 ile bağlantı
+açık (ADR-12): doğrulanmış bağlamın kareleri cevaba girer ve görüntüleri iddia kontrolünde judge'a gider (§4.2).
 
 **İstek bağlamı.**
 - `VideoRef.frame_id` **[ekleme]**: öğrencinin baktığı kare. Bu videonun karesi olmalı ve `time_s` anında ekranda olmalı
@@ -739,7 +759,7 @@ ocr_text, transcript, language }`, kayıt `INTERPRETERS[ad] = üretici`, seçim 
 yorumlayıcı **yoktur**: yorumlama kapalıdır ve uç nokta `409 interpreter_not_configured` döner. Sonuç: `description`
 (boşluk kırpılır, en çok 4000 karakter; güvenilir betimleme yoksa `null`, uydurma yok) ve `description_model`
 (doluysa kare yorumlandı). Betimleme türetilmiştir: aranmaz, alıntılanmaz. `InterpretationError` kalıcı hatadır;
-diğer hatalar yeniden denenir. Hosted görsel model ADR-5/ADR-8 rotasına ve eğitmen beyanına (ADR-3) bağlıdır.
+diğer hatalar yeniden denenir. Hosted görsel model ADR-5/ADR-8 rotasına ve eğitmen beyanına (ADR-3, ADR-12) bağlıdır.
 
 **Saklama.**
 - Medya yalnızca onu okuyacak iş bitene kadar diskte kalır: kare işi varsa o bitince (başarı, hata, iptal), yoksa
@@ -753,11 +773,11 @@ diğer hatalar yeniden denenir. Hosted görsel model ADR-5/ADR-8 rotasına ve e�
   satır kilidi altında yeniden verilir (etkin işler, dokümanın dosyası, yolun inode/değişme zamanı); kilitli doküman
   o turda atlanır. Kare videosu ekleme ucu dosyayı aynı kilit altında yazar.
 
-**#26 ile bağlantı.** `FrameLocator(document_id, frame_id=VideoRef.frame_id)` ya da `.moment(VideoPosition)`: isteğin
-doğrulanmış `VideoRef`'i (API'de `checked_video`) bunun için yeterlidir. #26 birleşince `answer_stream` içinde
-`StoredFrameSource(db, course)` ile `VisualContext` kurulup `stream_answer(visual=…)`a verilir; kare kimliği alıntıları
-`GET /sources/frame:<id>` ile açılır. Hosted judge'a kare görüntüsü gitmeden önce eğitmen beyanının (ADR-3) video
-görüntülerini kapsadığı ekip kararı olarak kaydedilmelidir (§4.2).
+**#26 ile bağlantı (açık).** `answer_stream`, isteğin doğrulanmış `VideoRef`'inden (API'de `checked_video`)
+`StoredFrameSource(db, course).moment(VideoPosition, frame_id=VideoRef.frame_id)` ile `VisualContext` kurar ve
+`stream_answer(visual=…)`a verir; kare kimliği alıntıları `GET /sources/frame:<id>` ile açılır. Eğitmen beyanı (ADR-3)
+video görüntülerini kapsar (ADR-12). Mesaj kaydında `meta.video`'nun yanına `meta.visual` (hangi karelerin cevaba
+girdiği, görüntüsü judge'a gidenler, kalan kare alıntıları; §4.2) yazılır.
 
 ---
 
@@ -779,6 +799,11 @@ unsupported, prompt_version} | null` **[ekleme]**; model cevap yazmadıysa `null
 judge'ın çıkardığı iddiaları da sayar. `CLAIM_CHECK=required` iken `/ask/stream` ve tutor akışında `delta` / taslak
 olayı gönderilmez. Ayrıntılı kayıt yalnızca mesaj meta'sındadır (`meta.claim_check`).
 Frontend: [outcome.ts](../frontend/src/features/tutor/outcome.ts).
+
+**#26 eklemeleri (ADR-12).** `outcome` += `"needs_clarification"` **[ekleme]**: videodaki sahne belirsiz, cevap yerine
+öğrenciye bir netleştirme sorusu sorulur. `answer == null`, `declined == true`, `decline_reason` = sabit netleştirme sorusu (`answer.CLARIFY`),
+`suggested_sources` döner. Yalnızca cevaba kare girdiğinde üretilir (§4.2). Eğitmen etkinliğinde
+`CourseActivity.clarification` **[ekleme]** sayar; `unanswered_questions` listesine girmez (materyal eksiği değildir).
 
 **Eksikler.**
 

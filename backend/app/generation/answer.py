@@ -11,8 +11,9 @@ judge'ın kontrol ettiği metin gider.
 
 Görsel kanıt (#26): `visual` verilirse video kareleri parçalardan sonraki etiketlerle ([S6]…)
 modele gider (türetilmiş metin, konuşma, zaman). Kareye dayanan iddialar karenin görüntüsüyle
-kontrol edilir (`verification/visual.py`). Sahne belirsizse model "NETLEŞTİR:" ile netleştirme
-sorusu sorar; cevap verilmez. `visual` verilmezse (ya da kare yoksa) istem ve akış önceki gibidir.
+kontrol edilir (`verification/visual.py`). Sahne belirsizse model "NETLEŞTİR:" yazar; cevap
+yerine öğrenciye içerik taşımayan sabit bir netleştirme sorusu gösterilir (`CLARIFY`).
+`visual` verilmezse (ya da kare yoksa) istem ve akış önceki gibidir.
 """
 
 import logging
@@ -20,10 +21,15 @@ import re
 from collections.abc import Iterator
 
 from app.db.models import Course
-from app.generation.visual import VisualContext, VisualEvidence, format_frames
+from app.generation.visual import (
+    FRAME_SOURCE_PREFIX,
+    VisualContext,
+    VisualEvidence,
+    format_frames,
+)
 from app.llm.base import ChatMessage, LLMClient, LLMError, LLMRefusal
 from app.retrieval.types import RetrievalResult, RetrievedPassage
-from app.schemas.ask import AskOutcome, AskResponse, ClaimCheck
+from app.schemas.ask import AskOutcome, AskResponse, ClaimCheck, FrameTrace, VisualTrace
 from app.schemas.common import Citation
 from app.verification.citations import verify_answer
 from app.verification.claims import CheckedText, check_claims
@@ -114,8 +120,8 @@ cümleler karenin görüntüsüyle ayrıca kontrol edilir; türetilmiş metinde 
 - Konuşmadaki ya da ders metnindeki bilgiyi ilgili kaynağın etiketiyle yaz; kare etiketini \
 yalnızca görüntüde görünen bilgi için kullan.
 - Soru ekrandaki bir şeye işaret ediyor ama neyi kastettiği belli değilse (karede birden fazla \
-diyagram ya da formül var, durdurulan anda kare yok, kare okunamıyor) cevap yazma: cevabına tam \
-olarak "{clarify}" ile başla ve ardından öğrenciye tek bir kısa netleştirme sorusu sor.\
+diyagram ya da formül var, durdurulan anda kare yok, kare okunamıyor) cevap yazma: yalnızca \
+"{clarify}" yaz, başka hiçbir şey yazma (öğrenciye sabit bir netleştirme sorusu gösterilir).\
 """
 
 
@@ -200,36 +206,45 @@ def stream_answer(
             if not declined and stream_drafts:
                 yield delta
     except LLMRefusal:
-        yield AskResponse(
+        refused = AskResponse(
             answer=None,
             declined=True,
             decline_reason=REFUSED,
             outcome="model_refusal",
             model=llm.model,
         )
+        if frames:
+            refused.visual = _visual_trace(frames, [], refused)
+        yield refused
         return
     except LLMError as exc:
         # Yarım kalan taslak gösterilmez; yerine en ilgili parça açıkça alıntılanır.
         logger.warning("LLM kullanılamadı, LLM'siz moda düşülüyor: %s", exc)
         fallback = extractive_answer(passages)
         fallback.outcome = "provider_failure"
+        if frames:
+            fallback.visual = _visual_trace(frames, [], fallback)
         yield fallback
         return
 
     stripped = text.lstrip()
+    images_sent: list[int] = []
     if frames and stripped.startswith(CLARIFY_PREFIX):
-        # Sahne belirsiz: cevap yerine netleştirme sorusu (#26).
-        question_back = stripped[len(CLARIFY_PREFIX) :].strip() or CLARIFY
-        response = _decline(question_back, passages, "insufficient_evidence")
+        # Sahne belirsiz: cevap yerine netleştirme sorusu (#26). Modelin "NETLEŞTİR:"den sonra
+        # yazdığı metin judge'dan geçmez; içinde kontrol edilmemiş bir kare iddiası olabilir. Bu
+        # yüzden öğrenciye ve kayda yalnızca içerik taşımayan sabit soru gider.
+        response = _decline(CLARIFY, passages, "needs_clarification")
     elif declined or stripped.startswith(DECLINE_PREFIX):
         reason = stripped[len(DECLINE_PREFIX) :].strip() or NOT_COVERED
         response = _decline(reason, passages, "insufficient_evidence")
     else:
         text, gap = split_gap_note(text)
-        response = _verified_response(
+        response, images_sent = _verified_response(
             text, gap, labels, passages, judge, claim_check, judge_error, frames
         )
     response.model = llm.model
+    if frames:
+        response.visual = _visual_trace(frames, images_sent, response)
     yield response
 
 
@@ -242,8 +257,11 @@ def _verified_response(
     claim_check: str,
     judge_error: str | None,
     frames: dict[str, VisualEvidence] | None = None,
-) -> AskResponse:
-    """Alıntı doğrulaması, ardından iddia kontrolü; sonuca göre cevap, ret ya da alıntı."""
+) -> tuple[AskResponse, list[int]]:
+    """Alıntı doğrulaması, ardından iddia kontrolü; sonuca göre cevap, ret ya da alıntı.
+
+    İkinci değer görüntüsü judge'a gönderilen karelerin kimlikleridir (denetim kaydı için).
+    """
     verification = verify_answer(text, labels)
     check: ClaimCheck | None = None
     checked: CheckedText | None = None
@@ -256,11 +274,12 @@ def _verified_response(
             fallback = extractive_answer(passages)
             fallback.outcome = "verification_failure"
             fallback.claim_check = check
-            return fallback
+            return fallback, checked.images_sent
         if checked.removed:
             judge_removed = checked.removed
             verification = verify_answer(checked.text, labels)
             verification.extra_dropped = judge_removed
+    images_sent = checked.images_sent if checked is not None else []
     if verification.dropped_claims:
         logger.info(
             "Doğrulanamayan %d iddia çıkarıldı (kapsama %.2f, geçersiz etiketler %s, judge %s)",
@@ -270,7 +289,7 @@ def _verified_response(
             check.unsupported if check else "-",
         )
     if verification.accepted:
-        return AskResponse(
+        response = AskResponse(
             answer=verification.text,
             citations=[to_citation(p) for p in verification.cited],
             unsupported_removed=len(verification.dropped_claims) + judge_removed,
@@ -278,20 +297,21 @@ def _verified_response(
             mode="llm",
             claim_check=check,
         )
+        return response, images_sent
     if gap and not verification.text:
         # Model yalnızca eksik satırını yazdı: materyal soruyu karşılamıyor demektir.
-        return _decline(gap, passages, "insufficient_evidence")
+        return _decline(gap, passages, "insufficient_evidence"), images_sent
     if checked is not None and checked.ambiguous:
         # Kareye dayanan iddialar görüntüde belirsiz kaldı ve kalan cevap yetmedi: tahmin yerine
         # öğrenciden neyi kastettiğini netleştirmesi istenir (#26).
-        response = _decline(CLARIFY, passages, "insufficient_evidence")
+        response = _decline(CLARIFY, passages, "needs_clarification")
         response.unsupported_removed = len(verification.dropped_claims) + judge_removed
         response.claim_check = check
-        return response
+        return response, images_sent
     response = _decline(UNSUPPORTED, passages, "unsupported")
     response.unsupported_removed = len(verification.dropped_claims) + judge_removed
     response.claim_check = check
-    return response
+    return response, images_sent
 
 
 def split_gap_note(text: str) -> tuple[str, str | None]:
@@ -344,6 +364,32 @@ def _frame_labels(
     if len(own) < len(visual.frames):
         logger.warning("Başka derse ait %d kare cevaba alınmadı", len(visual.frames) - len(own))
     return {f"S{index}": frame for index, frame in enumerate(own, start=start)}
+
+
+def _visual_trace(
+    frames: dict[str, VisualEvidence], images_sent: list[int], response: AskResponse
+) -> VisualTrace:
+    """Görsel kanıtın kaydı (ADR-12): üreticiye verilen kareler, görüntüsü judge'a gidenler ve
+    cevapta kalan kare alıntıları. Yalnızca kimlikler ve zamanlar."""
+    cited = [
+        int(citation.source_id.removeprefix(FRAME_SOURCE_PREFIX))
+        for citation in response.citations
+        if citation.source_id.startswith(FRAME_SOURCE_PREFIX)
+    ]
+    return VisualTrace(
+        frames=[
+            FrameTrace(
+                frame_id=frame.frame_id,
+                document_id=frame.document_id,
+                t_start=frame.t_start,
+                t_end=frame.t_end,
+                t_frame=frame.t_frame,
+            )
+            for frame in frames.values()
+        ],
+        judge_images=images_sent,
+        cited=cited,
+    )
 
 
 def _build_prompt(

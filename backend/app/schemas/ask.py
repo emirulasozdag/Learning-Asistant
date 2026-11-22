@@ -62,6 +62,8 @@ class RetrievalHit(BaseModel):
 # - provider_failure: LLM servisine ulaşılamadı; yerine en ilgili parça alıntılandı
 # - verification_failure: [ekleme, #10] cevap üretildi ama iddia kontrolü yapılamadı (judge yok,
 #   erişilemedi ya da sözleşme dışı çıktı); üretilen metin gösterilmez, en ilgili parça alıntılanır
+# - needs_clarification: [ekleme, #26] videodaki sahne belirsiz; cevap yerine öğrenciye bir
+#   netleştirme sorusu sorulur (`decline_reason`, `declined = true`). Yalnızca kare verildiğinde.
 AskOutcome = Literal[
     "answered",
     "insufficient_evidence",
@@ -69,6 +71,7 @@ AskOutcome = Literal[
     "model_refusal",
     "provider_failure",
     "verification_failure",
+    "needs_clarification",
 ]
 
 
@@ -120,6 +123,30 @@ class VideoContextOut(BaseModel):
     frame: FrameRef | None = None
 
 
+class FrameTrace(BaseModel):
+    """[ekleme, #26] Kayıttaki bir kare: kimlik ve zaman (saniye). Görüntü ve OCR metni yok."""
+
+    frame_id: int
+    document_id: int
+    t_start: float
+    t_end: float
+    t_frame: float
+
+
+class VisualTrace(BaseModel):
+    """[ekleme, #26, ADR-12] Görsel kanıtın denetim kaydı (asistan mesajının `meta.visual`'ı).
+
+    `frames`: üreticiye verilen kareler (türetilmiş metin ve konuşmayla; görüntü üreticiye
+    gitmez). `judge_images`: görüntüsü judge'a gönderilen karelerin kimlikleri. `cited`: cevapta
+    kalan kare alıntılarının kimlikleri. Yalnızca kimlikler ve zamanlar; görüntü baytı, OCR metni
+    ve betimleme kayda girmez.
+    """
+
+    frames: list[FrameTrace]
+    judge_images: list[int] = Field(default_factory=list)
+    cited: list[int] = Field(default_factory=list)
+
+
 class AskResponse(BaseModel):
     """Cite-or-decline cevabı: ya alıntılı cevap ya da gerekçeli reddetme.
 
@@ -155,3 +182,6 @@ class AskResponse(BaseModel):
     video_moment: VideoMomentOut | None = None
     # [ekleme, #25] İstekte video verildiyse doğrulanmış video bağlamı; yoksa None.
     video_context: VideoContextOut | None = None
+    # [ekleme, #26] Cevaba kare girdiyse görsel kanıtın kaydı; mesaj meta'sına yazılır, API
+    # yanıtına girmez. Kare verilmeyen cevapta None.
+    visual: VisualTrace | None = Field(default=None, exclude=True)
