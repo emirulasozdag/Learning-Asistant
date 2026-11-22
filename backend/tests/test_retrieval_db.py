@@ -1,5 +1,6 @@
 """Arama: alakasızlık kapısı, kelime araması, embedding kimliği, ders izolasyonu (veritabanı)."""
 
+import math
 from pathlib import Path
 
 import pytest
@@ -73,6 +74,27 @@ def test_rare_keyword_outranks_words_found_everywhere(
     # "version control" 3 sayfada geçer, "centralized" yalnızca birinde: nadir kelime kazanır.
     assert [h.page for h in hits][0] == 2
     assert len(hits) == 4
+
+
+def test_tied_scores_keep_their_order_when_k_is_smaller_and_missing_words_count(
+    db: Session, course: Course, tmp_path: Path, upload_dir
+) -> None:
+    ingest(db, course, make_pdf(tmp_path / "en.pdf", ENGLISH_PAGES))
+    question = "version control quicksort"
+
+    hits = lexical_search(db, course, question, 10)
+
+    # "version control" 4 parçanın 3'ünde (eşit puan), "quicksort" derste yok ama paydada kalır.
+    common, missing = math.log(1 + 1.5 / 3.5), math.log(1 + 4.5 / 0.5)
+    assert sorted(h.page for h in hits) == [1, 3, 4]
+    for hit in hits:
+        assert hit.score == pytest.approx(2 * common)
+        assert hit.keyword_coverage == pytest.approx(2 * common / (2 * common + missing))
+    # Eşitlik bozucu (ts_rank) yalnızca k'ncı puana yetişenlerde hesaplanır; küçük k aynı sıra.
+    for k in (1, 2):
+        assert [h.source_id for h in lexical_search(db, course, question, k)] == [
+            h.source_id for h in hits[:k]
+        ]
 
 
 def test_off_topic_follow_up_is_not_admitted_through_previous_question(
