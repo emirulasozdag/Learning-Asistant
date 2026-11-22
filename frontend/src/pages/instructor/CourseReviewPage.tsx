@@ -1,32 +1,22 @@
-import { CircleCheck, ListChecks, ServerOff, TriangleAlert } from "lucide-react";
+import { BookOpen, CircleCheck, ListChecks, ServerOff, TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router";
 
 import type { MistakeSummary, PracticeItemReview } from "../../api/types";
 import ReviewDialog, { type ReviewTarget } from "../../features/instructor/ReviewDialog";
+import { DIFFICULTY_LABEL, TYPE_LABEL, optionLetter } from "../../features/practice/labels";
 import { SourceDrawer } from "../../features/tutor/SourceViewer";
 import { citationLabel } from "../../labels";
 import { instructorService } from "../../services/instructorService";
 import { formatRelative } from "../../text";
 import Badge from "../../ui/Badge";
 import Button from "../../ui/Button";
+import Card from "../../ui/Card";
 import EmptyState from "../../ui/EmptyState";
 import { SectionHeader } from "../../ui/PageHeader";
 import PageTitle from "../../ui/PageTitle";
 import { SkeletonRows } from "../../ui/Skeleton";
 import { useToast } from "../../ui/toast/context";
-
-const TYPE_LABELS: Record<PracticeItemReview["type"], string> = {
-  mcq: "Çoktan seçmeli",
-  short_answer: "Kısa cevap",
-  code_tracing: "Kod izleme",
-};
-
-const DIFFICULTY_LABELS: Record<PracticeItemReview["difficulty"], string> = {
-  easy: "Kolay",
-  medium: "Orta",
-  hard: "Zor",
-};
 
 /**
  * Eğitmen incelemesi (#20, #22): sınıfın sık hataları (anonim) ve öğrencilere sunulan pratik
@@ -41,7 +31,7 @@ export default function CourseReviewPage() {
         title="İnceleme ve sık hatalar"
         description="Öğrencilerin pratikte en çok zorlandığı kavramlar ve sistemin ürettiği sorular. Öğrenci kimliği gösterilmez."
       />
-      <div className="flex flex-col gap-12">
+      <div className="flex flex-col gap-10">
         <MistakesSection courseId={courseId} onOpenSource={setSourceId} />
         <PracticeItemsSection courseId={courseId} onOpenSource={setSourceId} />
       </div>
@@ -86,6 +76,7 @@ function LoadFailed({ what, onRetry }: { what: string; onRetry: () => void }) {
       tone="danger"
       title={`${what} yüklenemedi`}
       description="Şu an ulaşılamıyor. Bağlantını kontrol edip tekrar dene."
+      className="py-10"
       action={<Button onClick={onRetry}>Tekrar dene</Button>}
     />
   );
@@ -133,9 +124,14 @@ function MistakeTable({ mistakes, onOpenSource }: { mistakes: MistakeSummary[]; 
               <span className="font-semibold">{mistake.students}</span> öğrenci · {mistake.count} deneme
             </span>
             {mistake.fixing_source_ids[0] && (
-              <button type="button" className="link" onClick={() => onOpenSource(mistake.fixing_source_ids[0])}>
+              <Button
+                size="sm"
+                variant="ghost"
+                icon={BookOpen}
+                onClick={() => onOpenSource(mistake.fixing_source_ids[0])}
+              >
                 Konuyu anlatan bölüm
-              </button>
+              </Button>
             )}
           </div>
         </li>
@@ -245,12 +241,12 @@ function PracticeItemCard({
 }) {
   const withdrawn = item.status === "withdrawn";
   return (
-    <li className="rounded-panel border border-line bg-surface p-4 shadow-card">
+    <Card as="li">
       <div className="flex flex-wrap items-center gap-2 text-sm text-graphite">
-        <Badge>{TYPE_LABELS[item.type]}</Badge>
-        <Badge>{DIFFICULTY_LABELS[item.difficulty]}</Badge>
+        <Badge>{TYPE_LABEL[item.type]}</Badge>
+        <Badge>{DIFFICULTY_LABEL[item.difficulty]}</Badge>
         {item.topic && <span className="truncate">{item.topic}</span>}
-        <span className="ml-auto text-xs">{formatRelative(item.created_at)}</span>
+        <span className="ml-auto text-xs tabular-nums">{formatRelative(item.created_at)}</span>
       </div>
       <p className="mt-3 text-base whitespace-pre-wrap text-ink">{item.prompt}</p>
       {item.options && (
@@ -264,7 +260,7 @@ function PracticeItemCard({
                   : "rounded-control border border-line px-3 py-1.5 text-base text-ink-2"
               }
             >
-              <span className="mr-2 font-semibold">{"ABCDEF"[index]})</span>
+              <span className="mr-2 font-semibold">{optionLetter(index)})</span>
               {option}
               {index === item.correct_option && <span className="sr-only"> (doğru cevap)</span>}
             </li>
@@ -273,7 +269,7 @@ function PracticeItemCard({
       )}
       {item.reference_answer && (
         <p className="mt-3 text-base text-ink-2">
-          <span className="font-medium text-ink">Referans cevap: </span>
+          <span className="font-semibold text-ink">Referans cevap: </span>
           {item.reference_answer}
         </p>
       )}
@@ -300,9 +296,15 @@ function PracticeItemCard({
           ) : (
             <p className="text-graphite">Henüz incelenmedi</p>
           )}
-          <button type="button" className="link mt-1" onClick={() => onOpenSource(item.source.source_id)}>
-            Dayandığı yer: {citationLabel(item.source)}
-          </button>
+          <Button
+            size="sm"
+            variant="ghost"
+            icon={BookOpen}
+            className="mt-1 -ml-3 max-w-full"
+            onClick={() => onOpenSource(item.source.source_id)}
+          >
+            <span className="min-w-0 truncate">Dayandığı yer: {citationLabel(item.source)}</span>
+          </Button>
         </div>
         <div className="flex shrink-0 gap-2">
           <Button size="sm" onClick={onCorrect}>
@@ -313,6 +315,6 @@ function PracticeItemCard({
           </Button>
         </div>
       </div>
-    </li>
+    </Card>
   );
 }

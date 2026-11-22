@@ -1,8 +1,10 @@
 import { useState, type FormEvent } from "react";
 
+import { userMessage } from "../../api/errors";
 import { courseService, type Course } from "../../services/courseService";
 import Button from "../../ui/Button";
 import Dialog from "../../ui/Dialog";
+import ErrorText from "../../ui/ErrorText";
 import Field from "../../ui/Field";
 import SegmentedControl from "../../ui/SegmentedControl";
 import CourseInfoFields from "./CourseInfoFields";
@@ -32,7 +34,7 @@ export default function CreateCourseDialog({ open, onClose, onCreated }: CreateC
       setName("");
       setInfo(EMPTY_INFO_DRAFT);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : String(reason));
+      setError(userMessage(reason, "Ders oluşturulamadı. Tekrar dene."));
     } finally {
       setSaving(false);
     }
@@ -94,11 +96,7 @@ export default function CreateCourseDialog({ open, onClose, onCreated }: CreateC
           </p>
           <CourseInfoFields draft={info} onChange={setInfo} />
         </div>
-        {error && (
-          <p role="alert" className="text-base text-danger">
-            {error}
-          </p>
-        )}
+        {error && <ErrorText>{error}</ErrorText>}
       </form>
     </Dialog>
   );

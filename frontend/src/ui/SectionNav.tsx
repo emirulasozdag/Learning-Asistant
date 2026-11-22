@@ -11,7 +11,7 @@ export interface SectionLink {
   end?: boolean;
 }
 
-/** Dersin bölümleri: dikey liste; seçili bölüm bordo ve kalın (OCW sol menüsü gibi). */
+/** Dersin bölümleri: dikey liste; seçili bölüm lacivert zemin ve soldaki çizgiyle belirgin. */
 export function SectionNav({ links, label }: { links: SectionLink[]; label: string }) {
   return (
     <nav aria-label={label}>
@@ -23,8 +23,10 @@ export function SectionNav({ links, label }: { links: SectionLink[]; label: stri
               end={end}
               className={({ isActive }) =>
                 cx(
-                  "flex items-center gap-3 rounded-control px-3 py-2.5 text-md transition-colors",
-                  isActive ? "font-semibold text-accent" : "text-ink hover:bg-subtle",
+                  "relative flex items-center gap-3 rounded-control px-3 py-2.5 text-md transition-colors",
+                  isActive
+                    ? "bg-accent-soft font-semibold text-accent before:absolute before:inset-y-2 before:left-0 before:w-0.75 before:rounded-full before:bg-accent"
+                    : "text-ink-2 hover:bg-subtle hover:text-ink",
                 )
               }
             >
@@ -41,7 +43,7 @@ export function SectionNav({ links, label }: { links: SectionLink[]; label: stri
 /** Dar ekranda aynı bölümler: yatay, kaydırılabilir sekme satırı. */
 export function SectionTabs({ links, label }: { links: SectionLink[]; label: string }) {
   return (
-    <nav aria-label={label} className="flex gap-6 overflow-x-auto border-b border-line bg-surface px-5">
+    <nav aria-label={label} className="flex gap-6 overflow-x-auto border-b border-line bg-surface px-5 sm:px-8">
       {links.map(({ to, label: text, end }) => (
         <NavLink
           key={to}

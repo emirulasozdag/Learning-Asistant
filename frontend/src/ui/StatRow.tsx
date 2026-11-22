@@ -21,7 +21,7 @@ export default function StatRow({ stats, className }: { stats: Stat[]; className
               {stat.label}
               {stat.hint && <span className="ml-1.5 text-faint">{stat.hint}</span>}
             </dt>
-            <dd className="text-[1.75rem] leading-tight font-bold text-ink tabular-nums">{stat.value}</dd>
+            <dd className="text-2xl font-bold text-ink tabular-nums">{stat.value}</dd>
           </div>
         </Fragment>
       ))}

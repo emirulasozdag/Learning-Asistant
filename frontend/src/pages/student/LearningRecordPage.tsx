@@ -4,6 +4,7 @@ import { Link } from "react-router";
 
 import type { AttemptSummary, ConceptProgress, LearningRecord } from "../../api/types";
 import { useCourseOutlet } from "../../features/courses/courseOutlet";
+import { formatScore } from "../../features/practice/labels";
 import { SourceDrawer } from "../../features/tutor/SourceViewer";
 import { citationLabel } from "../../labels";
 import { learningService } from "../../services/learningService";
@@ -11,8 +12,10 @@ import { formatRelative } from "../../text";
 import Badge from "../../ui/Badge";
 import Button from "../../ui/Button";
 import { buttonClasses } from "../../ui/buttonStyles";
+import Card from "../../ui/Card";
 import { cx } from "../../ui/cx";
 import EmptyState from "../../ui/EmptyState";
+import Notice from "../../ui/Notice";
 import { SectionHeader } from "../../ui/PageHeader";
 import PageTitle from "../../ui/PageTitle";
 import { SkeletonRows } from "../../ui/Skeleton";
@@ -118,20 +121,20 @@ export default function LearningRecordPage() {
 
 function LoggingOffNotice({ hasAttempts }: { hasAttempts: boolean }) {
   return (
-    <div
+    <Notice
+      tone="info"
       role="note"
-      className="flex flex-col gap-3 rounded-panel border border-line bg-surface px-4 py-3 sm:flex-row sm:items-center"
+      action={
+        <Link to="/student/account" className={buttonClasses("secondary", "sm")}>
+          <Settings size={14} aria-hidden />
+          Ayarı değiştir
+        </Link>
+      }
     >
-      <p className="flex-1 text-base text-ink-2">
-        Öğrenme kaydın şu an <strong>kapalı</strong>. Çözdüğün sorulara yine geri bildirim alırsın ama yeni
-        denemeler bu sayfaya yazılmaz.
-        {hasAttempts && " Aşağıda kayıt açıkken yaptığın denemeler görünüyor."}
-      </p>
-      <Link to="/student/account" className={cx(buttonClasses("secondary", "sm"), "shrink-0")}>
-        <Settings size={14} aria-hidden />
-        Ayarı değiştir
-      </Link>
-    </div>
+      Öğrenme kaydın şu an <strong className="font-semibold text-ink">kapalı</strong>. Çözdüğün sorulara yine
+      geri bildirim alırsın ama yeni denemeler bu sayfaya yazılmaz.
+      {hasAttempts && " Aşağıda kayıt açıkken yaptığın denemeler görünüyor."}
+    </Notice>
   );
 }
 
@@ -142,7 +145,7 @@ function percent(ratio: number): string {
 function ConceptCard({ concept, onOpenSource }: { concept: ConceptProgress; onOpenSource: (id: string) => void }) {
   const done = concept.open_gaps.length === 0;
   return (
-    <li className="flex flex-col gap-3 rounded-panel border border-line bg-surface p-4 shadow-card">
+    <Card as="li" className="flex flex-col gap-3">
       <div className="flex items-start gap-3">
         <p className="min-w-0 flex-1 text-md font-semibold text-ink">{concept.concept}</p>
         {done ? (
@@ -170,7 +173,7 @@ function ConceptCard({ concept, onOpenSource }: { concept: ConceptProgress; onOp
       </div>
       {!done && (
         <div>
-          <p className="text-sm font-medium text-ink-2">Eksik görünenler</p>
+          <p className="text-sm font-semibold text-graphite">Eksik görünenler</p>
           <ul className="mt-1 flex flex-wrap gap-1.5">
             {concept.open_gaps.map((gap) => (
               <li key={gap}>
@@ -189,7 +192,7 @@ function ConceptCard({ concept, onOpenSource }: { concept: ConceptProgress; onOp
           Kaynağı aç: {citationLabel(concept.source)}
         </button>
       )}
-    </li>
+    </Card>
   );
 }
 
@@ -214,15 +217,11 @@ function AttemptList({ attempts }: { attempts: AttemptSummary[] }) {
               <Badge tone={full ? "success" : attempt.score > 0 ? "warning" : "danger"}>
                 {formatScore(attempt.score)} / {formatScore(attempt.max_score)}
               </Badge>
-              <span className="text-xs text-graphite">{formatRelative(attempt.attempted_at)}</span>
+              <span className="text-xs text-graphite tabular-nums">{formatRelative(attempt.attempted_at)}</span>
             </div>
           </li>
         );
       })}
     </ul>
   );
-}
-
-function formatScore(value: number): string {
-  return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }

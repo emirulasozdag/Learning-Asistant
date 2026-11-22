@@ -44,7 +44,7 @@ test("soru sorulur; kaynaklı cevap, incelenen bölümler ve duyuru gelir", asyn
   const panel = page.getByRole("complementary", { name: "Kaynak" });
   await expect(panel.getByText(algorithms.documentTitle, { exact: true }).first()).toBeVisible();
 
-  // "Nasıl bulundu" geniş ekranda açık gelir.
+  // "Nasıl bulundu?" kapalı gelir; özet satırı yine görünür.
   await expect(page.getByText(/İncelenen bölümler: \d+, 1 tanesi cevapta/)).toBeVisible();
   // İç model adları öğrenciye gösterilmez.
   await expect(page.getByText(/\be5\b/i)).toHaveCount(0);

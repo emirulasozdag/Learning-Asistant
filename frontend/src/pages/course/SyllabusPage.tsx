@@ -26,9 +26,13 @@ export default function SyllabusPage() {
       ) : outline === null ? (
         <SkeletonRows rows={4} />
       ) : !outline.syllabus?.length ? (
-        <EmptyState icon={FileText} title="Bu derse henüz izlence eklenmedi." />
+        <EmptyState
+          icon={FileText}
+          title="Bu derse henüz izlence eklenmedi"
+          description="Eğitmen izlenceyi eklediğinde ön koşullar, kaynaklar ve notlandırma burada görünür."
+        />
       ) : (
-        <article className="flex max-w-3xl flex-col gap-4 font-serif text-[1.0625rem] leading-relaxed text-ink">
+        <article className="flex max-w-[70ch] flex-col gap-4 font-serif text-md leading-relaxed text-ink">
           {outline.syllabus.map((block, index) => (
             <Block key={index} block={block} />
           ))}
@@ -41,12 +45,12 @@ export default function SyllabusPage() {
 function Block({ block }: { block: SyllabusBlock }) {
   switch (block.type) {
     case "heading":
-      return <h2 className="mt-4 font-sans text-xl font-bold text-ink first:mt-0">{block.text}</h2>;
+      return <h2 className="mt-6 font-sans text-xl leading-tight font-bold tracking-tight text-ink first:mt-0">{block.text}</h2>;
     case "paragraph":
       return <p>{block.text}</p>;
     case "list":
       return (
-        <ul className="flex list-disc flex-col gap-2 pl-6">
+        <ul className="flex list-disc flex-col gap-2 pl-6 marker:text-faint">
           {block.items?.map((item, index) => (
             <li key={index}>{item}</li>
           ))}
@@ -56,7 +60,7 @@ function Block({ block }: { block: SyllabusBlock }) {
       const [header, ...rows] = block.rows ?? [];
       if (!header) return null;
       return (
-        <div className="max-w-lg font-sans">
+        <div className="max-w-lg font-sans text-base">
           <Table label="İzlence tablosu">
             <THead>
               <tr>

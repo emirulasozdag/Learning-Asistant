@@ -2,7 +2,7 @@ import type { HTMLAttributes, ReactNode, TdHTMLAttributes, ThHTMLAttributes } fr
 
 import { cx } from "./cx";
 
-/** Kurumsal veri tablosu: mavi başlık satırı, zebra satırlar, hover vurgusu. */
+/** Veri tablosu: sakin başlık satırı, ince satır çizgileri, tıklanabilir satırda hover vurgusu. */
 export function Table({ children, label }: { children: ReactNode; label: string }) {
   return (
     <div className="overflow-x-auto rounded-panel border border-line bg-surface">
@@ -14,14 +14,14 @@ export function Table({ children, label }: { children: ReactNode; label: string 
 }
 
 export function THead({ children }: { children: ReactNode }) {
-  return <thead className="border-b border-line-strong bg-subtle text-ink">{children}</thead>;
+  return <thead className="border-b border-line bg-subtle text-graphite">{children}</thead>;
 }
 
 export function TH({ className, ...props }: ThHTMLAttributes<HTMLTableCellElement>) {
   return (
     <th
       scope="col"
-      className={cx("h-11 px-4 text-sm font-bold whitespace-nowrap", className)}
+      className={cx("h-11 px-4 text-sm font-semibold whitespace-nowrap", className)}
       {...props}
     />
   );
@@ -36,8 +36,8 @@ export function TR({
   return (
     <tr
       className={cx(
-        "border-b border-line last:border-b-0 even:bg-canvas/70",
-        interactive && "cursor-pointer transition-colors hover:bg-canvas",
+        "border-b border-line last:border-b-0",
+        interactive && "cursor-pointer transition-colors hover:bg-accent-soft/50",
         selected && "bg-accent-soft/50",
         className,
       )}

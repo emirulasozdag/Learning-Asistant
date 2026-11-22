@@ -1,5 +1,6 @@
 import { mediaUrlError } from "../../services/courseService";
 import Button from "../../ui/Button";
+import Card from "../../ui/Card";
 import Field from "../../ui/Field";
 import FileBadge from "../../ui/FileBadge";
 
@@ -31,7 +32,7 @@ export default function VideoUrlStep({ items, onChange, onConfirm, onCancel }: V
   }
 
   return (
-    <section aria-label="Video adresi" className="flex flex-col gap-4 rounded-panel border border-line bg-surface px-4 py-4">
+    <Card as="section" aria-label="Video adresi" padding="sm" className="flex flex-col gap-4">
       <p className="text-sm text-graphite">
         Öğrenciler cevaptaki zaman damgasından videoyu bu adreste açabilir. Boş bırakırsan dosya yine yüklenir.
       </p>
@@ -59,6 +60,6 @@ export default function VideoUrlStep({ items, onChange, onConfirm, onCancel }: V
         </Button>
         <Button onClick={confirm}>Yükle</Button>
       </div>
-    </section>
+    </Card>
   );
 }

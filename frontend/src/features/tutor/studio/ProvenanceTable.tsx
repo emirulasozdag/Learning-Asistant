@@ -34,11 +34,11 @@ export default function ProvenanceTable({
   ];
 
   return (
-    <dl className="grid grid-cols-3 overflow-hidden rounded-[3px] border border-line-strong font-mono text-xs">
+    <dl className="grid grid-cols-3 overflow-hidden rounded-control border border-line text-xs tabular-nums">
       {cells.map((cell) => (
         <div
           key={cell.label}
-          className={`-mt-px -ml-px border-t border-l border-line-strong px-2.5 py-1.5 ${cell.wide ? "col-span-2" : ""}`}
+          className={`-mt-px -ml-px border-t border-l border-line px-2.5 py-1.5 ${cell.wide ? "col-span-2" : ""}`}
         >
           <dt className="text-graphite">{cell.label}</dt>
           <dd className="truncate font-semibold text-ink">{cell.value}</dd>

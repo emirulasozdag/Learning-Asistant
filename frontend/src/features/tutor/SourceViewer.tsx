@@ -131,7 +131,7 @@ function ModalFrame({ onClose, children }: { onClose: () => void; children: Reac
 
   return (
     <div className="fixed inset-0 z-40">
-      <div className="fade-in absolute inset-0 bg-ink/25" onClick={onClose} aria-hidden />
+      <div className="fade-in absolute inset-0 bg-scrim" onClick={onClose} aria-hidden />
       <div
         ref={dialogRef}
         role="dialog"

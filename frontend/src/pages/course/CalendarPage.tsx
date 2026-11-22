@@ -28,7 +28,11 @@ export default function CalendarPage() {
       ) : outline === null ? (
         <SkeletonRows rows={6} />
       ) : !calendar?.rows.length ? (
-        <EmptyState icon={CalendarDays} title="Bu derse henüz takvim eklenmedi." />
+        <EmptyState
+          icon={CalendarDays}
+          title="Bu derse henüz takvim eklenmedi"
+          description="Eğitmen takvimi eklediğinde haftalık dersler ve önemli tarihler burada görünür."
+        />
       ) : (
         <Table label="Ders takvimi">
           <THead>
@@ -45,7 +49,7 @@ export default function CalendarPage() {
                   <TD
                     key={index}
                     colSpan={cell.span > 1 ? cell.span : undefined}
-                    className={index === 0 ? "w-16 align-top font-semibold text-ink tabular-nums" : "align-top"}
+                    className={index === 0 ? "w-16 align-top font-semibold text-ink tabular-nums" : "align-top text-ink-2"}
                   >
                     <ul className="flex flex-col gap-1">
                       {cell.lines.map((line, lineIndex) => {

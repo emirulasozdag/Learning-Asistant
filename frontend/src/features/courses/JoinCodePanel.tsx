@@ -1,9 +1,11 @@
 import { Copy, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { userMessage } from "../../api/errors";
 import type { JoinCode } from "../../api/types";
 import { courseService } from "../../services/courseService";
 import Button from "../../ui/Button";
+import InlineError from "../../ui/InlineError";
 import PageTitle from "../../ui/PageTitle";
 import { SkeletonRows } from "../../ui/Skeleton";
 import { formatDate } from "../../text";
@@ -15,6 +17,7 @@ export default function JoinCodePanel({ courseId }: { courseId: number }) {
   const [joinCode, setJoinCode] = useState<JoinCode | null>(null);
   const [failed, setFailed] = useState(false);
   const [rotating, setRotating] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -27,7 +30,13 @@ export default function JoinCodePanel({ courseId }: { courseId: number }) {
         if (!controller.signal.aborted) setFailed(true);
       });
     return () => controller.abort();
-  }, [courseId]);
+  }, [courseId, attempt]);
+
+  function retry() {
+    setFailed(false);
+    setJoinCode(null);
+    setAttempt((value) => value + 1);
+  }
 
   async function rotate() {
     setRotating(true);
@@ -35,7 +44,7 @@ export default function JoinCodePanel({ courseId }: { courseId: number }) {
       setJoinCode(await courseService.rotateJoinCode(courseId));
       toast.show({ tone: "success", title: "Yeni katılım kodu oluşturuldu", description: "Eski kod artık çalışmaz." });
     } catch (reason) {
-      toast.show({ tone: "danger", title: "Kod yenilenemedi", description: reason instanceof Error ? reason.message : undefined });
+      toast.show({ tone: "danger", title: "Kod yenilenemedi", description: userMessage(reason, "Bağlantını kontrol edip tekrar dene.") });
     } finally {
       setRotating(false);
     }
@@ -58,7 +67,7 @@ export default function JoinCodePanel({ courseId }: { courseId: number }) {
         description="Öğrenciler bu kodla derse katılır. Kod sızdıysa yenile; var olan öğrenciler derste kalır."
       />
       {failed ? (
-        <p className="text-md text-danger">Katılım koduna şu an ulaşılamıyor.</p>
+        <InlineError message="Katılım koduna şu an ulaşılamıyor." onRetry={retry} />
       ) : joinCode === null ? (
         <SkeletonRows rows={1} />
       ) : (

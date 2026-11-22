@@ -25,7 +25,7 @@ export default function Badge({
   return (
     <span
       className={cx(
-        "inline-flex h-5 items-center gap-1 rounded px-1.5 text-xs font-medium whitespace-nowrap",
+        "inline-flex h-6 items-center gap-1 rounded-full px-2.5 text-xs font-semibold whitespace-nowrap",
         TONES[tone],
         className,
       )}
@@ -38,7 +38,7 @@ export default function Badge({
 export type IndexStatus = "indexed" | "processing" | "failed";
 
 const STATUS: Record<IndexStatus, { tone: Tone; label: string }> = {
-  indexed: { tone: "success", label: "İndekslendi" },
+  indexed: { tone: "success", label: "Hazır" },
   processing: { tone: "warning", label: "İşleniyor" },
   failed: { tone: "danger", label: "Başarısız" },
 };

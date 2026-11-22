@@ -111,7 +111,7 @@ const COMPONENTS: Components = {
     className ? (
       <code className={className}>{children}</code>
     ) : (
-      <code className="rounded bg-subtle px-1 py-0.5 font-mono text-[0.9em]">{children}</code>
+      <code className="rounded bg-subtle px-1 py-0.5 font-mono text-sm">{children}</code>
     ),
   pre: ({ children }) => (
     <pre className="my-3 overflow-x-auto rounded-panel bg-canvas px-3 py-2 font-mono text-sm leading-6">

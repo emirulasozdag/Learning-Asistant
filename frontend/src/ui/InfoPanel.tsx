@@ -2,6 +2,7 @@ import { X } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { cx } from "./cx";
+import IconButton from "./IconButton";
 
 export interface InfoSection {
   label: string;
@@ -9,8 +10,8 @@ export interface InfoSection {
 }
 
 /**
- * Sağ bilgi paneli (OCW "Course Info"): başlık şeridi, kapatma düğmesi ve küçük büyük harfli
- * başlıklarla bölümler. Boş bölümler çağıran tarafta elenir.
+ * Sağ bilgi paneli (OCW "Course Info"): başlık, kapatma düğmesi ve etiketli bölümler. Boş
+ * bölümler çağıran tarafta elenir.
  */
 export default function InfoPanel({
   title,
@@ -25,24 +26,17 @@ export default function InfoPanel({
 }) {
   return (
     <aside aria-label={title} className={cx("rounded-panel border border-line bg-surface", className)}>
-      <div className="flex items-center justify-between border-b border-line bg-subtle/70 py-1 pr-1 pl-5">
-        <h2 className="text-md font-bold text-ink">{title}</h2>
+      <div className="flex items-center justify-between border-b border-line py-2 pr-2 pl-5">
+        <h2 className="text-md font-semibold text-ink">{title}</h2>
         {onClose && (
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label={`${title} panelini kapat`}
-            className="flex size-10 items-center justify-center rounded-control text-ink hover:bg-muted-bg"
-          >
-            <X size={20} aria-hidden strokeWidth={2.5} />
-          </button>
+          <IconButton icon={X} label={`${title} panelini kapat`} onClick={onClose} />
         )}
       </div>
-      <dl className="flex flex-col gap-6 px-5 py-5">
+      <dl className="flex flex-col gap-5 px-5 py-5">
         {sections.map((section) => (
           <div key={section.label}>
-            <dt className="text-sm font-bold tracking-wide text-ink uppercase">{section.label}</dt>
-            <dd className="mt-2 text-base text-ink-2">{section.content}</dd>
+            <dt className="text-sm font-semibold text-graphite">{section.label}</dt>
+            <dd className="mt-1 text-base text-ink">{section.content}</dd>
           </div>
         ))}
       </dl>

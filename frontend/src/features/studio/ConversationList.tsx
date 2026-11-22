@@ -22,7 +22,7 @@ export default function ConversationList({
 }) {
   return (
     <section aria-labelledby="conversation-list-title">
-      <p id="conversation-list-title" className="mb-1.5 px-1 text-xs font-medium text-graphite">
+      <p id="conversation-list-title" className="mb-1.5 px-1 text-sm font-semibold text-graphite">
         Bu sohbet
       </p>
       {entries.length === 0 ? (

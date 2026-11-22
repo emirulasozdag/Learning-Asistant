@@ -1,8 +1,10 @@
 import { useState, type FormEvent } from "react";
 
+import { userMessage } from "../../api/errors";
 import { courseService, type Course } from "../../services/courseService";
 import Button from "../../ui/Button";
 import Dialog from "../../ui/Dialog";
+import ErrorText from "../../ui/ErrorText";
 import { useToast } from "../../ui/toast/context";
 import CourseInfoFields from "./CourseInfoFields";
 import { draftFrom, infoFromDraft } from "./courseInfoDraft";
@@ -33,7 +35,7 @@ export default function CourseInfoDialog({
       toast.show({ tone: "success", title: "Ders bilgileri kaydedildi" });
       onClose();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : String(reason));
+      setError(userMessage(reason, "Ders bilgileri kaydedilemedi. Tekrar dene."));
     } finally {
       setSaving(false);
     }
@@ -59,11 +61,7 @@ export default function CourseInfoDialog({
     >
       <form id="course-info" onSubmit={submit}>
         <CourseInfoFields draft={draft} onChange={setDraft} />
-        {error && (
-          <p role="alert" className="mt-3 text-base text-danger">
-            {error}
-          </p>
-        )}
+        {error && <ErrorText className="mt-3">{error}</ErrorText>}
       </form>
     </Dialog>
   );

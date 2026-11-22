@@ -4,8 +4,14 @@ import type { ReviewDecision, ReviewOut } from "../../api/types";
 import { instructorService } from "../../services/instructorService";
 import Button from "../../ui/Button";
 import Dialog from "../../ui/Dialog";
+import ErrorText from "../../ui/ErrorText";
+import { inputClasses } from "../../ui/Field";
+import { cx } from "../../ui/cx";
 
 const MAX_CORRECTION = 4000;
+
+/** Çok satırlı alan: metin kutusuyla aynı görünüm, yüksekliği satır sayısından. */
+const textareaClasses = cx(inputClasses.replace(/(^|\s)h-10(?=\s|$)/, "$1").trim(), "py-2 leading-relaxed");
 
 export interface ReviewTarget {
   type: ReviewDecision["target_type"];
@@ -100,14 +106,10 @@ export default function ReviewDialog({
             data-autofocus
             aria-invalid={error ? true : undefined}
             placeholder="Ne yanlış, doğrusu ne? Gerekirse ders materyalindeki yeri de yaz."
-            className="w-full rounded-control border border-line bg-surface px-3 py-2 text-base text-ink placeholder:text-faint focus:border-accent focus:ring-3 focus:ring-accent/12 focus:outline-none"
+            className={textareaClasses}
           />
         </label>
-        {error && (
-          <p role="alert" className="text-base text-danger">
-            {error}
-          </p>
-        )}
+        {error && <ErrorText>{error}</ErrorText>}
       </form>
     </Dialog>
   );

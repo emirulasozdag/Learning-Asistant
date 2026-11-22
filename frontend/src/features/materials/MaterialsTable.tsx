@@ -8,6 +8,10 @@ import FileBadge from "../../ui/FileBadge";
 import IconButton from "../../ui/IconButton";
 import { Table, TD, TH, THead, TR } from "../../ui/Table";
 
+/** `IconButton size="sm"` ile aynı görünüm; dosya yeni sekmede açıldığı için bağlantıdır. */
+const ICON_LINK =
+  "inline-flex size-7 shrink-0 items-center justify-center rounded-control text-graphite transition-colors hover:bg-subtle hover:text-ink";
+
 /** Yüklenmekte olan ya da yüklenemeyen dosya (henüz veritabanında yok). */
 export interface PendingUpload {
   key: string;
@@ -65,7 +69,7 @@ export default function MaterialsTable({
                   <p className="truncate text-sm text-graphite">
                     {upload.status === "failed"
                       ? upload.error
-                      : `${(upload.file.size / 1024 / 1024).toFixed(1)} MB, parçalara ayrılıyor ve vektörleştiriliyor`}
+                      : `${(upload.file.size / 1024 / 1024).toFixed(1)} MB, işleniyor`}
                   </p>
                 </div>
               </div>
@@ -123,7 +127,7 @@ export default function MaterialsTable({
               {formatRelative(document.created_at)}
             </TD>
             <TD className="hidden whitespace-nowrap text-graphite tabular-nums sm:table-cell">
-              {documentExtent(document)}, {document.chunk_count} parça
+              {documentExtent(document)}, {document.chunk_count} bölüm
               {document.frames_processing ? ", kareler hazırlanıyor" : document.frame_count ? `, ${document.frame_count} kare` : ""}
             </TD>
             <TD className="hidden sm:table-cell">
@@ -138,7 +142,7 @@ export default function MaterialsTable({
                     rel="noreferrer"
                     aria-label={`${document.title} dosyasını aç`}
                     title="Dosyayı aç"
-                    className="inline-flex size-7 items-center justify-center rounded-control text-graphite hover:bg-subtle hover:text-ink"
+                    className={ICON_LINK}
                   >
                     <ExternalLink size={14} aria-hidden />
                   </a>

@@ -124,14 +124,14 @@ export default function SourcePanel({
               </summary>
               <div className="mt-3">
                 <Sheet page={current.page}>
-                  <p className="font-mono text-sm leading-relaxed whitespace-pre-wrap">{current.text}</p>
+                  <p className="font-serif text-md whitespace-pre-wrap">{current.text}</p>
                 </Sheet>
               </div>
             </details>
           </>
         ) : (
           <Sheet page={current.page}>
-            <p className="font-mono text-sm leading-relaxed whitespace-pre-wrap">
+            <p className="font-serif text-md whitespace-pre-wrap">
               <span key={current.source_id} className="marker-sweep">
                 {current.text}
               </span>

@@ -54,11 +54,14 @@ import { courseService, type Course } from "../../services/courseService";
 import { formatTime } from "../../text";
 import { tutorService, type QuickAction } from "../../services/tutorService";
 import Button from "../../ui/Button";
+import Card from "../../ui/Card";
 import EmptyState from "../../ui/EmptyState";
 import FileBadge from "../../ui/FileBadge";
 import IconButton from "../../ui/IconButton";
+import Notice from "../../ui/Notice";
 import { cx } from "../../ui/cx";
 import { SkeletonRows } from "../../ui/Skeleton";
+import { usePageTitle } from "../../ui/usePageTitle";
 
 /**
  * AI Tutor: dersin materyalinden, kaynaklı ve akışlı cevaplar. Ürünün ana ekranı; ders
@@ -67,6 +70,7 @@ import { SkeletonRows } from "../../ui/Skeleton";
 export default function TutorPage() {
   const courseId = Number(useParams().courseId);
   const course = useCourse(courseId);
+  usePageTitle(course ? `${course.code} AI Tutor` : "AI Tutor");
   if (!course) return null;
   // `key`: ders değişince sohbet, açık kaynak, materyal durumu ve süren istekler sıfırlanır.
   return <TutorSession key={course.id} course={course} />;
@@ -83,7 +87,6 @@ interface Selection {
 const NO_SELECTION: Selection = { turnId: null, claim: null, sourceOverride: null };
 
 /** "Nasıl bulundu" listesinin açık başlayabileceği ekran yüksekliği. */
-const TALL_SCREEN = "(min-height: 800px)";
 
 /** Cevap iddia görünümünde gösterilebilir mi; gösterilebilirse cümlelere ayrılmış hâli. */
 function structuredView(response: AskResponse | undefined): StructuredAnswer | null {
@@ -463,14 +466,14 @@ function TutorSession({ course }: { course: Course }) {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div ref={workspaceRef} className="relative flex min-h-0 flex-1 gap-8 px-4 sm:px-6">
+      <div ref={workspaceRef} className="relative flex min-h-0 flex-1 gap-8 px-5 sm:px-8">
         {/* Yer yetmezse bölüm kayar; oynatıcı, soru şeridi ve cevap üst üste binmez (#103). */}
         <section className="flex min-w-0 flex-1 flex-col overflow-y-auto">
           {/* Dar ekranda video sohbetin üstünde; geniş ekranda sağ sütunda, kaynağın üstünde (#103). */}
           {videoDoc && !videoAside && playerBlock}
           {turns.length > 0 && (
             <div className="flex shrink-0 items-center gap-2 pb-2">
-              <span className="font-mono text-xs text-graphite">
+              <span className="text-sm text-graphite tabular-nums">
                 Soru {activeIndex + 1} / {turns.length}
               </span>
               <IconButton
@@ -537,9 +540,9 @@ function TutorSession({ course }: { course: Course }) {
                 {structured && response ? (
                   <>
                     {classifyResponse(response) === "ai_unavailable" && (
-                      <p className="rounded-panel border border-line bg-surface px-3 py-2 text-sm text-graphite">
+                      <Notice tone="info">
                         Yapay zekâ şu an kullanılamıyor; ders materyalindeki ilgili bölüm olduğu gibi, cümle cümle gösteriliyor.
-                      </p>
+                      </Notice>
                     )}
                     <ClaimAnswer
                       question={activeTurn.question}
@@ -560,9 +563,9 @@ function TutorSession({ course }: { course: Course }) {
                   </>
                 ) : (
                   <>
-                    <p className="max-w-[46rem] self-start rounded-panel border border-line bg-surface px-4 py-3 text-base text-ink-2 shadow-card">
-                      {activeTurn.question}
-                    </p>
+                    <Card variant="inset" padding="sm" className="max-w-[46rem] self-start">
+                      <p className="text-base text-ink-2">{activeTurn.question}</p>
+                    </Card>
                     {activeAnswer && (
                       <AnswerBlock
                         turn={activeAnswer}
@@ -619,16 +622,16 @@ function TutorSession({ course }: { course: Course }) {
         )}
       </div>
 
-      <div className="flex shrink-0 flex-col gap-3 px-4 pt-2 pb-4 sm:px-6">
+      <div className="flex shrink-0 flex-col gap-3 px-5 pt-2 pb-4 sm:px-8">
         {response && structured && (
           <RetrievalMeter
             key={`${activeTurn?.id}-${desktop}`}
             response={response}
             selectedSourceId={sourceId}
             onSelectSource={selectSource}
-            // Video açıkken ya da ekran alçakken (ör. 1024×768) kapalı başlar: cevabın yerini
-            // daraltmasın; 768 px yükseklikte açık liste cevaba ~100 px bırakıyordu (#32).
-            initiallyOpen={desktop && !videoDoc && window.matchMedia(TALL_SCREEN).matches}
+            // Kapalı başlar: özet satırı ("İncelenen bölümler: …") her zaman görünür; ayrıntı
+            // öğrenci isteyince açılır, cevabın yerini daraltmaz (#32).
+            initiallyOpen={false}
           />
         )}
         <Composer
@@ -675,9 +678,9 @@ function TutorSession({ course }: { course: Course }) {
 }
 
 const HOW_IT_WORKS = [
-  { title: "Soru sor", text: "Dersin materyaline ne merak ediyorsan yaz; cevap yalnızca onaylı materyalden gelir." },
-  { title: "Cümleye dokun", text: "Cevabın her cümlesi numaralıdır; dokununca dayandığı sayfa yanda açılır." },
-  { title: "Kaynağı kontrol et", text: "İşaretli satırı cevapla karşılaştır; materyalde yoksa asistan bunu söyler." },
+  { title: "Soru sor", text: "Dersin materyaline ne merak ediyorsan yaz; cevap yalnızca bu dersin materyalinden gelir." },
+  { title: "Dipnota dokun", text: "Her cümlenin sonundaki sarı numara, dayandığı sayfayı yanda açar." },
+  { title: "Kaynakla karşılaştır", text: "İşaretli satırı cevapla karşılaştır; materyalde yoksa asistan bunu söyler." },
   { title: "Kendini sına", text: "\"Beni test et\" de: dersin materyalinden, kontrol edilmiş soru ve geri bildirim." },
 ];
 
@@ -721,56 +724,63 @@ function TutorWelcome({
   const extent = describeTotals(materialTotals(materials ?? []));
   const suggestions = materials ? courseSuggestions(materials) : [];
   return (
-    <div className="max-w-3xl py-10">
-      <p className="font-mono text-xs text-graphite">{course.code}</p>
-      <h1 className="mt-2 text-[2.5rem] leading-[1.08] font-semibold tracking-tight text-balance text-ink">
-        {course.name} dersine sor
-      </h1>
+    <div className="max-w-3xl py-8">
+      {/* Ders kodu ve adı üstteki şeritte; başlık diğer ders sayfalarının başlığıyla aynı biçimde. */}
+      <h1 className="text-2xl font-bold text-balance text-ink">{course.name} dersine sor</h1>
       <p className="mt-3 max-w-2xl text-md text-graphite">
         {materials
-          ? `Cevaplar bu dersin ${materials.length} dokümanındaki${extent ? ` (${extent})` : ""} bölümlere dayandırılır. Her cümlenin kaynağı yanında açılır; önemli konularda kaynağı açıp kontrol et.`
-          : "Cevaplar bu dersin materyalindeki bölümlere dayandırılır. Her cümlenin kaynağı yanında açılır; önemli konularda kaynağı açıp kontrol et."}
+          ? `Cevaplar bu dersin ${materials.length} dokümanındaki${extent ? ` (${extent})` : ""} bölümlere dayanır. Her cümlenin sonunda`
+          : "Cevaplar bu dersin materyalindeki bölümlere dayanır. Her cümlenin sonunda"}{" "}
+        <span className="footnote-mark px-1">1</span>
+        {" gibi bir dipnot olur; dokununca dayandığı sayfa yanda açılır."}
       </p>
 
       {suggestions.length > 0 && (
-        <div className="mt-8">
-          <p className="mb-2.5 font-mono text-xs text-graphite">Buradan başlayabilirsin</p>
+        <section aria-labelledby="tutor-suggestions" className="mt-8">
+          <h2 id="tutor-suggestions" className="mb-2.5 text-sm font-semibold text-graphite">
+            Buradan başlayabilirsin
+          </h2>
           <ul className="grid gap-2.5 sm:grid-cols-2">
             {suggestions.map((suggestion) => {
               const Icon = suggestion.kind === "quiz" ? ClipboardCheck : MessageSquareText;
               return (
-                <li key={suggestion.text}>
+                <Card as="li" key={suggestion.text} padding="none" interactive>
                   <button
                     type="button"
                     onClick={() => onSuggest(suggestion.text)}
-                    className="flex h-full w-full items-start gap-3 rounded-panel border border-line bg-surface px-4 py-3 text-left text-base text-ink shadow-card transition-colors hover:border-accent hover:bg-accent-soft/40"
+                    className="flex h-full w-full items-start gap-3 rounded-panel px-4 py-3 text-left text-base text-ink"
                   >
                     <Icon size={16} aria-hidden className="mt-0.5 shrink-0 text-accent" />
                     <span>{suggestion.text}</span>
                   </button>
-                </li>
+                </Card>
               );
             })}
           </ul>
-        </div>
+        </section>
       )}
 
-      <ol className="mt-8 grid gap-3 sm:grid-cols-2">
-        {HOW_IT_WORKS.map((step, index) => (
-          <li key={step.title} className="flex gap-3 rounded-panel border border-line bg-surface px-4 py-3 shadow-card">
-            <span
-              aria-hidden
-              className="flex size-7 shrink-0 items-center justify-center rounded-full border border-accent-line bg-accent-soft text-xs font-semibold text-accent"
-            >
-              {index + 1}
-            </span>
-            <span>
-              <span className="block text-base font-semibold text-ink">{step.title}</span>
-              <span className="block text-sm text-graphite">{step.text}</span>
-            </span>
-          </li>
-        ))}
-      </ol>
+      <section aria-labelledby="tutor-how" className="mt-10">
+        <h2 id="tutor-how" className="mb-3 text-sm font-semibold text-graphite">
+          Nasıl çalışır?
+        </h2>
+        <ol className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
+          {HOW_IT_WORKS.map((step, index) => (
+            <li key={step.title} className="flex gap-3">
+              <span
+                aria-hidden
+                className="flex size-7 shrink-0 items-center justify-center rounded-full border border-accent-line bg-accent-soft text-sm font-semibold text-accent tabular-nums"
+              >
+                {index + 1}
+              </span>
+              <span>
+                <span className="block text-base font-semibold text-ink">{step.title}</span>
+                <span className="block text-sm text-graphite">{step.text}</span>
+              </span>
+            </li>
+          ))}
+        </ol>
+      </section>
 
       <MaterialSummary materials={materials} />
     </div>
@@ -803,13 +813,13 @@ function MaterialSummary({ materials }: { materials: DocumentOut[] | null }) {
     <div className="mt-3 flex flex-col gap-4">
       {groups.map((group) => (
         <div key={group.type}>
-          {groups.length > 1 && <p className="mb-1.5 font-mono text-xs text-graphite">{materialLabel(group.type)}</p>}
+          {groups.length > 1 && <h3 className="mb-1.5 text-sm font-semibold text-ink-2">{materialLabel(group.type)}</h3>}
           <ul className="grid gap-x-4 gap-y-1.5 sm:grid-cols-2">
             {group.documents.map((document) => (
               <li key={document.id} className="flex min-w-0 items-center gap-2 text-sm">
                 <FileBadge filename={document.filename} />
                 <span className="truncate text-ink">{document.title}</span>
-                <span className="shrink-0 text-faint">{documentExtent(document)}</span>
+                <span className="shrink-0 text-faint tabular-nums">{documentExtent(document)}</span>
               </li>
             ))}
           </ul>
@@ -818,29 +828,26 @@ function MaterialSummary({ materials }: { materials: DocumentOut[] | null }) {
     </div>
   );
   return (
-    <section
-      aria-label="Cevapların dayandığı materyal"
-      className="mt-10 rounded-panel border border-line bg-surface px-4 py-3.5 shadow-card"
-    >
-      <p className="flex items-center gap-2 text-sm font-medium text-ink-2">
-        <Library size={15} aria-hidden className="text-graphite" />
+    <Card as="section" aria-labelledby="tutor-materials" padding="sm" className="mt-10">
+      <h2 id="tutor-materials" className="flex items-center gap-2 text-base font-semibold text-ink">
+        <Library size={16} aria-hidden className="text-graphite" />
         Cevapların dayandığı materyal
-      </p>
-      <p className="mt-1 font-mono text-xs text-graphite">
+      </h2>
+      <p className="mt-1 text-sm text-graphite tabular-nums">
         {materials.length} doküman{extent ? ` · ${extent}` : ""}
-        {groups.length > 1 ? ` — ${counts}` : ""}
+        {groups.length > 1 ? ` (${counts})` : ""}
       </p>
       {materials.length <= INLINE_DOCUMENTS ? (
         list
       ) : (
         <details className="mt-2">
-          <summary className="cursor-pointer text-sm font-medium text-accent select-none hover:underline">
+          <summary className="cursor-pointer text-sm font-medium text-link select-none hover:underline">
             Tüm dokümanları göster
           </summary>
           {list}
         </details>
       )}
-    </section>
+    </Card>
   );
 }
 

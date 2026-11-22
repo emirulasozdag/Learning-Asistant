@@ -4,9 +4,9 @@ interface Step {
   title: string;
   value: string;
   detail: string;
-  ms: number;
 }
 
+/** Eğitmenin göreceği sade adımlar; model, vektör boyutu ve süreler "Teknik ayrıntılar"da. */
 function steps(report: Report): Step[] {
   const removed = report.repeated_lines_removed + report.page_numbers_removed;
   const video = report.cues_read != null;
@@ -21,28 +21,31 @@ function steps(report: Report): Step[] {
         : report.empty_pages
           ? `${report.empty_pages} boş sayfa atlandı`
           : "metin çıkarıldı",
-      ms: report.timings_ms.parse,
     },
     {
       title: "Temizleme",
-      value: `${removed} satır`,
-      detail: `${report.repeated_lines_removed} üst/alt bilgi, ${report.page_numbers_removed} sayfa no.`,
-      ms: report.timings_ms.clean,
+      value: `${removed} satır kaldırıldı`,
+      detail: `${report.repeated_lines_removed} üst/alt bilgi, ${report.page_numbers_removed} sayfa numarası`,
     },
     {
-      title: "Parçalama",
-      value: `${report.chunks} parça`,
-      detail: video ? "ardışık satırlar, zaman aralıklı" : "her parça tek sayfadan",
-      ms: report.timings_ms.chunk,
+      title: "Bölümlere ayırma",
+      value: `${report.chunks} bölüm`,
+      detail: video ? "ardışık satırlar, zaman aralığıyla" : "her bölüm tek sayfadan",
     },
     {
-      title: "Vektörleştirme",
-      value: `${report.vectors} vektör`,
-      detail: `${report.vector_dim} boyut, ${report.embedding_model.split("/").pop()}`,
-      ms: report.timings_ms.embed,
+      title: "Aramaya hazırlama",
+      value: "Hazır",
+      detail: "öğrenci soruları bu bölümlerde aranır",
     },
   ];
 }
+
+const TIMING_LABELS: Record<keyof Report["timings_ms"], string> = {
+  parse: "Okuma",
+  clean: "Temizleme",
+  chunk: "Bölümlere ayırma",
+  embed: "Aramaya hazırlama",
+};
 
 function formatMs(ms: number): string {
   return ms >= 1000 ? `${(ms / 1000).toFixed(1)} sn` : `${ms} ms`;
@@ -53,10 +56,7 @@ export default function IngestionReport({ report }: { report: Report }) {
   const total = Object.values(report.timings_ms).reduce((sum, ms) => sum + ms, 0);
   return (
     <section aria-label="Yükleme raporu">
-      <div className="mb-3 flex items-baseline justify-between gap-4">
-        <h3 className="text-base font-medium text-ink">Bilgi tabanına nasıl eklendi</h3>
-        <span className="text-sm text-graphite tabular-nums">toplam {formatMs(total)}</span>
-      </div>
+      <h3 className="mb-3 text-base font-semibold text-ink">Bilgi tabanına nasıl eklendi</h3>
       <ol className="grid grid-cols-2 gap-px overflow-hidden rounded-panel border border-line bg-line sm:grid-cols-4">
         {steps(report).map((step, index) => (
           <li
@@ -69,7 +69,6 @@ export default function IngestionReport({ report }: { report: Report }) {
             </p>
             <p className="mt-1 text-md font-semibold text-ink tabular-nums">{step.value}</p>
             <p className="mt-0.5 text-xs text-graphite">{step.detail}</p>
-            <p className="mt-1.5 text-xs text-faint tabular-nums">{formatMs(step.ms)}</p>
           </li>
         ))}
       </ol>
@@ -80,6 +79,25 @@ export default function IngestionReport({ report }: { report: Report }) {
           ))}
         </ul>
       )}
+      <details className="mt-3">
+        <summary className="cursor-pointer text-sm text-graphite hover:text-ink">Teknik ayrıntılar</summary>
+        <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-6 gap-y-1 text-sm">
+          <dt className="text-graphite">Embedding modeli</dt>
+          <dd className="break-all text-ink">{report.embedding_model}</dd>
+          <dt className="text-graphite">Vektör</dt>
+          <dd className="text-ink tabular-nums">
+            {report.vectors} adet, {report.vector_dim} boyut
+          </dd>
+          {(Object.keys(TIMING_LABELS) as (keyof Report["timings_ms"])[]).map((key) => (
+            <div key={key} className="contents">
+              <dt className="text-graphite">{TIMING_LABELS[key]} süresi</dt>
+              <dd className="text-ink tabular-nums">{formatMs(report.timings_ms[key])}</dd>
+            </div>
+          ))}
+          <dt className="text-graphite">Toplam süre</dt>
+          <dd className="text-ink tabular-nums">{formatMs(total)}</dd>
+        </dl>
+      </details>
     </section>
   );
 }

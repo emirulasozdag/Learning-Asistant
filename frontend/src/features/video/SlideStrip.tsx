@@ -3,20 +3,25 @@ import { useEffect, useRef, type KeyboardEvent } from "react";
 import type { FrameRef } from "../../api/types";
 import { formatTime } from "../../text";
 import { cx } from "../../ui/cx";
+import Skeleton from "../../ui/Skeleton";
 import FrameImage from "./FrameImage";
 import { frameAt } from "./frames";
 
 /**
  * Videonun slaytları yan yana (zaman çizgisinin altında): şu an ekrandaki işaretli; tıklayınca
  * ya da Enter'la video o slaytın başına gider, ok tuşları slaytlar arasında gezer. Tek satırdır,
- * yalnızca şeridin kendisi yana kayar (sayfa taşmaz). Kare yoksa çizilmez.
+ * yalnızca şeridin kendisi yana kayar (sayfa taşmaz). Kare yoksa çizilmez; kareler yüklenirken
+ * (videonun karesi olduğu biliniyorsa) yerleri iskeletle tutulur.
  */
 export default function SlideStrip({
   frames,
+  expected = 0,
   time,
   onSeek,
 }: {
   frames: FrameRef[] | null;
+  /** Videonun kaç karesi olduğu (`DocumentOut.frame_count`); yüklenirken iskelet sayısı. */
+  expected?: number;
   time: number;
   onSeek: (seconds: number) => void;
 }) {
@@ -35,6 +40,18 @@ export default function SlideStrip({
     }
   }, [currentId]);
 
+  if (frames === null && expected > 0) {
+    return (
+      <div role="status" aria-label="Slaytlar yükleniyor" className="flex gap-2 overflow-hidden p-1 pb-2">
+        {Array.from({ length: Math.min(expected, 8) }, (_, index) => (
+          <div key={index} className="flex w-24 shrink-0 flex-col gap-1 p-1 sm:w-28">
+            <Skeleton className="aspect-video w-full rounded-control" />
+            <Skeleton className="h-3 w-8" />
+          </div>
+        ))}
+      </div>
+    );
+  }
   if (!frames || frames.length === 0) return null;
   // Klavye odağı tek düğmede durur (şu anki slayt, yoksa ilki); oklarla diğerlerine geçilir.
   const focusId = currentId ?? frames[0].frame_id;
@@ -81,7 +98,7 @@ export default function SlideStrip({
                 <FrameImage frame={frame} compact />
                 <span
                   className={cx(
-                    "font-mono text-xs tabular-nums",
+                    "text-xs tabular-nums",
                     isCurrent ? "font-medium text-accent" : "text-graphite",
                   )}
                 >

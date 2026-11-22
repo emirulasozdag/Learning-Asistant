@@ -10,6 +10,7 @@ import ConversationList from "../features/studio/ConversationList";
 import StudioProvider from "../features/studio/StudioProvider";
 import { useStudio } from "../features/studio/useStudio";
 import { contentSections, toolSections } from "../features/courses/sections";
+import { Breadcrumbs } from "./Topbar";
 import { LEVEL_LABELS, MATERIAL_LABELS, courseMetaParts, languageLabel, materialTotals } from "../labels";
 import { courseService, type Course } from "../services/courseService";
 import { formatRelative, formatTime } from "../text";
@@ -164,7 +165,6 @@ function CourseFrame({ course, role }: { course: Course; role: "student" | "inst
     <div className="flex h-full min-h-0 flex-col">
       <CourseBanner
         course={course}
-        compact={tutor}
         searchable={role === "student"}
         onShowInfo={!tutor && infoClosed ? () => toggleInfo(false) : undefined}
       />
@@ -173,11 +173,11 @@ function CourseFrame({ course, role }: { course: Course; role: "student" | "inst
       </div>
 
       <div className="flex min-h-0 flex-1">
-        <aside className="hidden w-64 shrink-0 flex-col gap-8 overflow-y-auto border-r border-line bg-subtle/60 px-3 py-6 lg:flex">
+        <aside className="hidden w-64 shrink-0 flex-col gap-8 overflow-y-auto border-r border-line bg-surface px-3 py-6 lg:flex">
           <SectionNav links={tools} label="Ders araçları" />
           {tutor && <TutorConversation />}
           <div className="border-t border-line pt-6">
-            <p className="px-3 text-sm font-bold tracking-wide text-ink uppercase">Ders içeriği</p>
+            <p className="px-3 text-sm font-semibold text-graphite">Ders içeriği</p>
             <div className="mt-2">
               <SectionNav links={content} label="Ders içeriği" />
             </div>
@@ -191,9 +191,9 @@ function CourseFrame({ course, role }: { course: Course; role: "student" | "inst
           </div>
         ) : (
           <div className="min-h-0 min-w-0 flex-1 overflow-y-auto">
-            {/* Ders bilgisi paneli yalnızca çok geniş ekranda yanda durur; daha darda içeriğin altına
-                iner, böylece takvim ve materyal tabloları kesilmez (#106). */}
-            <div className="mx-auto flex max-w-[78rem] flex-col gap-8 px-5 py-8 sm:px-8 2xl:flex-row 2xl:items-start">
+            {/* Ders bilgisi paneli çok geniş ekranda (2xl) yanda durur; daha darda içeriğin altına
+                iner, böylece takvim ve materyal tabloları daralmaz (#106). */}
+            <div className="page flex flex-col gap-8 2xl:flex-row 2xl:items-start">
               <div className="min-w-0 flex-1">
                 <Outlet context={outlet} />
               </div>
@@ -202,7 +202,7 @@ function CourseFrame({ course, role }: { course: Course; role: "student" | "inst
                   course={course}
                   documents={documents}
                   onClose={() => toggleInfo(true)}
-                  className="2xl:sticky 2xl:top-0 2xl:w-80 2xl:shrink-0"
+                  className="2xl:sticky 2xl:top-0 2xl:w-72 2xl:shrink-0"
                 />
               )}
             </div>
@@ -230,52 +230,47 @@ function TutorConversation() {
   );
 }
 
-/** Dersin mavi şeridi: "BLM2512 | Güz 2026 | Lisans" ve büyük ders adı. */
+/**
+ * Dersin şeridi: konum ("Derslerim / 18.06 / Takvim"), ders adı ve ders bilgileri. Bütün ders
+ * sayfalarında (AI Tutor dahil) aynı boyuttadır; bölümler arasında geçerken üst kısım kaymaz.
+ */
 function CourseBanner({
   course,
-  compact,
   searchable,
   onShowInfo,
 }: {
   course: Course;
-  compact: boolean;
   /** Öğrenci: materyal araması (Ctrl/⌘+K) düğmesi. */
   searchable: boolean;
   onShowInfo?: () => void;
 }) {
-  const meta = courseMetaParts(course);
+  const [, ...details] = courseMetaParts(course);
   return (
-    <div className={cx("shrink-0 border-b border-line bg-surface/70 text-ink", compact ? "py-3" : "py-8 lg:py-10")}>
-      <div className="flex items-end justify-between gap-6 px-5 sm:px-8">
+    <div className="shrink-0 border-b border-line bg-surface px-5 pt-3 pb-4 text-ink sm:px-8">
+      <Breadcrumbs />
+      <div className="mt-2 flex items-end justify-between gap-6">
         <div className="min-w-0">
-          <p className={cx("flex flex-wrap items-center font-mono text-graphite", compact ? "text-xs" : "text-sm")}>
-            {meta.map((part, index) => (
+          {/* Sayfanın başlığı (h1) bölüm başlığıdır (Takvim, Ders notları…); ders adı şerittir (#106). */}
+          <p className="truncate text-2xl font-bold tracking-tight text-ink">{course.name}</p>
+          <p className="mt-1.5 flex flex-wrap items-center gap-2 text-sm text-graphite">
+            <span className="rounded-full bg-accent-soft px-2.5 py-0.5 text-xs font-semibold text-accent tabular-nums">
+              {course.code}
+            </span>
+            {details.map((part, index) => (
               <Fragment key={part}>
-                {index > 0 && <span aria-hidden className="mx-2.5 h-3.5 w-px bg-line-strong" />}
-                {part}
+                {index > 0 && <span aria-hidden className="h-3.5 w-px bg-line-strong" />}
+                <span>{part}</span>
               </Fragment>
             ))}
           </p>
-          {compact ? (
-            <p className="mt-0.5 truncate text-lg">{course.name}</p>
-          ) : (
-            // Sayfanın başlığı (h1) bölüm başlığıdır (Takvim, Ders notları…); ders adı şerittir (#106).
-            <p className="mt-3 text-[2.25rem] leading-[1.08] font-semibold tracking-tight text-balance text-ink sm:text-[2.75rem]">
-              {course.name}
-            </p>
-          )}
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        {/* Dar ekranda arama ve bilgi düğmeleri gizlenir (menüde ve sekmelerde ulaşılır). */}
+        <div className="hidden shrink-0 items-center gap-2 sm:flex">
           {searchable && <SearchButton />}
           {onShowInfo && (
-            <button
-              type="button"
-              onClick={onShowInfo}
-              className="hidden shrink-0 items-center gap-2 rounded-control border border-line bg-surface px-3 py-1.5 text-sm font-semibold text-ink-2 shadow-card hover:border-line-strong hover:text-ink sm:flex"
-            >
-              <Info size={16} aria-hidden />
+            <Button size="sm" icon={Info} onClick={onShowInfo}>
               Ders bilgisi
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -303,7 +298,7 @@ function OtherCourses({
   const { courses } = useCourses();
   return (
     <div className="border-t border-line pt-6">
-      <p className="px-3 text-sm font-bold tracking-wide text-ink uppercase">Derslerim</p>
+      <p className="px-3 text-sm font-semibold text-graphite">Derslerim</p>
       <ul className="mt-2 flex flex-col">
         {courses.map((item) => (
           <li key={item.id}>
@@ -398,14 +393,9 @@ function CourseInfo({
 function SearchButton() {
   const { openSearch } = useStudio();
   return (
-    <button
-      type="button"
-      onClick={openSearch}
-      className="hidden shrink-0 items-center gap-2 rounded-control border border-line bg-surface px-3 py-1.5 text-sm text-graphite shadow-card hover:border-line-strong hover:text-ink sm:flex"
-    >
-      <Search size={16} aria-hidden />
+    <Button size="sm" icon={Search} onClick={openSearch}>
       Materyalde ara
-      <kbd className="rounded border border-line px-1 font-mono text-xs">Ctrl K</kbd>
-    </button>
+      <kbd className="rounded border border-line px-1 font-mono text-xs font-normal text-graphite">Ctrl K</kbd>
+    </Button>
   );
 }

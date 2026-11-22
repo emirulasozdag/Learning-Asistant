@@ -1,4 +1,4 @@
-import { ArrowLeft, ChevronDown, FileText, PlayCircle, ServerOff, SquarePen, Video } from "lucide-react";
+import { ChevronDown, ChevronRight, FileText, PlayCircle, ServerOff, SquarePen, Video } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 
@@ -15,13 +15,16 @@ import FrameAtMoment from "../../features/video/FrameAtMoment";
 import { citedFrameIds, useFrames } from "../../features/video/frames";
 import LecturePlayer, { type PlayerHandle } from "../../features/video/LecturePlayer";
 import SlideStrip from "../../features/video/SlideStrip";
+import { Breadcrumbs } from "../../layouts/Topbar";
 import { courseService } from "../../services/courseService";
 import { tutorService, type QuickAction } from "../../services/tutorService";
 import { formatTime, formatTimeRange } from "../../text";
 import Button from "../../ui/Button";
 import { cx } from "../../ui/cx";
 import EmptyState from "../../ui/EmptyState";
+import { inputClasses } from "../../ui/Field";
 import { SkeletonRows } from "../../ui/Skeleton";
+import { usePageTitle } from "../../ui/usePageTitle";
 
 /**
  * Video çalışma ekranı (#103): büyük video, altında açılıp kapanan transkript, yanda soru-cevap.
@@ -66,6 +69,7 @@ export default function VideoStudyPage() {
   );
   const video = videos.find((doc) => doc.id === documentId);
   const back = `/student/courses/${courseId}/videos`;
+  usePageTitle(video?.title);
 
   if (failed) {
     return (
@@ -201,20 +205,25 @@ function StudySession({
 
   return (
     <div className="lg:flex lg:h-full lg:min-h-0 lg:flex-col lg:overflow-hidden">
-      <div className="flex shrink-0 flex-wrap items-center gap-3 border-b border-line bg-surface/70 px-4 py-2.5 sm:px-6">
-        <Link to={back} className="link inline-flex items-center gap-1.5 text-sm">
-          <ArrowLeft size={14} aria-hidden />
-          Ders videoları
-        </Link>
-        <span aria-hidden className="h-4 w-px bg-line" />
-        <h1 className="min-w-0 flex-1 truncate text-base font-semibold text-ink">{video.title}</h1>
+      {/* Ders kabuğunun dışında: konum ("Derslerim / KOD / Ders videoları / video") ve video seçimi
+          tek şeritte; kenar boşluğu diğer sayfalarla aynı (px-5, sm:px-8). */}
+      <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-b border-line bg-surface px-5 py-2.5 sm:px-8">
+        <div className="flex min-w-0 flex-1 items-center gap-1.5 text-sm">
+          <Breadcrumbs className="shrink-0" />
+          <ChevronRight size={14} aria-hidden className="shrink-0 text-faint" />
+          <Link to={back} className="shrink-0 text-graphite hover:text-accent hover:underline">
+            Ders videoları
+          </Link>
+          <ChevronRight size={14} aria-hidden className="shrink-0 text-faint" />
+          <h1 className="min-w-0 truncate text-sm font-semibold text-ink">{video.title}</h1>
+        </div>
         {videos.length > 1 && (
-          <label className="flex items-center gap-2 text-sm text-graphite">
-            <span className="hidden sm:inline">Başka video</span>
+          <label className="flex min-w-0 items-center gap-2 text-sm text-graphite">
+            <span className="hidden shrink-0 sm:inline">Başka video</span>
             <select
               value={video.id}
               onChange={(event) => navigate(`/student/courses/${courseId}/watch/${event.target.value}`)}
-              className="h-8 max-w-56 rounded-control border border-line bg-surface px-2 text-sm text-ink"
+              className={cx(inputClasses, "max-w-64")}
             >
               {videos.map((doc) => (
                 <option key={doc.id} value={doc.id}>
@@ -228,7 +237,7 @@ function StudySession({
 
       {/* Telefonda tek sütun: video, zaman çizgisi, sohbet, transkript (sol sütun `contents`
           olduğundan öğeleri sıraya girer). Geniş ekranda solda video+transkript, sağda sohbet. */}
-      <div className="grid grid-cols-[minmax(0,1fr)] gap-4 p-4 sm:px-6 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-4 px-5 py-4 sm:px-8 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:gap-6">
         <div className="contents lg:flex lg:min-h-0 lg:flex-col lg:gap-3">
           <div
             className={cx(
@@ -246,7 +255,7 @@ function StudySession({
           </div>
           <div className="order-2 flex min-w-0 shrink-0 flex-col gap-3 lg:order-none">
             <Timeline duration={video.duration_s} time={time} moment={moment} onSeek={seek} />
-            <SlideStrip frames={frames} time={time} onSeek={seek} />
+            <SlideStrip frames={frames} expected={video.frame_count ?? 0} time={time} onSeek={seek} />
           </div>
           <Transcript
             chunks={chunks}
@@ -264,7 +273,7 @@ function StudySession({
           className="order-3 flex min-h-[28rem] flex-col rounded-panel border border-line bg-surface lg:order-none lg:min-h-0"
         >
           <div className="flex shrink-0 items-center gap-2 border-b border-line px-4 py-2.5">
-            <p className="flex-1 text-sm font-semibold text-ink">Bu videoya soru sor</p>
+            <h2 className="flex-1 text-sm font-semibold text-ink">Bu videoya soru sor</h2>
             {turns.length > 0 && (
               <Button size="sm" variant="ghost" icon={SquarePen} onClick={conversation.reset}>
                 Yeni sohbet
@@ -400,7 +409,7 @@ function Timeline({
         )}
         <span className="absolute inset-y-0 left-0 rounded-full bg-accent/60" style={{ width: percent(time) }} />
       </div>
-      <p className="mt-1.5 flex flex-wrap justify-between gap-x-4 gap-y-0.5 font-mono text-xs text-graphite">
+      <p className="mt-1.5 flex flex-wrap justify-between gap-x-4 gap-y-0.5 text-xs text-graphite tabular-nums">
         <span>
           {formatTime(time)} / {formatTime(duration)}
         </span>
@@ -502,7 +511,7 @@ function Transcript({
                     isCited ? "bg-marker/40 text-ink" : isCurrent ? "text-ink" : "text-ink-2 hover:bg-subtle",
                   )}
                 >
-                  <span className="w-12 shrink-0 font-mono text-xs text-graphite tabular-nums">
+                  <span className="w-12 shrink-0 pt-px text-xs text-graphite tabular-nums">
                     {formatTime(line.t_start)}
                   </span>
                   <span className={cx(isCurrent && "font-medium")}>{line.text}</span>
@@ -592,7 +601,7 @@ function StudyTurn({
     <article className="flex flex-col gap-3" aria-label={turn.question}>
       <p className="self-end rounded-panel bg-subtle px-3 py-2 text-sm text-ink">
         {turn.question}
-        {askedAt != null && <span className="ml-2 font-mono text-xs text-graphite">· {formatTime(askedAt)}</span>}
+        {askedAt != null && <span className="ml-2 text-xs text-graphite tabular-nums">· {formatTime(askedAt)}</span>}
       </p>
       {askedAt != null && (
         <FrameAtMoment
@@ -604,24 +613,19 @@ function StudyTurn({
         />
       )}
       {response && (moment || fromVideo > 0 || fromDocs > 0) && (
-        <p className="flex flex-wrap items-center gap-2 text-xs">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           {moment && (
-            <button
-              type="button"
-              onClick={() => onSeek(moment.t_start)}
-              className="inline-flex items-center gap-1 rounded-full bg-accent-soft px-2.5 py-1 font-medium text-accent"
-            >
-              <PlayCircle size={12} aria-hidden />
+            <Button size="sm" variant="secondary" icon={PlayCircle} onClick={() => onSeek(moment.t_start)}>
               Videodan · {formatTimeRange(moment.t_start, moment.t_end)}
-            </button>
+            </Button>
           )}
           {fromDocs > 0 && (
-            <span className="inline-flex items-center gap-1 rounded-full border border-line px-2.5 py-1 text-graphite">
-              <FileText size={12} aria-hidden />
+            <span className="inline-flex items-center gap-1.5 text-sm text-graphite">
+              <FileText size={14} aria-hidden />
               {fromDocs} doküman kaynağı
             </span>
           )}
-        </p>
+        </div>
       )}
       {answer && (
         <AnswerBlock

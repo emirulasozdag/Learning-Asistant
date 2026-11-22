@@ -36,6 +36,13 @@ export function greeting(now: Date = new Date()): string {
   return "İyi akşamlar";
 }
 
+/** Selamlamadaki ad: unvanlar ("Dr.", "Prof.", "Doç.", "Öğr. Gör.") atlanır; yoksa tam ad. */
+export function firstName(fullName: string | null | undefined): string {
+  const words = (fullName ?? "").trim().split(/\s+/).filter(Boolean);
+  const name = words.find((word) => !word.endsWith("."));
+  return name ?? words[0] ?? "";
+}
+
 /** Saniye → "m:ss" (bir saat ve üstü için "h:mm:ss"): videoda konum göstermek için. */
 export function formatTime(seconds: number): string {
   const total = Math.max(0, Math.floor(seconds));

@@ -1,6 +1,7 @@
 import { ExternalLink, FileText, Images, Square } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+import { userMessage } from "../../api/errors";
 import type { ChunkPreview, DocumentOut, IngestionReport as Report } from "../../api/types";
 import Sheet from "../../components/Sheet";
 import { documentExtent, documentIndexStatus, materialLabel } from "../../labels";
@@ -11,6 +12,7 @@ import Button from "../../ui/Button";
 import { buttonClasses } from "../../ui/buttonStyles";
 import { Drawer } from "../../ui/Dialog";
 import EmptyState from "../../ui/EmptyState";
+import ErrorText from "../../ui/ErrorText";
 import { SkeletonRows } from "../../ui/Skeleton";
 import IngestionReport from "./IngestionReport";
 
@@ -24,7 +26,7 @@ interface DocumentDrawerProps {
   onCancel?: (document: DocumentOut) => void;
 }
 
-/** Doküman ayrıntısı: yükleme raporu, videoda slayt kareleri ve sistemin çıkardığı parçalar. */
+/** Doküman ayrıntısı: yükleme raporu, videoda slayt kareleri ve sistemin çıkardığı bölümler. */
 export default function DocumentDrawer({ document, report, onClose, onChanged, onCancel }: DocumentDrawerProps) {
   return (
     <Drawer
@@ -73,7 +75,7 @@ function DocumentDetail({
     courseService
       .chunks(document.id)
       .then(setChunks)
-      .catch((reason: unknown) => setError(reason instanceof Error ? reason.message : String(reason)));
+      .catch((reason: unknown) => setError(userMessage(reason, "Bölümlere şu an ulaşılamıyor. Tekrar dene.")));
   }, [document.id]);
 
   return (
@@ -84,7 +86,7 @@ function DocumentDetail({
         </Meta>
         <Meta label="Tür">{materialLabel(document.material_type)}</Meta>
         <Meta label="İçerik">
-          {documentExtent(document)}, {document.chunk_count} parça
+          {documentExtent(document)}, {document.chunk_count} bölüm
         </Meta>
         <Meta label="Yüklendi">{formatRelative(document.created_at)}</Meta>
         {document.media_url && (
@@ -108,12 +110,12 @@ function DocumentDetail({
       )}
 
       <section>
-        <h3 className="mb-1 text-base font-medium text-ink">Sistemin çıkardığı parçalar</h3>
+        <h3 className="mb-1 text-base font-semibold text-ink">Sistemin çıkardığı bölümler</h3>
         <p className="mb-4 text-sm text-graphite">
-          AI Tutor öğrenci sorularını bu parçalarda arar ve cevabında sayfa numarasıyla gösterir.
+          AI Tutor öğrenci sorularını bu bölümlerde arar ve cevabında sayfa numarasıyla gösterir.
         </p>
         {error ? (
-          <EmptyState icon={FileText} tone="danger" title="Parçalar yüklenemedi" description={error} />
+          <EmptyState icon={FileText} tone="danger" title="Bölümler yüklenemedi" description={error} />
         ) : chunks === null ? (
           <SkeletonRows rows={3} />
         ) : (
@@ -121,7 +123,7 @@ function DocumentDetail({
             {chunks.map((chunk) => (
               <li key={chunk.id}>
                 <Sheet page={chunk.page}>
-                  <p className="font-mono text-sm leading-relaxed whitespace-pre-wrap">{chunk.text}</p>
+                  <p className="text-sm leading-relaxed whitespace-pre-wrap">{chunk.text}</p>
                 </Sheet>
               </li>
             ))}
@@ -157,7 +159,7 @@ function FrameVideoSection({
     try {
       onChanged(await courseService.addFrameVideo(document.id, file));
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : String(reason));
+      setError(userMessage(reason, "Video dosyası eklenemedi. Tekrar dene."));
     } finally {
       setUploading(false);
       if (input.current) input.current.value = "";
@@ -166,7 +168,7 @@ function FrameVideoSection({
 
   return (
     <section aria-labelledby="frame-video-title">
-      <h3 id="frame-video-title" className="mb-1 flex items-center gap-2 text-base font-medium text-ink">
+      <h3 id="frame-video-title" className="mb-1 flex items-center gap-2 text-base font-semibold text-ink">
         <Images size={16} aria-hidden className="text-graphite" />
         Slayt kareleri
       </h3>
@@ -206,11 +208,7 @@ function FrameVideoSection({
           </>
         )}
       </div>
-      {error && (
-        <p role="alert" className="mt-2 text-sm text-danger">
-          {error}
-        </p>
-      )}
+      {error && <ErrorText className="mt-2">{error}</ErrorText>}
     </section>
   );
 }
