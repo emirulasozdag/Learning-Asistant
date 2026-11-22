@@ -127,8 +127,8 @@ export interface VideoMoment {
  * - model_refusal: model yanıtlamayı reddetti
  * - provider_failure: model cevabı tamamlayamadı, answer null
  * - verification_failure: cevap üretildi ama iddia kontrolü tamamlanamadı (#10), answer null
- * - needs_clarification: videodaki sahne belirsiz (#26); `decline_reason` öğrenciye sorulan
- *   netleştirme sorusudur
+ * - needs_clarification: videodaki sahne belirsiz (#26) ya da görüntü ile anlatılan çelişiyor
+ *   (#30); `decline_reason` öğrenciye sorulan netleştirme sorusudur
  */
 export type AskOutcome =
   | "answered"
@@ -138,6 +138,14 @@ export type AskOutcome =
   | "provider_failure"
   | "verification_failure"
   | "needs_clarification";
+
+/**
+ * Görsel kanıtın neden yetmediği (#30; yalnızca kare verilen cevapta):
+ * - scene_ambiguous: görüntüde neyin kastedildiği belli değil
+ * - source_conflict: görüntü ile konuşma/ders metni çelişiyor; çelişen kısım çıkarıldı
+ * - frame_insufficient: orijinal kare iddiayı taşımaya yetmiyor (ör. tek kareden önce/sonra)
+ */
+export type VisualGap = "scene_ambiguous" | "source_conflict" | "frame_insufficient";
 
 /** İddia kontrolünün özeti (#10); ayrıntılı kayıt yalnızca backend'de tutulur. */
 export interface ClaimCheck {
@@ -175,6 +183,8 @@ export interface AskResponse {
   video_moment?: VideoMoment | null;
   /** İstekte video verildiyse doğrulanmış video bağlamı (#25). */
   video_context?: VideoContext | null;
+  /** Görsel kanıt yetmediyse nedeni (#30); yoksa null. */
+  visual_gap?: VisualGap | null;
 }
 
 /**

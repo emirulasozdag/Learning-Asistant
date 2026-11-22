@@ -28,6 +28,10 @@ ClaimReason = Literal[
     "unsupported_fact",
     "source_mismatch",
     "ambiguous_scene",
+    # #30: alıntılanan kaynaklar birbiriyle çelişiyor (ör. görüntü ile konuşma); zamansal bilgi
+    # tek bir durağan kareden çıkarılmış.
+    "source_conflict",
+    "temporal_inference",
     "images_not_supported",
     "image_unavailable",
     "no_visual_observation",

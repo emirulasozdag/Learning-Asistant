@@ -86,6 +86,7 @@ def ask_stream(
     llm: LLMClient | None,
     embedder: Embedder | None = None,
     user_id: int | None = None,
+    frames: bool = True,
 ) -> Iterator[QAEvent]:
     """Önce bulunan parçalar, sonra taslak cevap metni parça parça, en sonda doğrulanmış cevap.
 
@@ -114,6 +115,7 @@ def ask_stream(
         video=request.video,
         embedder=embedder,
         release=db.commit,
+        frames=frames,
     ):
         if isinstance(event, DoneEvent):
             response = event.response
@@ -157,6 +159,7 @@ def answer_stream(
     search_query: str | None = None,
     reranker: LLMClient | None = None,
     release: Callable[[], None] | None = None,
+    frames: bool = True,
 ) -> Iterator[QAEvent]:
     """Kaynaklı cevap hattı (arama → üretim → alıntı doğrulama); hiçbir şey kaydetmez.
 
@@ -166,6 +169,8 @@ def answer_stream(
     `reranker`: verilirse geniş aday listesi bu modelle yeniden sıralanır (`retrieval/rerank.py`).
     `release`: verilirse aramadan hemen sonra çağrılır (ör. `db.commit`); model çağrıları açık
     bir veritabanı işlemi içinde beklemez.
+    `frames`: False ise durdurulan anın kareleri cevaba girmez (yalnızca transkript). Ürün her
+    zaman True kullanır; değerlendirme transcript-only ve görsel koşulu ayırmak için kapatır (#30).
     """
     # Takip sorusu ("peki karmaşıklığı ne?") tek başına eksik kalabilir; önceki soru
     # bağlam olarak ayrıca aranır.
@@ -185,7 +190,7 @@ def answer_stream(
     context = video_context(db, video)
     visual = (
         frame_context(db, course, video)
-        if llm is not None and retrieval.relevant and retrieval.passages
+        if frames and llm is not None and retrieval.relevant and retrieval.passages
         else None
     )
     if release is not None:
@@ -321,6 +326,9 @@ def answer_meta(response: AskResponse) -> dict:
         # #26 (ADR-12): cevaba giren kareler, görüntüsü judge'a gidenler, kalan kare alıntıları;
         # yalnızca kimlikler ve zamanlar. Kare verilmeyen cevabın kaydı önceki gibidir.
         meta["visual"] = response.visual.model_dump()
+    if response.visual_gap is not None:
+        # #30: görsel kanıtın neden yetmediği (eğitmen etkinliği ve değerlendirme için).
+        meta["visual_gap"] = response.visual_gap
     return meta
 
 
@@ -342,8 +350,9 @@ def ask(
     llm: LLMClient | None,
     embedder: Embedder | None = None,
     user_id: int | None = None,
+    frames: bool = True,
 ) -> AskResponse:
-    for event in ask_stream(db, course, request, llm, embedder, user_id):
+    for event in ask_stream(db, course, request, llm, embedder, user_id, frames=frames):
         if isinstance(event, DoneEvent):
             return event.response
     raise RuntimeError("Soru-cevap akışı sonuçsuz bitti")

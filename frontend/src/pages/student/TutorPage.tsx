@@ -46,7 +46,7 @@ import TurnExtras from "../../features/tutor/TutorTurnView";
 import type { Segment, TutorTurn, VideoMomentRef } from "../../features/tutor/types";
 import { useIsDesktop } from "../../features/tutor/useIsDesktop";
 import FrameAtMoment from "../../features/video/FrameAtMoment";
-import { useFrames } from "../../features/video/frames";
+import { citedFrameIds, useFrames } from "../../features/video/frames";
 import LecturePlayer, { type PlayerHandle } from "../../features/video/LecturePlayer";
 import VideoMomentNote from "../../features/video/VideoMomentNote";
 import { describeTotals, documentExtent, materialLabel, materialTotals } from "../../labels";
@@ -524,6 +524,7 @@ function TutorSession({ course }: { course: Course }) {
                     seconds={askedMoment.seconds}
                     heading="Durdurduğun anda ekranda"
                     onSeek={(seconds) => playAt(askedMoment.documentId, seconds)}
+                    cited={citedFrameIds(response?.citations)}
                     className="max-w-md self-start"
                   />
                 )}

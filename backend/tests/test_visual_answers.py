@@ -134,7 +134,7 @@ def test_paused_video_sends_frames_to_the_generator_and_the_image_to_the_judge(
         p.text for parts in judge.vision_calls for p in parts if isinstance(p, TextPart)
     )
     assert not any(text in sent_text for text in OCR_TEXTS)
-    assert body["claim_check"]["prompt_version"] == "claim-judge-v1+visual-claim-judge-v1"
+    assert body["claim_check"]["prompt_version"] == "claim-judge-v1+visual-claim-judge-v2"
     # Kare alıntısı cevapta kaldı: karenin ekranda kaldığı aralıkla.
     frame_citation = next(c for c in body["citations"] if c["source_id"].startswith("frame:"))
     assert frame_citation == {
@@ -187,11 +187,15 @@ def test_message_trace_records_frame_ids_and_times_but_no_image_or_ocr_text(
             "t_start": start,
             "t_end": end,
             "t_frame": start,
+            # #30: kare durumu ve OCR güveni köken olarak; OCR metni yok.
+            "status": frame.status,
+            "confidence": frame.confidence,
         }
         for frame, (start, end) in zip(frames[:2], [(0.0, 100.0), (100.0, 300.0)], strict=True)
     ]
     assert visual["judge_images"] == [frames[1].id]
     assert visual["cited"] == [frames[1].id]
+    assert visual["rules_version"] == "visual-rules-v2" and visual["gap"] is None
     assert f"frame:{frames[1].id}" in meta["cited_source_ids"]
     stored = json.dumps(meta, ensure_ascii=False)
     assert not any(text in stored for text in OCR_TEXTS)

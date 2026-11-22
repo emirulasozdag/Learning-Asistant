@@ -29,7 +29,14 @@ from app.generation.visual import (
 )
 from app.llm.base import ChatMessage, LLMClient, LLMError, LLMRefusal
 from app.retrieval.types import RetrievalResult, RetrievedPassage
-from app.schemas.ask import AskOutcome, AskResponse, ClaimCheck, FrameTrace, VisualTrace
+from app.schemas.ask import (
+    AskOutcome,
+    AskResponse,
+    ClaimCheck,
+    FrameTrace,
+    VisualGap,
+    VisualTrace,
+)
 from app.schemas.common import Citation
 from app.verification.citations import verify_answer
 from app.verification.claims import CheckedText, check_claims
@@ -45,6 +52,24 @@ CLARIFY_PREFIX = "NETLEŞTİR:"
 CLARIFY = (
     "Sorduğun kısmı videodaki görüntüde tam olarak seçemedim. Slaytın hangi bölümünü (ör. hangi "
     "diyagramı, formülü ya da kod satırını) kastettiğini yazar mısın?"
+)
+# #30: görüntü ile konuşma/ders metni çelişti ve kalan cevap yetmedi; hangisinin doğru olduğu
+# tahmin edilmez.
+CONFLICT = (
+    "Videodaki görüntü ile anlatılan (ya da ders metni) bu noktada birbirini tutmuyor; hangisinin "
+    "doğru olduğunu tahmin etmemek için cevap vermedim. Soruyu biraz daha açar mısın, ya da hocana "
+    "sorar mısın?"
+)
+# #30: cevap kaldı ama çelişen kısım çıkarıldı; öğrenciye ayrı satırda söylenir.
+CONFLICT_NOTE = (
+    "Videodaki görüntü ile anlatılan bir noktada birbirini tutmadığı için o kısım cevaptan "
+    "çıkarıldı."
+)
+# #30: kareye dayanan iddialar orijinal görüntüyle taşınamadı (tek kareden önce/sonra çıkarımı,
+# görüntü kontrol edilemedi) ve kalan cevap yetmedi.
+FRAME_INSUFFICIENT = (
+    "Bu sorunun cevabı videodaki tek bir görüntüden çıkarılamıyor (ör. neyin önce ya da sonra "
+    "olduğu karede görünmüyor). Videoyu biraz ileri ya da geri alıp o anda tekrar sorabilirsin."
 )
 # Kısmi cevapta kaynakların kapsamadığı kısmı bildiren satır; iddia sayılmaz, ayrı gösterilir.
 GAP_PREFIX = "EKSİK:"
@@ -108,6 +133,9 @@ olmayan yeni bir bilgi, tanım ya da örnek ekleme.\
 """
 
 
+# Görsel kuralların sürümü; değişince artırılır ve kayda yazılır (#30).
+VISUAL_RULES_VERSION = "visual-rules-v2"
+
 # Görsel bağlam verildiğinde sistem istemine eklenir (#26); yalnızca metinde istem değişmez.
 VISUAL_RULES = """
 Video kareleri:
@@ -119,6 +147,11 @@ cümleler karenin görüntüsüyle ayrıca kontrol edilir; türetilmiş metinde 
 şekli, yerleşimi) tahmin etme.
 - Konuşmadaki ya da ders metnindeki bilgiyi ilgili kaynağın etiketiyle yaz; kare etiketini \
 yalnızca görüntüde görünen bilgi için kullan.
+- Bir kare durağan bir görüntüdür: hocanın neyi önce ya da sonra yazdığını, neyi sildiğini ya da \
+neyin değiştiğini tek bir kareden çıkarma. Böyle bir sırayı yalnızca konuşmada ya da ders \
+metninde söyleniyorsa o kaynağın etiketiyle yaz. Karenin zamanı yalnızca hangi kare olduğunu \
+gösterir; sıra kanıtı değildir.
+- Görüntü ile konuşma ya da ders metni çelişiyorsa birini seçme; çelişen bilgiyi yazma.
 - Soru ekrandaki bir şeye işaret ediyor ama neyi kastettiği belli değilse (karede birden fazla \
 diyagram ya da formül var, durdurulan anda kare yok, kare okunamıyor) cevap yazma: yalnızca \
 "{clarify}" yaz, başka hiçbir şey yazma (öğrenciye sabit bir netleştirme sorusu gösterilir).\
@@ -232,6 +265,7 @@ def stream_answer(
         # yazdığı metin judge'dan geçmez; içinde kontrol edilmemiş bir kare iddiası olabilir. Bu
         # yüzden öğrenciye ve kayda yalnızca içerik taşımayan sabit soru gider.
         response = _decline(CLARIFY, passages, "needs_clarification")
+        response.visual_gap = "scene_ambiguous"
     elif declined or stripped.startswith(DECLINE_PREFIX):
         reason = stripped[len(DECLINE_PREFIX) :].strip() or NOT_COVERED
         response = _decline(reason, passages, "insufficient_evidence")
@@ -271,7 +305,9 @@ def _verified_response(
             return AskResponse(
                 answer=None, outcome="verification_failure", claim_check=check
             ), checked.images_sent
-        if checked.removed:
+        if checked.removed or checked.text != text:
+            # Hiçbir iddia çıkarılmasa da görüntüden doğrulanmayan kare alıntıları silinmiş
+            # olabilir (#26); metin her durumda kontrol edilmiş haliyle yeniden doğrulanır (#30).
             judge_removed = checked.removed
             verification = verify_answer(checked.text, labels)
             verification.extra_dropped = judge_removed
@@ -285,22 +321,28 @@ def _verified_response(
             check.unsupported if check else "-",
         )
     if verification.accepted:
+        conflicted = checked is not None and checked.conflicts > 0
         response = AskResponse(
             answer=verification.text,
             citations=[to_citation(p) for p in verification.cited],
             unsupported_removed=len(verification.dropped_claims) + judge_removed,
-            coverage_gap=gap,
+            # Çelişen kısım çıkarıldıysa öğrenci bunu ayrı satırda görür (#30).
+            coverage_gap=_join_notes(gap, CONFLICT_NOTE if conflicted else None),
             mode="llm",
             claim_check=check,
+            visual_gap="source_conflict" if conflicted else None,
         )
         return response, images_sent
     if gap and not verification.text:
         # Model yalnızca eksik satırını yazdı: materyal soruyu karşılamıyor demektir.
         return _decline(gap, passages, "insufficient_evidence"), images_sent
-    if checked is not None and checked.ambiguous:
-        # Kareye dayanan iddialar görüntüde belirsiz kaldı ve kalan cevap yetmedi: tahmin yerine
-        # öğrenciden neyi kastettiğini netleştirmesi istenir (#26).
-        response = _decline(CLARIFY, passages, "needs_clarification")
+    visual_decline = _visual_decline(checked)
+    if visual_decline is not None:
+        # Kareye dayanan iddialar görüntüyle taşınamadı ve kalan cevap yetmedi (#26, #30):
+        # tahmin yerine nedenine göre netleştirme ya da gerekçeli ret.
+        text, outcome, visual_gap = visual_decline
+        response = _decline(text, passages, outcome)
+        response.visual_gap = visual_gap
         response.unsupported_removed = len(verification.dropped_claims) + judge_removed
         response.claim_check = check
         return response, images_sent
@@ -308,6 +350,29 @@ def _verified_response(
     response.unsupported_removed = len(verification.dropped_claims) + judge_removed
     response.claim_check = check
     return response, images_sent
+
+
+def _visual_decline(
+    checked: CheckedText | None,
+) -> tuple[str, AskOutcome, VisualGap] | None:
+    """Kalan cevap yetmediğinde görsel nedenin öğrenciye dönüşü (#30); görsel neden yoksa None.
+
+    Öncelik: çelişki (bir kaynak sessizce seçilmez) → sahne belirsizliği (öğrenci neyi
+    kastettiğini söyleyebilir) → orijinal karenin yetmemesi (gerekçeli ret).
+    """
+    if checked is None:
+        return None
+    if checked.conflicts:
+        return CONFLICT, "needs_clarification", "source_conflict"
+    if checked.ambiguous:
+        return CLARIFY, "needs_clarification", "scene_ambiguous"
+    if checked.frame_insufficient:
+        return FRAME_INSUFFICIENT, "insufficient_evidence", "frame_insufficient"
+    return None
+
+
+def _join_notes(*notes: str | None) -> str | None:
+    return " ".join(note for note in notes if note) or None
 
 
 def split_gap_note(text: str) -> tuple[str, str | None]:
@@ -380,11 +445,15 @@ def _visual_trace(
                 t_start=frame.t_start,
                 t_end=frame.t_end,
                 t_frame=frame.t_frame,
+                status=frame.status,
+                confidence=frame.confidence,
             )
             for frame in frames.values()
         ],
         judge_images=images_sent,
         cited=cited,
+        rules_version=VISUAL_RULES_VERSION,
+        gap=response.visual_gap,
     )
 
 

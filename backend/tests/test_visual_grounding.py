@@ -81,13 +81,14 @@ def frame(frame_id: int = 7, image: bool = True, **kwargs) -> VisualEvidence:
     return VisualEvidence(**values)
 
 
-Decide = Callable[[str, list[str]], tuple[str, list[str], str]]
+Decide = Callable[[str, list[str]], tuple]
 
 
 class FakeVisionJudge(FakeJudge):
     """Metin iddiaları `FakeJudge` gibi; kareli iddialar `see(claim_id, cites)` kararıyla.
 
-    `see` (karar, destek kaynakları, görüntüde görülen) döndürür.
+    `see` (karar, destek kaynakları, görüntüde görülen) ya da sonuna bilginin türü eklenmiş
+    dörtlü (#30: content, spatial, temporal) döndürür.
     """
 
     accepts_images = True
@@ -109,7 +110,7 @@ class FakeVisionJudge(FakeJudge):
                 continue
             claim_id = line.split('id="')[1].split('"')[0]
             cites = line.split('cites="')[1].split('"')[0].split(",")
-            decision, sources, observed = self.see(claim_id, cites)
+            decision, sources, observed, *kind = self.see(claim_id, cites)
             verdicts.append(
                 VisualClaimVerdict(
                     claim_id=claim_id,
@@ -117,6 +118,7 @@ class FakeVisionJudge(FakeJudge):
                         VisualFact(
                             fact="bilgi",
                             decision=decision,
+                            kind=kind[0] if kind else "content",
                             supporting_sources=sources,
                             observed=observed,
                         )

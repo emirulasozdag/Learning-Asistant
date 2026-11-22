@@ -1,4 +1,4 @@
-"""Dört karşılaştırma koşulu (ANALYSIS §9, #18).
+"""Karşılaştırma koşulları (ANALYSIS §9, #18; görsel koşul #30).
 
 Aynı sorular, aynı üretici model ve aynı indeksle koşulur; koşullar yalnızca hattın şu
 parçalarında ayrılır (`SETTINGS`, koşu kaydına yazılır):
@@ -9,6 +9,11 @@ parçalarında ayrılır (`SETTINGS`, koşu kaydına yazılır):
 | basic_rag | yalnız anlamsal, ilk 5 | yok | yok (etiketler yalnızca kaynağa çevrilir) | yok |
 | full | hibrit + RRF | var | var (ürün hattı, `/ask`) | yok |
 | full_video_time | hibrit + RRF + video komşuları | var | var | gold sorudaki `playback` |
+| visual | full_video_time ile aynı | var | var; kare iddiaları görüntüyle | `playback` |
+
+Kareler (durdurulan anın video kareleri) yalnızca visual koşulunda cevaba girer; full_video_time
+transcript-only'dir. İki koşul arasındaki tek fark karelerdir (#30, #33): aynı sorularla birlikte
+koşulunca görsel bağlamın katkısı ve yalnızca metinde regresyon ayrılır.
 
 no_rag ve basic_rag temel çizgidir: ürün davranışı değil, karşılaştırma için minimal hatlar.
 Bu modül veritabanına dokunmaz; arama ve model çağrısı çağırandan gelir (`run._backend_ask`).
@@ -22,12 +27,13 @@ from typing import Protocol
 
 
 class Condition(StrEnum):
-    """150 test sorusunun koşulduğu 4 karşılaştırma koşulu."""
+    """Test sorularının koşulduğu karşılaştırma koşulları."""
 
     NO_RAG = "no_rag"
     BASIC_RAG = "basic_rag"
     FULL = "full"
     FULL_VIDEO_TIME = "full_video_time"
+    VISUAL = "visual"
 
 
 SETTINGS: dict[Condition, dict[str, str | bool | int]] = {
@@ -36,6 +42,7 @@ SETTINGS: dict[Condition, dict[str, str | bool | int]] = {
         "relevance_gate": False,
         "citation_verification": False,
         "playback_position": False,
+        "frames": False,
     },
     Condition.BASIC_RAG: {
         "retrieval": "dense",
@@ -43,6 +50,7 @@ SETTINGS: dict[Condition, dict[str, str | bool | int]] = {
         "relevance_gate": False,
         "citation_verification": False,
         "playback_position": False,
+        "frames": False,
     },
     Condition.FULL: {
         "retrieval": "hybrid",
@@ -50,6 +58,7 @@ SETTINGS: dict[Condition, dict[str, str | bool | int]] = {
         "relevance_gate": True,
         "citation_verification": True,
         "playback_position": False,
+        "frames": False,
     },
     Condition.FULL_VIDEO_TIME: {
         "retrieval": "hybrid+video",
@@ -57,8 +66,20 @@ SETTINGS: dict[Condition, dict[str, str | bool | int]] = {
         "relevance_gate": True,
         "citation_verification": True,
         "playback_position": True,
+        "frames": False,
+    },
+    Condition.VISUAL: {
+        "retrieval": "hybrid+video",
+        "k": 5,
+        "relevance_gate": True,
+        "citation_verification": True,
+        "playback_position": True,
+        "frames": True,
     },
 }
+
+# Oynatma konumunu kullanan koşullar.
+PLAYBACK_CONDITIONS = frozenset({Condition.FULL_VIDEO_TIME, Condition.VISUAL})
 
 BASIC_K = 5
 
