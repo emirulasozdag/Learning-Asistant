@@ -245,6 +245,9 @@ def _answer_from_course(
     if response.outcome == "insufficient_evidence":
         general = ctx.general_enabled and ctx.generator is not None
         return ToolOutcome("not_covered", {"general_explanation_available": general})
+    if response.outcome == "needs_clarification":
+        # Videodaki sahne belirsiz (#26): netleştirme sorusu blokta öğrenciye gösterildi.
+        return ToolOutcome("needs_clarification", {"clarification_shown": True})
     return ToolOutcome(
         response.outcome,
         {
@@ -401,8 +404,9 @@ ANSWER_FROM_COURSE = Tool(
     name="answer_from_course",
     description=(
         "Ders materyalinde arar ve alıntılı, doğrulanmış bir cevap üretir; materyal yetmezse "
-        "'not_covered' döner. Ders konusuyla ilgili her soru, açıklama, 'daha basit anlat' ve "
-        "'örnekle göster' isteği için kullan."
+        "'not_covered', videodaki sahne belirsizse 'needs_clarification' döner (netleştirme "
+        "sorusu öğrenciye gösterilmiştir). Ders konusuyla ilgili her soru, açıklama, 'daha basit "
+        "anlat' ve 'örnekle göster' isteği için kullan."
     ),
     params=CourseQuestionArgs,
     label="Ders materyalinde aranıyor…",

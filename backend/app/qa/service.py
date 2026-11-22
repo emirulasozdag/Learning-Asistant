@@ -9,6 +9,7 @@ from app.core.config import settings
 from app.db.models import Conversation, Course, Document, Message, User, VideoFrame
 from app.embeddings.base import Embedder
 from app.generation.answer import stream_answer
+from app.generation.visual import StoredFrameSource, VisualContext
 from app.llm.base import ChatMessage, LLMClient
 from app.llm.gateway import resolve_judge
 from app.retrieval.hybrid import retrieve
@@ -90,7 +91,9 @@ def ask_stream(
 
     DeltaEvent'ler doğrulanmamış taslaktır; DoneEvent'teki cevap taslağın yerini alır
     (iddialar çıkarılmış, cevap reddedilmiş ya da LLM'siz alıntıya düşülmüş olabilir).
-    LLM'e yalnızca soru, parçalar ve sohbet geçmişi gider; kullanıcı kimliği gitmez (ADR-5).
+    LLM'e yalnızca soru, parçalar ve sohbet geçmişi gider; video verildiyse durdurulan anın
+    kareleri de (üreticiye türetilmiş metin, judge'a görüntü; ADR-12). Kullanıcı kimliği gitmez
+    (ADR-5).
     """
     # Var olan sohbet yalnızca okunur; yenisi cevapla birlikte yazılır. Uzun üretim (LLM,
     # judge) sırasında açık bir veritabanı işlemi kalmaz (#21): arama bitince işlem kapatılır.
@@ -177,8 +180,14 @@ def answer_stream(
         embedder=embedder,
         context=previous_question,
     )
-    # Doğrulanmış video bağlamı (#25) model çağrılarından önce, aynı okuma işleminde okunur.
+    # Doğrulanmış video bağlamı (#25) ve durdurulan anın kareleri (#26) model çağrılarından önce,
+    # aynı okuma işleminde okunur. Kareler yalnızca model cevap yazacaksa yüklenir.
     context = video_context(db, video)
+    visual = (
+        frame_context(db, course, video)
+        if llm is not None and retrieval.relevant and retrieval.passages
+        else None
+    )
     if release is not None:
         release()
     # Durdurulan andaki bölüm (#102) yeniden sıralamaya girmez, her zaman başta kalır.
@@ -208,6 +217,7 @@ def answer_stream(
         judge_error=judge_error,
         # "Burayı anlamadım" + durdurulan an: özet değil, o anı öğreten açıklama (#103).
         explain=moment is not None and retrieval.deictic,
+        visual=visual,
     ):
         if isinstance(item, AskResponse):
             response = item
@@ -252,6 +262,20 @@ def video_context(db: Session, video: VideoRef | None) -> VideoContextOut | None
     )
 
 
+def frame_context(db: Session, course: Course, video: VideoRef | None) -> VisualContext | None:
+    """Cevaba girecek kareler (#26, ADR-12): durdurulan andaki (ya da öğrencinin seçtiği) kare ve
+    çevresindeki kareler, en çok `MAX_FRAMES`.
+
+    `video` API katmanında doğrulanmıştır (`api.deps.checked_video`); `StoredFrameSource` yine
+    yalnızca bu dersin onaylı ve hazır video dokümanlarının karelerini okur. Video yoksa None.
+    """
+    if video is None:
+        return None
+    return StoredFrameSource(db, course).moment(
+        VideoPosition(video.document_id, video.time_s), frame_id=video.frame_id
+    )
+
+
 def video_trace(context: VideoContextOut | None) -> dict | None:
     """Mesaj kaydına yazılan video bağlamı (#25): kimlikler ve zamanlar. Kare görüntüsü ve
     türetilmiş metin (OCR, betimleme) kayda girmez; kare kendi tablosunda kalır."""
@@ -284,7 +308,7 @@ def research_logging_now(db: Session, user_id: int | None) -> bool:
 
 def answer_meta(response: AskResponse) -> dict:
     """Mesaj kaydındaki cevap özeti; eğitmen etkinliği (`instructor/activity.py`) bunu okur."""
-    return {
+    meta = {
         "declined": response.declined,
         "outcome": response.outcome,
         "mode": response.mode,
@@ -293,6 +317,11 @@ def answer_meta(response: AskResponse) -> dict:
         # #10: iddia kontrolünün denetim kaydı (hallucination oranı buradan hesaplanır).
         "claim_check": _claim_check_meta(response),
     }
+    if response.visual is not None:
+        # #26 (ADR-12): cevaba giren kareler, görüntüsü judge'a gidenler, kalan kare alıntıları;
+        # yalnızca kimlikler ve zamanlar. Kare verilmeyen cevabın kaydı önceki gibidir.
+        meta["visual"] = response.visual.model_dump()
+    return meta
 
 
 def _claim_check_meta(response: AskResponse) -> dict | None:

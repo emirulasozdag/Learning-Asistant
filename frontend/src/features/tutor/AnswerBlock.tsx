@@ -3,6 +3,7 @@ import {
   ClipboardCheck,
   CircleSlash,
   FlaskConical,
+  HelpCircle,
   RotateCcw,
   SearchX,
   ServerOff,
@@ -15,7 +16,7 @@ import Button from "../../ui/Button";
 import { LogoMark } from "../../ui/Logo";
 import CitedText from "./CitedText";
 import RichText from "./RichText";
-import { classifyResponse, declineExplanation, extractiveNotice } from "./outcome";
+import { clarificationQuestion, classifyResponse, declineExplanation, extractiveNotice } from "./outcome";
 import RetrievalDetails from "./RetrievalDetails";
 import SourceCards from "./SourceCards";
 import type { SelectSourceProps, Turn, TutorFailure } from "./types";
@@ -175,6 +176,22 @@ function Body({ turn, isLatest, onQuickAction, onRetry, ...select }: AnswerBlock
             <SourceCards citations={response.suggested_sources} numbered={false} {...select} />
           </div>
         )}
+        <RetrievalDetails response={response} {...select} />
+      </div>
+    );
+  }
+
+  if (outcome === "clarification") {
+    // Videodaki sahne belirsiz (#26): cevap yerine öğrenciye netleştirme sorusu sorulur.
+    return (
+      <div className="flex flex-col gap-4">
+        <div className="rounded-panel border border-line bg-canvas px-4 py-3">
+          <p className="flex items-center gap-2 text-base font-medium text-ink">
+            <HelpCircle size={16} aria-hidden className="text-accent" />
+            Neyi kastettiğini netleştirir misin?
+          </p>
+          <p className="mt-1 text-md leading-7 text-ink">{clarificationQuestion(response)}</p>
+        </div>
         <RetrievalDetails response={response} {...select} />
       </div>
     );

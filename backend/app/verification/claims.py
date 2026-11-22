@@ -17,7 +17,7 @@ isteği önceki gibidir.
 import logging
 import re
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from app.generation.visual import VisualEvidence
 from app.llm.base import LLMClient, LLMError
@@ -47,6 +47,8 @@ class CheckedText:
     removed: int = 0
     # Görüntüde ne kastedildiği belli olmadığı için çıkarılanlar (netleştirme isteği için).
     ambiguous: int = 0
+    # Görüntüsü judge'a gönderilen karelerin kimlikleri (kontrol sonra başarısız olsa da).
+    images_sent: list[int] = field(default_factory=list)
 
     @property
     def usable(self) -> bool:
@@ -96,16 +98,21 @@ def check_claims(
             else JUDGE_PROMPT_VERSION
         ),
     )
+    # Görüntüsü judge'a gerçekten gönderilen kareler; istek gitmezse (ör. metin judge'ı önce hata
+    # verdi) boş kalır.
+    images_sent: list[int] = []
     try:
         text_results = iter(label_claims(text_units, labels, judge))
         visual_results = iter(
-            label_visual_claims(visual_units, labels, frames, judge) if visual_units else []
+            label_visual_claims(visual_units, labels, frames, judge, sent=images_sent)
+            if visual_units
+            else []
         )
     except LLMError as exc:
         logger.warning("İddia kontrolü yapılamadı (%s): %s", judge.model, exc)
         check.status = "failed"
         check.error = str(exc)
-        return CheckedText(answer, check)
+        return CheckedText(answer, check, images_sent=images_sent)
 
     # Cevaptaki sıraya göre birleştirilir; kayıttaki iddia kimlikleri de bu sırayla verilir.
     results: list[ClaimLabel] = [
@@ -130,6 +137,7 @@ def check_claims(
         check,
         removed=len(rejected),
         ambiguous=sum(result.label == "ambiguous" for result in results),
+        images_sent=images_sent,
     )
 
 

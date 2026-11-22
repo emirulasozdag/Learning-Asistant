@@ -237,7 +237,7 @@ export default function MaterialsPage() {
         />
         <span className="text-base text-ink">
           Yükleyeceğim dosyaların bu ders için kullanılmasına izin verilmiş materyal olduğunu ve cevap üretmek
-          için yapay zekâ servisine gönderilebileceğini beyan ederim.
+          için yapay zekâ servisine gönderilebileceğini (videolardan alınan slayt kareleri dahil) beyan ederim.
         </span>
       </label>
 

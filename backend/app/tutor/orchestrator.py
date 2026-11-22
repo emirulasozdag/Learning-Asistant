@@ -69,7 +69,8 @@ cümlesi olarak yaz (anahtar kelime listesi değil).
 2. Mesaj birbirinden ayrı iki soru içeriyorsa her biri için ayrı answer_from_course \
 çağırabilirsin (en fazla 2).
 3. answer_from_course "not_covered" dönerse: soru dersin alanı içindeyse ve explain_general \
-araç listesindeyse explain_general çağır; değilse finish.
+araç listesindeyse explain_general çağır; değilse finish. "needs_clarification" dönerse \
+netleştirme sorusu öğrenciye gösterilmiştir: finish (follow_ups önerme).
 4. Mesaj, önceki konuşmayla bile ne sorulduğu anlaşılmayacak kadar belirsizse → \
 ask_clarification. <video> etiketi varsa "burası", "bunu", "anlamadım" gibi mesajlar belirsiz \
 değildir: öğrenci videonun durdurduğu anda anlatılanı soruyor → answer_from_course; `question` \

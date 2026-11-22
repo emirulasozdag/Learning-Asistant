@@ -185,14 +185,17 @@ Hızlı deneme için `TRANSCRIPTION_MODEL=tiny` (düşük doğruluk). Sınırlar
 
 Transkripsiyon açıkken yüklenen ders videosundan slayt kareleri de çıkarılabilir: görüntü birkaç saniye sabit kalınca
 (slayt) kare alınır ve üstündeki yazı yerel Tesseract ile okunur (Türkçe + İngilizce; formül, kod, diyagram etiketi).
-Görüntü sunucudan çıkmaz (DECISIONS.md ADR-10). Varsayılan **kapalıdır**; açmak için `.env`:
+OCR yereldir (DECISIONS.md ADR-10). Varsayılan **kapalıdır**; açmak için `.env`:
 
 ```
 FRAME_EXTRACTION=ocr
 ```
 
 Sonra `docker compose up -d --build --force-recreate`. Kareler `GET /api/documents/{id}/frames` ile listelenir ve kaynak
-görüntüleyicide video alıntısının `frames` alanında görünür. Okunan metin cevaplarda kanıt olarak **kullanılmaz** (#26).
+görüntüleyicide video alıntısının `frames` alanında görünür. Öğrenci videoyu durdurup sorduğunda o anın kareleri
+cevaba girer: üretici okunan metni ipucu olarak görür, kareye dayanan iddia ise karenin **görüntüsüyle** judge'da kontrol
+edilir (okunan metin kanıt sayılmaz; #26). Kare görüntüleri metin ders materyaliyle aynı kurallarla hosted judge'a gider
+(DECISIONS.md ADR-12); kayıtlara görüntü ve okunan metin girmez.
 Yalnızca `.vtt` ile yüklenen videoda medya olmadığı için kare yoktur. Ayrıntılar: [CONTRACTS.md §4.1](docs/CONTRACTS.md).
 
 ### AI Tutor (orkestratör)

@@ -183,6 +183,7 @@ const OUTCOME_PARTS = [
   { key: "not_covered", label: "Materyalde yok", swatch: "bg-line-strong" },
   { key: "not_generated", label: "Doğrulanamadı", swatch: "bg-warning" },
   { key: "unavailable", label: "Servis yanıt vermedi", swatch: "bg-danger" },
+  { key: "clarification", label: "Netleştirme istendi", swatch: "bg-accent" },
 ] as const;
 
 /** Soruların sonuçlara dağılımı: tek yatay çubuk, renkler her zaman etiketle birlikte. */
@@ -298,6 +299,7 @@ const OUTCOME_BADGES: Record<string, { label: string; tone: "success" | "neutral
   model_refusal: { label: "Yanıtlanmadı", tone: "warning" },
   provider_failure: { label: "Servis yanıt vermedi", tone: "danger" },
   verification_failure: { label: "Kontrol edilemedi", tone: "danger" },
+  needs_clarification: { label: "Netleştirme istendi", tone: "neutral" },
 };
 
 function QuestionList({ items, empty, review }: { items: QuestionItem[]; empty: string; review: ReviewControls }) {

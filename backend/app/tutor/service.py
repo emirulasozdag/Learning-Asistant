@@ -28,6 +28,7 @@ from app.qa.service import (
     video_context,
     video_trace,
 )
+from app.schemas.ask import VisualTrace
 from app.schemas.tutor import (
     ClarificationBlock,
     CourseAnswerBlock,
@@ -187,4 +188,13 @@ def _summary(ctx: TurnContext) -> dict:
     answered = next((r for r in responses if r.outcome == "answered"), None)
     summary = answer_meta(answered or responses[0])
     summary["cited_source_ids"] = sorted({c.source_id for r in responses for c in r.citations})
+    visuals = [r.visual for r in responses if r.visual is not None]
+    if visuals:
+        # #26: turdaki bütün kaynaklı cevapların kareleri (bir tur en çok iki cevap verir).
+        frames = {frame.frame_id: frame for visual in visuals for frame in visual.frames}
+        summary["visual"] = VisualTrace(
+            frames=list(frames.values()),
+            judge_images=list(dict.fromkeys(i for v in visuals for i in v.judge_images)),
+            cited=list(dict.fromkeys(i for v in visuals for i in v.cited)),
+        ).model_dump()
     return summary

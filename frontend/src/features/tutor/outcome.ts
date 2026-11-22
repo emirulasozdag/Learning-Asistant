@@ -11,7 +11,9 @@ export type ResponseOutcome =
   /** Kaynak bulundu ama dayanaklı bir cevap üretilemedi (soru kapsam dışı değil). */
   | "not_generated"
   /** Soru için ders materyalinde yeterli bilgi yok. */
-  | "out_of_scope";
+  | "out_of_scope"
+  /** Videodaki sahne belirsiz; cevap yerine öğrenciye netleştirme sorusu soruldu (#26). */
+  | "clarification";
 
 // Backend'in "materyalde yok" sabit cümlesi; öğrenciye yerine sade bir yönlendirme gösterilir.
 const DECLINE_NOT_COVERED =
@@ -23,6 +25,7 @@ const DECLINE_NOT_COVERED =
  *   (ya da kontrol edilemedi), ilgili bölüm gösterildi
  * - unsupported / model_refusal: kaynak bulundu ama dayanaklı cevap üretilemedi
  * - insufficient_evidence: soru için materyalde yeterli bilgi yok
+ * - needs_clarification: videodaki sahne belirsiz; netleştirme sorusu soruldu
  */
 export function classifyResponse(response: AskResponse): ResponseOutcome {
   switch (response.outcome) {
@@ -36,7 +39,17 @@ export function classifyResponse(response: AskResponse): ResponseOutcome {
       return "not_generated";
     case "insufficient_evidence":
       return "out_of_scope";
+    case "needs_clarification":
+      return "clarification";
   }
+}
+
+/** Netleştirme sorusu (clarification): backend `decline_reason`'da gönderir. */
+export function clarificationQuestion(response: AskResponse): string {
+  return (
+    response.decline_reason ??
+    "Sorduğun kısmı videodaki görüntüde tam olarak seçemedim. Slaytın hangi bölümünü kastettiğini yazar mısın?"
+  );
 }
 
 /** Alıntı gösterilirken (ai_unavailable) neden yapay zekâ cevabı olmadığını söyleyen cümle. */
@@ -78,6 +91,8 @@ export function describeTurn(turn: Turn): string {
         return "Cevap hazırlanamadı.";
       case "out_of_scope":
         return "Bu soru için ders materyalinde yeterli bilgi bulunamadı.";
+      case "clarification":
+        return `Netleştirme sorusu: ${clarificationQuestion(response)}`;
     }
   }
   if (turn.streamText) return "Cevap yazılıyor.";

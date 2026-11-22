@@ -122,6 +122,8 @@ class CourseActivity(BaseModel):
     not_generated: int
     # Modele ulaşılamadı ya da cevap kontrol edilemedi (#10); ilgili bölüm alıntılandı.
     unavailable: int
+    # [ekleme, #26] Videodaki sahne belirsizdi; öğrenciden netleştirme istendi.
+    clarification: int = 0
     daily: list[DailyCount]
     top_sources: list[SourceUsage]
     recent_questions: list[QuestionItem]

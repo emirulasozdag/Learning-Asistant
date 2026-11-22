@@ -14,7 +14,7 @@ modüldeki çok kipli çağrıyla kontrol edilir:
   kendi kaynaklarından biri; kareyle desteklenen bilgi için görüntüde ne görüldüğü (`observed`)
   boş olamaz.
 
-Kareler ders materyalidir (onaylı ders videosu, ADR-3): yük `DataClass.COURSE_EVIDENCE`,
+Kareler ders materyalidir (onaylı ders videosu, ADR-3, ADR-12): yük `DataClass.COURSE_EVIDENCE`,
 metin judge'ıyla aynı rota (ADR-8). Kimlik ve öğrenci verisi gitmez.
 """
 
@@ -112,30 +112,37 @@ def label_visual_claims(
     labels: dict[str, RetrievedPassage],
     frames: dict[str, VisualEvidence],
     judge: LLMClient,
+    sent: list[int] | None = None,
 ) -> list[VisualClaimLabel]:
     """Kare alıntılayan iddia birimlerini görüntüyle etiketler; sonuç `units` ile aynı sırada.
 
     Görüntüsü olmayan karelere dayanan ya da görüntü kabul etmeyen judge'a düşen birimler
     judge'a sorulmadan `unverifiable` olur. Hata türleri: LLMError (sağlayıcı),
     JudgeContractError (sözleşme dışı çıktı).
+
+    `sent`: verilirse görüntüsü judge'a gönderilen karelerin kimlikleri, istek gönderilmeden hemen
+    önce eklenir (istek sonra hata verse de gönderilmiştir). İstek gitmezse boş kalır. Denetim
+    kaydı içindir (ADR-12); görüntünün kendisi kayda girmez.
     """
     results: list[VisualClaimLabel | None] = [None] * len(units)
     checkable: list[int] = []
     can_see = supports_images(judge)
     for index, unit in enumerate(units):
-        cited = [frames[label] for label in unit.labels if label in frames]
         if not can_see:
             results[index] = _unverifiable(unit, labels, frames, judge, "images_not_supported")
-        elif any(frame.image is None for frame in cited):
+        elif not _images_ready(unit, frames):
             results[index] = _unverifiable(unit, labels, frames, judge, "image_unavailable")
         else:
             checkable.append(index)
 
     if checkable:
         batch = [units[index] for index in checkable]
+        parts = build_parts(batch, labels, frames)
+        if sent is not None:
+            sent.extend(_frame_ids(batch, frames))
         try:
             output = judge.complete_json_with_images(  # type: ignore[attr-defined]
-                SYSTEM_PROMPT, build_parts(batch, labels, frames), VisualJudgeOutput
+                SYSTEM_PROMPT, parts, VisualJudgeOutput
             )
         except ImageInputUnsupported:
             for index in checkable:
@@ -147,6 +154,17 @@ def label_visual_claims(
             for index, result in zip(checkable, checked, strict=True):
                 results[index] = result
     return [result for result in results if result is not None]
+
+
+def _frame_ids(units: list[ClaimUnit], frames: dict[str, VisualEvidence]) -> list[int]:
+    """`build_parts`'ın görüntüsünü isteğe koyduğu kareler (kimlikleri, etiket sırasıyla)."""
+    cited = sorted({label for unit in units for label in unit.labels}, key=lambda x: int(x[1:]))
+    return [frames[label].frame_id for label in cited if label in frames]
+
+
+def _images_ready(unit: ClaimUnit, frames: dict[str, VisualEvidence]) -> bool:
+    """Birimin alıntıladığı her karenin görüntüsü var mı (yoksa birim kontrol edilemez)."""
+    return all(frames[label].image is not None for label in unit.labels if label in frames)
 
 
 def build_parts(
