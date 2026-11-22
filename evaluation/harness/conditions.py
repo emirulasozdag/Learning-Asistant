@@ -3,15 +3,16 @@
 Aynı sorular, aynı üretici model ve aynı indeksle koşulur; koşullar yalnızca hattın şu
 parçalarında ayrılır (`SETTINGS`, koşu kaydına yazılır):
 
-| Koşul | Arama | Kapı | Alıntı doğrulama / iddia kontrolü | Oynatma konumu | Kareler |
-|---|---|---|---|---|---|
-| no_rag | yok | yok | yok (alıntısız) | yok | yok |
-| basic_rag | yalnız anlamsal, ilk 5 | yok | yok (etiketler yalnızca kaynağa çevrilir) | yok | yok |
-| full | hibrit + RRF | var | var (ürün hattı, `/ask`) | yok | yok |
-| full_video_time | hibrit + RRF + video komşuları | var | var | gold sorudaki `playback` | yok (transcript-only) |
-| visual | full_video_time ile aynı | var | var; kare iddiaları görüntüyle | `playback` | durdurulan anın kareleri |
+| Koşul | Arama | Kapı | Alıntı doğrulama / iddia kontrolü | Oynatma konumu |
+|---|---|---|---|---|
+| no_rag | yok | yok | yok (alıntısız) | yok |
+| basic_rag | yalnız anlamsal, ilk 5 | yok | yok (etiketler yalnızca kaynağa çevrilir) | yok |
+| full | hibrit + RRF | var | var (ürün hattı, `/ask`) | yok |
+| full_video_time | hibrit + RRF + video komşuları | var | var | gold sorudaki `playback` |
+| visual | full_video_time ile aynı | var | var; kare iddiaları görüntüyle | `playback` |
 
-full_video_time ile visual arasındaki tek fark karelerdir (#30, #33): aynı sorularla birlikte
+Kareler (durdurulan anın video kareleri) yalnızca visual koşulunda cevaba girer; full_video_time
+transcript-only'dir. İki koşul arasındaki tek fark karelerdir (#30, #33): aynı sorularla birlikte
 koşulunca görsel bağlamın katkısı ve yalnızca metinde regresyon ayrılır.
 
 no_rag ve basic_rag temel çizgidir: ürün davranışı değil, karşılaştırma için minimal hatlar.

@@ -95,14 +95,20 @@ def test_visual_differs_from_full_video_time_only_by_frames() -> None:
     assert {k: v for k, v in visual.items() if k != "frames"} == {
         k: v for k, v in transcript.items() if k != "frames"
     }
-    assert all(settings["frames"] is False for c, settings in conditions.SETTINGS.items() if c is not Condition.VISUAL)
+    assert all(
+        settings["frames"] is False
+        for c, settings in conditions.SETTINGS.items()
+        if c is not Condition.VISUAL
+    )
     assert Condition.VISUAL in parse_conditions(["all"])
 
 
 def test_visual_condition_reports_a_course_without_frames() -> None:
     gaps = condition_gaps(Condition.VISUAL, [gold()], frame_count=0)
     assert any("kare yok" in gap for gap in gaps)
-    assert not any("kare yok" in g for g in condition_gaps(Condition.VISUAL, [gold()], frame_count=3))
+    assert not any(
+        "kare yok" in g for g in condition_gaps(Condition.VISUAL, [gold()], frame_count=3)
+    )
     assert condition_gaps(Condition.FULL_VIDEO_TIME, [gold()], frame_count=0) == []
     assert condition_gaps(Condition.FULL, [gold()], frame_count=0) == []
 

@@ -45,7 +45,9 @@ def reasons(response) -> list[str | None]:
 
 
 def test_order_of_events_from_a_single_frame_is_not_supported() -> None:
-    judge = FakeVisionJudge(see=lambda claim_id, cites: ("supported", cites, "karede yazi var", "temporal"))
+    judge = FakeVisionJudge(
+        see=lambda claim_id, cites: ("supported", cites, "karede yazi var", "temporal")
+    )
 
     _, result = run(FakeLLM([ORDER_CLAIM]), judge, visual=VISUAL)
 
