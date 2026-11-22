@@ -16,7 +16,7 @@ import Button from "../../ui/Button";
 import { LogoMark } from "../../ui/Logo";
 import CitedText from "./CitedText";
 import RichText from "./RichText";
-import { clarificationQuestion, classifyResponse, declineExplanation, extractiveNotice } from "./outcome";
+import { clarificationQuestion, classifyResponse, declineExplanation } from "./outcome";
 import RetrievalDetails from "./RetrievalDetails";
 import SourceCards from "./SourceCards";
 import type { SelectSourceProps, Turn, TutorFailure } from "./types";
@@ -154,6 +154,23 @@ function Body({ turn, isLatest, onQuickAction, onRetry, ...select }: AnswerBlock
 
   const outcome = classifyResponse(response);
 
+  if (outcome === "verification_failure" || outcome === "provider_failure") {
+    return (
+      <div role="alert" className="flex flex-col items-start gap-3">
+        <p className="flex items-center gap-2 text-base font-medium text-danger">
+          <CircleAlert size={16} aria-hidden />
+          {outcome === "verification_failure"
+            ? "Cevap kaynaklarla doğrulanamadı"
+            : "Cevap üretilirken bir hata oluştu"}
+        </p>
+        <p className="text-base text-graphite">
+          Sorunu tekrar gönderebilirsin. Sorun sürerse eğitmenine haber ver.
+        </p>
+        {isLatest && <RetryButton onRetry={onRetry} />}
+      </div>
+    );
+  }
+
   if (outcome === "not_generated") {
     return (
       <div className="flex flex-col gap-4">
@@ -222,7 +239,9 @@ function Body({ turn, isLatest, onQuickAction, onRetry, ...select }: AnswerBlock
   return (
     <div className="flex flex-col gap-4">
       {extractive && (
-        <p className="text-sm text-graphite">{extractiveNotice(response)}</p>
+        <p className="text-sm text-graphite">
+          Yapay zekâ şu an kullanılamıyor; ders materyalindeki ilgili bölüm olduğu gibi gösteriliyor.
+        </p>
       )}
       {extractive ? (
         // LLM'siz alıntı: materyalin kendi metni, biçimlendirilmeden.

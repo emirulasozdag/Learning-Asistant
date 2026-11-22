@@ -193,15 +193,15 @@ def test_refusal_is_reported_as_decline() -> None:
     assert response.outcome == "model_refusal"
 
 
-def test_llm_error_mid_stream_replaces_draft_with_marked_excerpt() -> None:
+def test_llm_error_mid_stream_discards_the_draft_and_reports_failure() -> None:
     deltas, response = run(FakeLLM(["Sag yari "], error=LLMError("ag koptu")))
 
     # Taslak akmıştı; son cevap onun yerine geçer ve servis hatası olarak işaretlenir.
     assert deltas == ["Sag yari "]
     assert response.outcome == "provider_failure"
-    assert response.mode == "extractive" and not response.declined
-    assert "Sag yari elenir." in response.answer
-    assert [c.source_id for c in response.citations] == ["11"]
+    assert response.mode == "llm" and not response.declined
+    assert response.answer is None and response.citations == []
+    assert response.model == FakeLLM.model
 
 
 def test_llm_error_before_any_text_is_provider_failure() -> None:

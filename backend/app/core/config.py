@@ -53,7 +53,7 @@ class Settings(BaseSettings):
     # İddia kontrolü (#10, ADR-8): cevap atomik iddialara bölünür ve generator'dan farklı model
     # ailesinden bir judge her iddiayı kaynağa göre etiketler.
     # required: kontrol edilmemiş üretilmiş içerik öğrenciye gösterilmez (judge yoksa ya da
-    #   hata verirse yalnızca kaynaktan aynen alıntı gösterilir, outcome=verification_failure).
+    #   hata verirse cevap boş döner, outcome=verification_failure).
     # off: yalnızca alıntı doğrulaması (geliştirme; pilotta kullanılmaz).
     claim_check: str = "required"
     # gemini | openrouter | anthropic | local. Boşsa judge yapılandırılmamıştır.

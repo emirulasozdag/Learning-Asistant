@@ -120,7 +120,7 @@ class CourseActivity(BaseModel):
     not_covered: int
     # Doğrulanamadı ya da model reddetti.
     not_generated: int
-    # Modele ulaşılamadı ya da cevap kontrol edilemedi (#10); ilgili bölüm alıntılandı.
+    # Model cevabı ya da zorunlu iddia kontrolünü tamamlayamadı (#10).
     unavailable: int
     # [ekleme, #26] Videodaki sahne belirsizdi; öğrenciden netleştirme istendi.
     clarification: int = 0

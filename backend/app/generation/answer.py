@@ -141,10 +141,10 @@ def stream_answer(
 
     - Soru dersle ilgisizse (alakasızlık kapısı) ya da parça yoksa: LLM çağrılmadan reddet.
     - LLM varsa: yalnızca parçalara dayanan, alıntılı cevap; model "YOK:" derse reddet.
-    - LLM yoksa ya da erişilemezse: en ilgili parçayı kaynağıyla alıntıla.
+    - LLM yapılandırılmamışsa en ilgili parçayı kaynağıyla alıntıla.
+      Yapılandırılmış model hata verirse provider_failure döndür.
     - `claim_check="required"`: alıntı doğrulamasından geçen cevabın iddiaları `judge` ile
-      kontrol edilir; kontrol yapılamazsa üretilen metin yerine alıntı gösterilir
-      (`verification_failure`). Taslak akıtılmaz.
+      kontrol edilir. Kontrol yapılamazsa verification_failure döndür. Taslak akıtılmaz.
     - `explain`: video anı açıklaması (#103); başlıklı, adım adım, öğretici biçim.
     - `visual`: video kareleri (#26). Kapı ve LLM'siz alıntı yalnızca metin parçalarına bakar;
       kareler cevaba ek kanıttır ve kareye dayanan iddialar görüntüyle kontrol edilir. Kare
@@ -218,13 +218,11 @@ def stream_answer(
         yield refused
         return
     except LLMError as exc:
-        # Yarım kalan taslak gösterilmez; yerine en ilgili parça açıkça alıntılanır.
-        logger.warning("LLM kullanılamadı, LLM'siz moda düşülüyor: %s", exc)
-        fallback = extractive_answer(passages)
-        fallback.outcome = "provider_failure"
+        logger.warning("Cevap üretilemedi (%s): %s", llm.model, exc)
+        failed = AskResponse(answer=None, outcome="provider_failure", model=llm.model)
         if frames:
-            fallback.visual = _visual_trace(frames, [], fallback)
-        yield fallback
+            failed.visual = _visual_trace(frames, [], failed)
+        yield failed
         return
 
     stripped = text.lstrip()
@@ -258,7 +256,7 @@ def _verified_response(
     judge_error: str | None,
     frames: dict[str, VisualEvidence] | None = None,
 ) -> tuple[AskResponse, list[int]]:
-    """Alıntı doğrulaması, ardından iddia kontrolü; sonuca göre cevap, ret ya da alıntı.
+    """Alıntı ve iddia kontrolünün sonucuna göre cevap, ret ya da doğrulama hatası.
 
     İkinci değer görüntüsü judge'a gönderilen karelerin kimlikleridir (denetim kaydı için).
     """
@@ -270,11 +268,9 @@ def _verified_response(
         checked = check_claims(text, labels, judge, claim_check, judge_error, frames)
         check = checked.check
         if not checked.usable:
-            # Üretilen metin kontrol edilmeden gösterilmez; kaynaktan aynen alıntı verilir.
-            fallback = extractive_answer(passages)
-            fallback.outcome = "verification_failure"
-            fallback.claim_check = check
-            return fallback, checked.images_sent
+            return AskResponse(
+                answer=None, outcome="verification_failure", claim_check=check
+            ), checked.images_sent
         if checked.removed:
             judge_removed = checked.removed
             verification = verify_answer(checked.text, labels)

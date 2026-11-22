@@ -283,9 +283,9 @@ def test_visual_judge_output_that_does_not_match_the_claims_fails_the_check() ->
 
     _, result = run(FakeLLM([VISUAL_ANSWER]), judge, visual=VISUAL)
 
-    assert result.outcome == "verification_failure" and result.mode == "extractive"
+    assert result.outcome == "verification_failure" and result.mode == "llm"
+    assert result.answer is None and result.citations == []
     assert result.claim_check is not None and result.claim_check.status == "failed"
-    assert "frame:" not in str([c.source_id for c in result.citations])
 
 
 def test_visual_judge_giving_two_verdicts_for_one_claim_breaks_the_contract() -> None:

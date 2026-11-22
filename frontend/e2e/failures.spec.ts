@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 
+import type { TutorTurnResponse } from "../src/api/types";
 import { ask, course, firstClaim, loginAsStudent, openTutor, questionBox, waitForAnswer } from "./helpers";
 
 // Hata durumları. Uygulamaya sahte veri eklenmez: `route.abort` yalnızca bağlantının
@@ -24,6 +25,49 @@ test("servise ulaşılamazsa öğrenciye söylenir; Tekrar sor yeniden dener", a
   await expect(firstClaim(page)).toBeVisible();
   await expect(page.getByText("Ders servisine ulaşılamıyor")).toHaveCount(0);
 });
+
+for (const [outcome, title] of [
+  ["verification_failure", "Cevap kaynaklarla doğrulanamadı"],
+  ["provider_failure", "Cevap üretilirken bir hata oluştu"],
+] as const) {
+  test(`${outcome} gösterilir ve aynı soru yeniden sorulabilir`, async ({ page }) => {
+    await openTutor(page, course("A"));
+    const question = "İkili arama nasıl çalışır?";
+    const endpoint = "**/api/tutor/turn/stream";
+    await page.route(endpoint, async (route) => {
+      // Gerçek ders, sohbet ve arama sonuçlarıyla yalnızca sağlayıcının hatasını canlandır.
+      const upstream = await route.fetch({ url: route.request().url().replace(/\/stream$/, "") });
+      expect(upstream.ok()).toBe(true);
+      const turn: TutorTurnResponse = await upstream.json();
+      const block = turn.blocks.find((entry) => entry.type === "course_answer");
+      if (!block) throw new Error("Test dersinden kaynaklı cevap bekleniyordu");
+      block.response = {
+        ...block.response, answer: null, mode: "llm", outcome, citations: [], suggested_sources: [],
+        retrieval: block.response.retrieval.map((hit) => ({ ...hit, used: false })),
+        claim_check: outcome === "verification_failure"
+          ? { status: "failed", judge_model: "test", claims: 1, unsupported: 0, prompt_version: null }
+          : null,
+      };
+      await route.fulfill({
+        contentType: "text/event-stream",
+        body: `event: block\ndata: ${JSON.stringify({ index: 0, block })}\n\n`
+          + `event: done\ndata: ${JSON.stringify({ ...turn, blocks: [block] })}\n\n`,
+      });
+    }, { times: 1 });
+
+    await ask(page, question);
+    const alert = page.getByRole("alert").filter({ hasText: title });
+    await expect(alert).toBeVisible();
+    await expect(firstClaim(page)).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Beni bu konuda test et" })).toHaveCount(0);
+
+    const retry = page.waitForRequest(endpoint);
+    await alert.getByRole("button", { name: "Tekrar sor" }).click();
+    expect((await retry).postDataJSON().message).toBe(question);
+    await expect(firstClaim(page)).toBeVisible();
+    await expect(alert).toHaveCount(0);
+  });
+}
 
 test("akıştaki hata olayı geçici sorun olarak gösterilir, 'konu derste yok' olarak değil", async ({ page }) => {
   await openTutor(page, course("A"));

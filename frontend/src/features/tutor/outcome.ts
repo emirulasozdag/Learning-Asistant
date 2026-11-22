@@ -8,6 +8,8 @@ export type ResponseOutcome =
   | "answered"
   /** Yapay zekâ kullanılamıyor; ders materyalinden ilgili bölüm aynen gösterildi. */
   | "ai_unavailable"
+  | "verification_failure"
+  | "provider_failure"
   /** Kaynak bulundu ama dayanaklı bir cevap üretilemedi (soru kapsam dışı değil). */
   | "not_generated"
   /** Soru için ders materyalinde yeterli bilgi yok. */
@@ -21,8 +23,8 @@ const DECLINE_NOT_COVERED =
 
 /**
  * Backend cevabını öğrenciye gösterilecek türe çevirir; backend'in `outcome` alanını kullanır.
- * - provider_failure, verification_failure ya da LLM'siz mod (extractive): yapay zekâ cevabı yok
- *   (ya da kontrol edilemedi), ilgili bölüm gösterildi
+ * - provider_failure / verification_failure: üretim ya da kontrol tamamlanamadı
+ * - answered + extractive: LLM'siz modda materyalden alıntı gösterildi
  * - unsupported / model_refusal: kaynak bulundu ama dayanaklı cevap üretilemedi
  * - insufficient_evidence: soru için materyalde yeterli bilgi yok
  * - needs_clarification: videodaki sahne belirsiz; netleştirme sorusu soruldu
@@ -33,7 +35,7 @@ export function classifyResponse(response: AskResponse): ResponseOutcome {
       return response.mode === "extractive" ? "ai_unavailable" : "answered";
     case "provider_failure":
     case "verification_failure":
-      return "ai_unavailable";
+      return response.outcome;
     case "unsupported":
     case "model_refusal":
       return "not_generated";
@@ -50,14 +52,6 @@ export function clarificationQuestion(response: AskResponse): string {
     response.decline_reason ??
     "Sorduğun kısmı videodaki görüntüde tam olarak seçemedim. Slaytın hangi bölümünü kastettiğini yazar mısın?"
   );
-}
-
-/** Alıntı gösterilirken (ai_unavailable) neden yapay zekâ cevabı olmadığını söyleyen cümle. */
-export function extractiveNotice(response: AskResponse): string {
-  if (response.outcome === "verification_failure") {
-    return "Yapay zekânın cevabı bağımsız olarak kontrol edilemedi, bu yüzden gösterilmiyor; ders materyalindeki ilgili bölüm olduğu gibi gösteriliyor.";
-  }
-  return "Yapay zekâ şu an kullanılamıyor; ders materyalindeki ilgili bölüm olduğu gibi gösteriliyor.";
 }
 
 /**
@@ -84,9 +78,10 @@ export function describeTurn(turn: Turn): string {
       case "answered":
         return `Cevap hazır. ${response.citations.length} kaynak gösterildi.`;
       case "ai_unavailable":
-        return response.outcome === "verification_failure"
-          ? "Yapay zekânın cevabı kontrol edilemedi; ders materyalindeki ilgili bölüm gösterildi."
-          : "Yapay zekâ şu an kullanılamıyor; ders materyalindeki ilgili bölüm gösterildi.";
+        return "Yapay zekâ şu an kullanılamıyor; ders materyalindeki ilgili bölüm gösterildi.";
+      case "verification_failure":
+      case "provider_failure":
+        return ""; // Hata mesajını role="alert" duyurur.
       case "not_generated":
         return "Cevap hazırlanamadı.";
       case "out_of_scope":

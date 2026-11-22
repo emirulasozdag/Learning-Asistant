@@ -107,6 +107,8 @@ class OpenRouterLLMClient:
         choice = response.choices[0]
         if choice.finish_reason == "content_filter":
             raise LLMRefusal("Model bu isteği yanıtlamadı.")
+        if choice.finish_reason == "length":
+            raise LLMError("LLM cevabı uzunluk sınırında kesildi.")
         try:
             return schema.model_validate(json.loads(choice.message.content or ""))
         except (json.JSONDecodeError, ValidationError) as exc:

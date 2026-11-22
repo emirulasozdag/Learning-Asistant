@@ -413,7 +413,8 @@ def test_stream_provider_failure_mid_answer_is_reported(
     assert [name for name, _ in events] == ["retrieval", "delta", "done"]
     done = events[-1][1]
     assert done["outcome"] == "provider_failure"
-    assert done["mode"] == "extractive" and "sag yari elenir" in done["answer"]
+    assert done["mode"] == "llm" and done["answer"] is None
+    assert done["citations"] == [] and not any(hit["used"] for hit in done["retrieval"])
 
 
 def test_irrelevant_question_never_reaches_the_llm(

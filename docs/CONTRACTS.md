@@ -793,7 +793,7 @@ girdiği, görüntüsü judge'a gidenler, kalan kare alıntıları; §4.2) yazı
 `"answered" | "insufficient_evidence" | "unsupported" | "model_refusal" | "provider_failure"`, ayrıca `unsupported_removed`.
 
 **#10 eklemeleri (ADR-8).** `outcome` += `"verification_failure"` **[ekleme]**: cevap üretildi ama iddia kontrolü
-yapılamadı; `answer` en ilgili parçanın alıntısıdır, `mode == "extractive"`, `declined == false`.
+yapılamadı. Hem bu durumda hem de `provider_failure` için `answer == null`, `citations == []`, `mode == "llm"`, `declined == false`.
 `AskResponse.claim_check: {status: "checked" | "not_configured" | "failed" | "off", judge_model, claims,
 unsupported, prompt_version} | null` **[ekleme]**; model cevap yazmadıysa `null`. `unsupported_removed` artık
 judge'ın çıkardığı iddiaları da sayar. `CLAIM_CHECK=required` iken `/ask/stream` ve tutor akışında `delta` / taslak
@@ -832,9 +832,9 @@ Hata zarfı (tüm uygulama hataları):  { detail: str, code: str }
 ```
 
 Değişmezler (`AskResponse`):
-- `declined == true` ⇔ `answer == null`.
+- `declined == true` ⇒ `answer == null`.
 - `outcome == "answered"` ⇒ `declined == false`, `citations` boş değil.
-- `outcome == "provider_failure"` ⇒ `answer` dolu (alıntı), `mode == "extractive"`, `provider_error != null`.
+- `outcome == "provider_failure"` ⇒ `answer == null`, `mode == "llm"`, `provider_error != null`.
 - `mode == "extractive"` ve `provider_error == "not_configured"`: LLM yok.
 - `outcome ∈ {insufficient_evidence, unsupported, model_refusal}` ⇒ `declined == true`; ilk ikisi `suggested_sources` döndürür;
   `model_refusal` için de döndürülmesi önerilir.

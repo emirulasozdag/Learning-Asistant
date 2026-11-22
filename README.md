@@ -151,8 +151,8 @@ LLM_API_KEY=<Gemini API anahtarı>
   Bu sağlayıcıda orkestratör yoktur; AI Tutor sabit akışla çalışır.
 - Anahtar boşsa sistem **LLM'siz** çalışır: cevap yerine en ilgili ders parçasını kaynağıyla gösterir.
 
-> **Önemli (#10):** Artık varsayılan `CLAIM_CHECK=required`. Judge tanımlı değilse LLM cevabı yerine kaynaktan
-> alıntı gösterilir. Judge, üreticiden farklı model ailesinden olmalıdır (Gemini dışı; örneğin OpenRouter
+> **Önemli (#10):** Varsayılan `CLAIM_CHECK=required`. Judge tanımlı değilse veya kontrolü tamamlayamazsa
+> öğrenci doğrulama hatasını görür ve sorusunu yeniden gönderebilir. Judge, üreticiden farklı model ailesinden olmalıdır (örneğin OpenRouter
 > üzerinden Claude):
 >
 > ```
@@ -221,7 +221,8 @@ Hata olursa `error` olayı gelir.
   - `insufficient_evidence`: materyalde yok
   - `unsupported`: doğrulamadan geçemedi
   - `model_refusal`: model reddetti
-  - `provider_failure`: modele ulaşılamadı; en ilgili parça alıntılandı
+  - `provider_failure`: model cevabı tamamlayamadı, `answer` boş
+  - `verification_failure`: zorunlu iddia kontrolü tamamlanamadı, `answer` boş. Hatanın nedeni asistan mesajının `meta.claim_check.error` alanında kayıtlıdır.
 
   `unsupported_removed` kaç cümlenin çıkarıldığını söyler.
 - **Gecikme:**

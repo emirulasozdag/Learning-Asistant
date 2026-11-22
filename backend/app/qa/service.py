@@ -136,7 +136,7 @@ def ask_stream(
             Message(
                 conversation_id=conversation.id,
                 role="assistant",
-                content=response.answer or response.decline_reason or "",
+                content=response.transcript_text,
                 meta={**answer_meta(response), "video": video_trace(response.video_context)},
                 research_logged=logged,
             ),

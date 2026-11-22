@@ -15,8 +15,10 @@ from app.core.config import settings
 from app.db.models import Course, Message
 from app.llm.base import ChatMessage, LLMError, LLMUsage, ToolCall, ToolSpec
 from app.llm.gateway import LLMRole
+from app.qa import service as qa_service
 from tests.conftest import enroll, make_user
 from tests.test_answer import FakeLLM
+from tests.test_claims import FakeJudge
 from tests.test_flow import parse_sse, upload
 
 ANSWER = "Dizi sirali oldugu icin sag yari elenir [S1]."
@@ -316,6 +318,42 @@ def test_stream_sends_status_drafts_and_verified_blocks(
     block = events[4][1]
     assert block["index"] == 0 and block["block"]["type"] == "course_answer"
     assert events[-1][1]["blocks"][0] == block["block"]
+
+
+def test_required_judge_failure_is_auditable_and_the_same_question_can_be_retried(
+    client: TestClient, db, course: Course, ready, monkeypatch: pytest.MonkeyPatch, caplog
+) -> None:
+    use(monkeypatch, None, FakeLLM([ANSWER]))
+    monkeypatch.setattr(settings, "claim_check", "required")
+    reason = "LLM cevabı uzunluk sınırında kesildi."
+    judge = FakeJudge(error=LLMError(reason))
+    monkeypatch.setattr(qa_service, "resolve_judge", lambda: (judge, None))
+    question = "Neden sag yari elenir?"
+
+    stream = client.post("/tutor/turn/stream", json={"course_id": course.id, "message": question})
+    assert stream.status_code == 200
+    events = parse_sse(stream.text)
+    assert not any(name == "delta" for name, _ in events)
+    (block,) = (data["block"] for name, data in events if name == "block")
+    name, done = events[-1]
+    assert name == "done" and done["blocks"] == [block]
+    response = block["response"]
+    assert response["outcome"] == "verification_failure"
+    assert response["answer"] is None and response["citations"] == []
+    assert response["retrieval"] and not any(hit["used"] for hit in response["retrieval"])
+    assert response["claim_check"]["status"] == "failed" and "error" not in response["claim_check"]
+    assert reason not in stream.text and reason in caplog.text
+
+    message = db.scalars(select(Message).where(Message.role == "assistant")).one()
+    assert message.content == "Cevap kaynaklarla doğrulanamadı."
+    assert message.meta["claim_check"]["judge_model"] == judge.model
+    assert message.meta["claim_check"]["error"] == reason
+
+    judge.error = None
+    retried = turn(client, course, question, conversation_id=done["conversation_id"])
+    answer = retried["blocks"][0]["response"]
+    assert answer["outcome"] == "answered" and answer["claim_check"]["status"] == "checked"
+    assert answer["answer"] == "Dizi sirali oldugu icin sag yari elenir [1]."
 
 
 def test_turn_requires_membership_consent_and_own_conversation(

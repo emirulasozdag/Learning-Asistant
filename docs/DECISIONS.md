@@ -324,8 +324,8 @@ olması gerekiyor (ANALYSIS §7.3) ve hassas verinin hosted modele sessizce gitm
   atomik bilgi; desteklenen bilginin kaynağı iddianın kendi kaynaklarından biri olmalı (değilse `source_mismatch`).
   Desteklenmeyen birimler cevaptan çıkarılır; kalan kapsama `MIN_COVERAGE` altındaysa cevap reddedilir (`unsupported`).
 - **Yalnızca kontrol edilmiş içerik:** `CLAIM_CHECK=required` (varsayılan) iken taslak akıtılmaz; judge yoksa,
-  ayarı geçersizse, hata verirse ya da sözleşme dışı çıktı verirse üretilen metin gösterilmez, en ilgili parça aynen
-  alıntılanır ve `outcome="verification_failure"`. Bu, `provider_failure` (üretici erişilemedi), ret ve LLM'siz
+  ayarı geçersizse, hata verirse ya da sözleşme dışı çıktı verirse `answer=null` ve
+  `outcome="verification_failure"` döner. Bu, `provider_failure` (üretici erişilemedi), ret ve LLM'siz
   alıntıdan ayrı kaydedilir. `CLAIM_CHECK=off` yalnızca geliştirme içindir (`claim_check.status="off"`).
 - **Judge seçimi:** `JUDGE_PROVIDER`, `JUDGE_MODEL`, `JUDGE_API_KEY`. Aile model adından çıkarılır
   (`llm/gateway.py::model_family`); generator'la aynı aile reddedilir (`JudgeConfigError`). Üretici Gemini iken
