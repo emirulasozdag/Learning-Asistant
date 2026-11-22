@@ -83,6 +83,216 @@
         "support": "mixed",
         "trap": null
       }
+    },
+    {
+      "id": "la-r-01",
+      "split": "heldout",
+      "kind": "answerable",
+      "question": "Bir alt uzaya izdüşüm (projection) matrisi P'nin formülü ne?",
+      "topic": "projection matrix",
+      "reference_answer": "P = A (AᵀA)⁻¹ Aᵀ. Tek boyutlu durumdaki bölme, n×n matris olduğu için tersle yazılır; P, b'yi A'nın sütun uzayına izdüşürür.",
+      "evidence": [
+        {
+          "document_sha256": "a2dfef77d0da73a61d6828fa3ce28d158e7f091ac68e4f1455eef33392d24a1c",
+          "t_start": 2086,
+          "t_end": 2133
+        }
+      ],
+      "origin": "team_draft",
+      "notes": "Arama ölçümü taslağı (#29): formül, Lecture 15 transkripti.",
+      "query_type": "formula"
+    },
+    {
+      "id": "la-r-02",
+      "split": "calibration",
+      "kind": "answerable",
+      "question": "Cramer kuralına göre x_j nasıl bulunur, pratikte iyi bir yöntem mi?",
+      "topic": "Cramer's rule",
+      "reference_answer": "x_j = det(B_j) / det(A); B_j, A'nın j. sütunu b ile değiştirilmiş hâlidir. n+1 determinant gerektirdiği için pratik hesapta elimination'dan kötüdür.",
+      "evidence": [
+        {
+          "document_sha256": "a6766cd301cf0622b94598c034283b5c22ef7b5501b6a08d646b1108f650d77d",
+          "t_start": 1508,
+          "t_end": 1567
+        }
+      ],
+      "origin": "team_draft",
+      "notes": "Arama ölçümü taslağı (#29): özel ad (Cramer), Lecture 20 transkripti.",
+      "query_type": "lexical"
+    },
+    {
+      "id": "la-r-03",
+      "split": "heldout",
+      "kind": "answerable",
+      "question": "Markov matrisinin özellikleri neler ve en büyük özdeğeri kaç?",
+      "topic": "Markov matrix",
+      "reference_answer": "Bütün girdileri ≥ 0'dır ve her sütunun toplamı 1'dir. En büyük özdeğer λ = 1'dir; diğer özdeğerlerin mutlak değeri 1'den küçük ya da eşittir (girdiler pozitifse kesin küçük, Perron-Frobenius).",
+      "evidence": [
+        {
+          "document_sha256": "fc5a449b797478be15171ade92cd11ea15559c42eeeb9a252bcdab325ec7b344",
+          "page": 79
+        }
+      ],
+      "origin": "team_draft",
+      "notes": "Arama ölçümü taslağı (#29): özel ad (Markov), ZoomNotes 11.5.",
+      "query_type": "lexical"
+    },
+    {
+      "id": "la-r-04",
+      "split": "heldout",
+      "kind": "answerable",
+      "question": "m×n ve rankı r olan bir matrisin dört temel alt uzayının boyutları nedir?",
+      "topic": "four fundamental subspaces",
+      "reference_answer": "Satır uzayı C(Aᵀ) ve sütun uzayı C(A) r boyutludur; sıfır uzayı N(A) n − r, sol sıfır uzayı N(Aᵀ) m − r boyutludur.",
+      "evidence": [
+        {
+          "document_sha256": "fc5a449b797478be15171ade92cd11ea15559c42eeeb9a252bcdab325ec7b344",
+          "page": 28
+        }
+      ],
+      "origin": "team_draft",
+      "notes": "Arama ölçümü taslağı (#29): kavram, ZoomNotes 3.5 (sayfada diyagram).",
+      "query_type": "concept"
+    },
+    {
+      "id": "la-r-05",
+      "split": "calibration",
+      "kind": "answerable",
+      "question": "Pozitif tanımlı bir matrisin determinantı için ne söylenebilir, determinantın pozitif olması yeter mi?",
+      "topic": "positive definite determinant",
+      "reference_answer": "Pozitif tanımlı matriste bütün özdeğerler ve pivotlar pozitiftir, bu yüzden determinant da pozitiftir. Ama determinantın pozitif olması yetmez: ör. köşegeni −1 ve −3 olan matrisin determinantı pozitif, pivotları ve özdeğerleri negatiftir.",
+      "evidence": [
+        {
+          "document_sha256": "d24aa5e299f35350bb3c4613f3757babccfd23ab68cef5238a75d21d585c31a2",
+          "t_start": 2375,
+          "t_end": 2466
+        }
+      ],
+      "origin": "team_draft",
+      "notes": "Arama ölçümü taslağı (#29): kavram, Lecture 25 transkripti.",
+      "query_type": "concept"
+    },
+    {
+      "id": "la-r-06",
+      "split": "heldout",
+      "kind": "answerable",
+      "question": "Pascal matrisi S'nin özdeğerleri neden λ ve 1/λ çiftleri hâlinde gelir?",
+      "topic": "Pascal matrices",
+      "reference_answer": "S = LU ve L, U kendi terslerine benzerdir (L⁻¹ = DLD⁻¹, U⁻¹ = DUD⁻¹); buradan S⁻¹ = (DU) S (DU)⁻¹ çıkar, yani S⁻¹ S'ye benzerdir. Benzer matrislerin özdeğerleri aynı olduğu için özdeğerler λ ve 1/λ çiftleridir.",
+      "evidence": [
+        {
+          "document_sha256": "fdf3d00a994ae88388ecb3cc17f93abcb75130ac6f155de24a660e05ad872846",
+          "page": 8
+        }
+      ],
+      "origin": "team_draft",
+      "notes": "Arama ölçümü taslağı (#29): özel ad (Pascal), Pascal Matrices okumasının 8. sayfası.",
+      "query_type": "lexical"
+    },
+    {
+      "id": "la-r-07",
+      "split": "heldout",
+      "kind": "answerable",
+      "question": "MATLAB'de n×n birim matris, sıfır matris ve rastgele matris hangi komutlarla oluşturulur?",
+      "topic": "MATLAB eye zeros rand",
+      "reference_answer": "eye(n) birim matrisi, zeros(n) sıfır matrisini, rand(n) 0–1 arasında düzgün dağılımlı, randn(n) normal dağılımlı rastgele matrisi verir; ones(m, n) gibi biçimler m×n matris üretir.",
+      "evidence": [
+        {
+          "document_sha256": "56b9819f17e83a3e89c7f5079b6e5d7cacd8cd407f282b00110faf5a6c9442a2",
+          "page": 3
+        }
+      ],
+      "origin": "team_draft",
+      "notes": "Arama ölçümü taslağı (#29): kod terimi. MATLAB Tutorial 3. sayfa; PDF metninde parantez ve semboller kayboluyor.",
+      "query_type": "code"
+    },
+    {
+      "id": "la-r-08",
+      "split": "calibration",
+      "kind": "answerable",
+      "question": "MATLAB'de A\\b (backslash) komutu A kare değilken farklı ne yapar?",
+      "topic": "MATLAB backslash",
+      "reference_answer": "Ters bölü A\\b, A kare olmadığında farklı davranır (kare olmayan sistemde en küçük kareler çözümü verir); öğretici bunu ayrıca not eder.",
+      "evidence": [
+        {
+          "document_sha256": "56b9819f17e83a3e89c7f5079b6e5d7cacd8cd407f282b00110faf5a6c9442a2",
+          "page": 2
+        }
+      ],
+      "origin": "team_draft",
+      "notes": "Arama ölçümü taslağı (#29): kod terimi. MATLAB Tutorial 2. sayfa; PDF metninde ters bölü 'Anb' olarak okunuyor (çıkarım kusuru).",
+      "query_type": "code"
+    },
+    {
+      "id": "la-r-09",
+      "split": "heldout",
+      "kind": "answerable",
+      "question": "Gram-Schmidt'in 9 satırlık MATLAB kodunda R(i,j) ve R(j,j) nasıl hesaplanıyor?",
+      "topic": "Gram-Schmidt MATLAB",
+      "reference_answer": "Her j sütunu için v = A(:, j) alınır; her önceki q_i için R(i, j) = q_iᵀ a_j hesaplanır ve v'den R(i, j) q_i çıkarılır. R(j, j) = ||v|| ve q_j = v / R(j, j) olur; sonuçta A = QR.",
+      "evidence": [
+        {
+          "document_sha256": "d98c7da70cbbc910e236aa1852039fc0e4090df964c54c61dc63785f5816b1e6",
+          "page": 1
+        }
+      ],
+      "origin": "team_draft",
+      "notes": "Arama ölçümü taslağı (#29): kod terimi. Bu PDF'in metni çıkarımda bozuluyor (font kodlaması); soru o kusuru ölçmek için seçildi.",
+      "query_type": "code"
+    },
+    {
+      "id": "la-v-04",
+      "split": "heldout",
+      "kind": "answerable",
+      "question": "Tahtadaki sistemde eliminasyonun ilk adımı ne?",
+      "topic": "elimination first step",
+      "reference_answer": "Ax = b sistemi (sağ taraf 2, 12, 2) matrisle yazılır. Birinci denklem olduğu gibi kalır; doğru çarpanla çarpılıp ikinci denklemden çıkarılır, amaç ikinci denklemdeki x'i yok etmektir.",
+      "evidence": [
+        {
+          "document_sha256": "24691acb19c79d716f8801ee15f67acb46bee004171fea3b43ea03f8ae32bd48",
+          "t_start": 154,
+          "t_end": 254
+        }
+      ],
+      "origin": "team_draft",
+      "notes": "Görsel/arama taslağı (#29): tahta (formül/matris). Tahta karelerinin OCR'ı anlamsız; kare dalının zor durumu. Referans cevap transkriptten.",
+      "playback": {
+        "document_sha256": "24691acb19c79d716f8801ee15f67acb46bee004171fea3b43ea03f8ae32bd48",
+        "time_s": 200
+      },
+      "visual": {
+        "frame_kind": "formula",
+        "expected": "answer",
+        "support": "mixed",
+        "trap": null
+      }
+    },
+    {
+      "id": "la-v-05",
+      "split": "calibration",
+      "kind": "answerable",
+      "question": "Burada bu matrisin neden tersi olamayacağını söylüyor?",
+      "topic": "singular matrix no inverse",
+      "reference_answer": "Sıfır olmayan bir x için Ax = 0'dır (x = (3, −1)). A⁻¹ olsaydı iki tarafı A⁻¹ ile çarpınca x = 0 çıkardı; çelişki. Tekil matriste sütunların bir birleşimi sıfır sütununu verir ve A⁻¹ sıfırdan geri dönemez.",
+      "evidence": [
+        {
+          "document_sha256": "4ba30e88b21da7203eb9af5a43b1f6362b71d31b82bcc63ee6fe9cad52db87fa",
+          "t_start": 1824,
+          "t_end": 1917
+        }
+      ],
+      "origin": "team_draft",
+      "notes": "Görsel/arama taslağı (#29): tahta (formül). Tahta karelerinin OCR'ı anlamsız. Referans cevap transkriptten.",
+      "playback": {
+        "document_sha256": "4ba30e88b21da7203eb9af5a43b1f6362b71d31b82bcc63ee6fe9cad52db87fa",
+        "time_s": 1875
+      },
+      "visual": {
+        "frame_kind": "formula",
+        "expected": "answer",
+        "support": "mixed",
+        "trap": null
+      }
     }
   ]
 }

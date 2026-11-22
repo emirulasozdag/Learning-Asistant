@@ -152,6 +152,33 @@ def test_frame_times_never_pass_the_media_duration(
     assert all(f.t_start <= f.t_frame <= f.t_end <= 450.0 for f in frames)
 
 
+def test_frames_after_the_media_duration_are_dropped_not_collapsed(
+    client: TestClient,
+    db: Session,
+    course: Course,
+    run_jobs,
+    frames_on,
+    transcriber: FakeTranscriber,
+) -> None:
+    """#29: mp4 altyazıdan uzunsa (kapanış ekranı) süreden sonra başlayan kare sıfır uzunlukta
+    bir aralığa sıkışıyordu (t_start = t_end = süre): hiçbir ana ve transkripte denk gelmez."""
+    transcriber.duration_s = 450.0
+
+    document = processed_video(client, db, course, run_jobs)
+    frames = frames_of(db, document)
+
+    # 500–705 sn'lik son slayt tamamen sürenin dışında: alınmaz; 410–500 kırpılır.
+    assert [(f.ordinal, f.t_start, f.t_end) for f in frames] == [
+        (0, 0.0, 90.0),
+        (1, 90.0, 190.0),
+        (2, 190.0, 410.0),
+        (3, 410.0, 450.0),
+    ]
+    assert all(f.t_end > f.t_start for f in frames)
+    images = frame_dir(course.id, document.id)
+    assert sorted(p.name for p in images.iterdir()) == [f"{i}.png" for i in range(4)]
+
+
 def test_frames_are_not_extracted_when_the_feature_is_off(
     client: TestClient, db: Session, course: Course, run_jobs, monkeypatch
 ) -> None:

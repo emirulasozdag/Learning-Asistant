@@ -67,6 +67,20 @@ def read_lecture_frames(
         remove_paths([out_dir])
         return []
 
+    # Videonun zaman çizelgesi dokümanın süresidir (çoğunlukla altyazının sonu). mp4 daha uzunsa
+    # (ör. OCW'nin kapanış ekranı) sonrasında başlayan kare sıfır uzunlukta bir aralığa sıkışır:
+    # hiçbir ana ve transkripte denk gelmez ama aranabilir kalırdı (#29). Bu kareler alınmaz.
+    outside = [f for f in extracted if duration_s is not None and f.t_start >= duration_s]
+    if outside:
+        logger.info(
+            "%s: videonun süresinden (%.1f sn) sonra başlayan %d kare atlandı",
+            media_path.name,
+            duration_s,
+            len(outside),
+        )
+        remove_paths([frame.image_path for frame in outside])
+        extracted = [frame for frame in extracted if frame not in outside]
+
     results: list[OcrResult] = []
     for frame in extracted:
         if should_stop():

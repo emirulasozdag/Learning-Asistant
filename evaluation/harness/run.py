@@ -676,8 +676,8 @@ def run_conditions(args: argparse.Namespace) -> list[RunRecord]:
     from app.core.config import settings
     from app.embeddings.provider import get_embedder
     from app.llm.gateway import select_client
-    from app.retrieval.index import inventory
-    from harness.corpus import CorpusError, Locator, find_course, snapshot
+    from app.retrieval.index import frame_inventory, inventory
+    from harness.corpus import CorpusError, Locator, corpus_fingerprint, find_course, snapshot
 
     selected = parse_conditions(args.condition)
     split = None if args.split == "all" else Split(args.split)
@@ -712,6 +712,7 @@ def run_conditions(args: argparse.Namespace) -> list[RunRecord]:
             )
         identity = get_embedder().identity
         index = inventory(db, course.id)
+        frames = frame_inventory(db, course.id)
         videos = playback_documents(db, course, locator)
         frame_count = course_frame_count(db, course)
         commit, _ = git_state(args.repo)
@@ -725,6 +726,8 @@ def run_conditions(args: argparse.Namespace) -> list[RunRecord]:
                 update={
                     "embedding_identity": identity,
                     "index_fingerprint": index.fingerprint,
+                    "corpus_fingerprint": corpus_fingerprint(corpus),
+                    "frame_fingerprint": frames.fingerprint,
                     "batch_id": batch_id if len(selected) > 1 else None,
                 }
             )

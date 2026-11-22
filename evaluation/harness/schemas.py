@@ -132,6 +132,21 @@ class VisualLabel(_Strict):
     trap: Literal["spatial", "temporal"] | None = None
 
 
+class QueryType(StrEnum):
+    """Arama ölçümünde sorunun türü (#29): Recall@5 tür başına ayrıca raporlanır.
+
+    `lexical`: soru dersin nadir bir terimine/özel adına dayanır (ör. "Bellman-Ford").
+    `code`: kod ya da sözdizimi parçası (fonksiyon adı, MATLAB komutu).
+    `diagram` / `formula`: bilgi tahtadaki çizimde ya da formülde.
+    """
+
+    CONCEPT = "concept"
+    LEXICAL = "lexical"
+    CODE = "code"
+    DIAGRAM = "diagram"
+    FORMULA = "formula"
+
+
 class GoldItem(_Strict):
     id: str = Field(pattern=r"^[A-Za-z0-9_.-]{1,64}$")
     split: Split
@@ -149,6 +164,8 @@ class GoldItem(_Strict):
     playback: Playback | None = None
     # Görsel soru etiketi (#30); yalnızca oynatma konumu olan cevaplanabilir soruda.
     visual: VisualLabel | None = None
+    # Arama ölçümü için soru türü (#29); yoksa görsel etiketin kare türü, o da yoksa `concept`.
+    query_type: QueryType | None = None
 
     @model_validator(mode="after")
     def _check_kind(self) -> Self:
@@ -164,6 +181,14 @@ class GoldItem(_Strict):
     @property
     def reviewed(self) -> bool:
         return self.review is not None
+
+    @property
+    def retrieval_type(self) -> QueryType:
+        """Recall@5 kırılımında kullanılan tür (bkz. `query_type`)."""
+        if self.query_type is not None:
+            return self.query_type
+        kind = self.visual.frame_kind.value if self.visual is not None else None
+        return QueryType(kind) if kind in {t.value for t in QueryType} else QueryType.CONCEPT
 
 
 class GoldSet(_Strict):
@@ -285,6 +310,10 @@ class RunConfig(_Strict):
     # vektörleştirilirse değişir. Eski kayıtlarda boştur.
     embedding_identity: str | None = None
     index_fingerprint: str | None = None
+    # Derlem (indeksteki dokümanların içerik parmak izleri ve parça sayıları) ve kare indeksi
+    # (OCR metni, çıkarıcı, embedder, yorumlayıcı) parmak izleri (#29). Eski kayıtlarda boştur.
+    corpus_fingerprint: str | None = None
+    frame_fingerprint: str | None = None
     # Koşulun hattı (arama, kapı, doğrulama, oynatma konumu; `conditions.SETTINGS`) ve aynı
     # sorularla birlikte koşulan koşulların ortak kimliği. Eski kayıtlarda boştur.
     condition_settings: dict[str, str | bool | int] = {}

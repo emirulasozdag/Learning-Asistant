@@ -119,9 +119,16 @@ def frame_search(
 
 
 def frames_overlapping(
-    db: Session, document_id: int, t_start: float, t_end: float
+    db: Session,
+    document_id: int,
+    t_start: float,
+    t_end: float,
+    course_id: int | None = None,
 ) -> list[VideoFrame]:
     """Videonun [t_start, t_end] aralığında ekranda olan kareleri, zamana göre.
+
+    `course_id` verilirse yalnızca o dersin kareleri döner. Arama ve kanıt dalları her zaman
+    verir; vermeyen çağıran dokümanı aynı istekte dersle doğrulamış olmalıdır.
 
     Yalnızca sınırda değen kare sayılmaz (önceki slaytın bittiği an bir sonrakinin başıdır);
     anlık bir aralık (t_start == t_end) o anda ekrandaki kareyi verir.
@@ -130,22 +137,23 @@ def frames_overlapping(
         overlap = and_(VideoFrame.t_start < t_end, VideoFrame.t_end > t_start)
     else:
         overlap = and_(VideoFrame.t_start <= t_start, VideoFrame.t_end > t_start)
-    return list(
-        db.scalars(
-            select(VideoFrame)
-            .where(VideoFrame.document_id == document_id, overlap)
-            .order_by(VideoFrame.t_start, VideoFrame.ordinal)
-        )
-    )
+    query = select(VideoFrame).where(VideoFrame.document_id == document_id, overlap)
+    if course_id is not None:
+        # Arama dallarında ders ayrıca süzülür (#29): doküman kimliği yanlış dersten gelse bile
+        # başka dersin karesi dönmez.
+        query = query.where(VideoFrame.course_id == course_id)
+    return list(db.scalars(query.order_by(VideoFrame.t_start, VideoFrame.ordinal)))
 
 
 def transcript_during(db: Session, frame: VideoFrame) -> list[Chunk]:
-    """Karenin ekranda kaldığı aralıkla örtüşen transkript parçaları, zamana göre."""
+    """Karenin ekranda kaldığı aralıkla örtüşen transkript parçaları (karenin dersinden),
+    zamana göre."""
     return list(
         db.scalars(
             select(Chunk)
             .where(
                 Chunk.document_id == frame.document_id,
+                Chunk.course_id == frame.course_id,
                 Chunk.t_start.is_not(None),
                 Chunk.t_end.is_not(None),
                 Chunk.t_start < frame.t_end,
@@ -163,6 +171,7 @@ def neighbor_frames(db: Session, frame: VideoFrame) -> list[VideoFrame]:
             select(VideoFrame)
             .where(
                 VideoFrame.document_id == frame.document_id,
+                VideoFrame.course_id == frame.course_id,
                 VideoFrame.ordinal.in_([frame.ordinal - 1, frame.ordinal + 1]),
             )
             .order_by(VideoFrame.ordinal)

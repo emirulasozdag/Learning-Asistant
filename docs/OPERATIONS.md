@@ -182,6 +182,27 @@ Durdurup yeniden başlatmak veri kaybettirmez: `docker compose restart worker` s
 dener. `docker compose down -v` ise veritabanını siler; yüklenen dosyalar (`data/uploads`) hacim değil klasör olduğu
 için kalır ve sahipsiz kalır: temiz başlangıçta onu da elle boşaltın.
 
+## Parmak izleri ve yeniden kurulum (#29)
+
+Bir ölçümün hangi indeksle yapıldığı içerikten hesaplanan parmak izleriyle kaydedilir (doküman/kare kimliklerinden
+ve dosya yollarından bağımsız):
+
+| Parmak izi | İçerik | Nerede |
+|---|---|---|
+| Derlem | İndeksteki dosyaların SHA-256'sı, türü, parça sayısı | `harness.corpus.corpus_fingerprint` |
+| Embedder | Model ve sürüm kimliği (`e5/intfloat/multilingual-e5-base/v1`) | `Embedder.identity` |
+| Metin indeksi | Parça metni, sayfa/zaman, embedder kimliği, FTS dili | `app.retrieval.index.inventory` |
+| Kare indeksi | Kare zamanı, durumu, OCR metni, çıkarıcı (`tesseract/<sürüm>/<dil>`), embedder, yorumlayıcı | `app.retrieval.index.frame_inventory` |
+
+Yeniden kurulum davranışı (ölçüldü, 2026-11-22): 18.06 silinip aynı OCW paketinden içe aktarıldı ve aynı üç
+videonun kareleri yeniden çıkarıldı. Derlem ve metin indeksi parmak izi aynı kaldı, kare kümesi birebir aynı çıktı
+(sıfır uzunluklu kare düzeltmesi dışında). Parmak izi değişirse önceki ölçümle karşılaştırma geçersizdir:
+`harness.run` koşul karşılaştırması bunu "geçersiz karşılaştırma" olarak yazar.
+
+- Model ya da çıkarıcı değişince: metin için `python -m app.scripts.reembed`, kareler için videonun karelerini
+  yeniden çıkarın. Kareler OCR'dan geldiği için Tesseract sürümü değişirse kare parmak izi de değişir.
+- mp4 süresi altyazıdan uzunsa altyazının bitişinden sonra başlayan kareler alınmaz (OCW kapanış ekranı).
+
 ## Gizlilik ve ders izolasyonu (#31)
 
 Doğrulanan kurallar (`backend/tests/test_media_isolation.py`; tek tek durumlar `test_frames_db.py`,
@@ -200,6 +221,10 @@ Doğrulanan kurallar (`backend/tests/test_media_isolation.py`; tek tek durumlar 
 - Her adımdan sonra diskte tam olarak veritabanının bildiği dosyalar vardır (doküman dosyası, etkin işin medyası, kare
   görüntüleri); temizlik tutarlı depoda hiçbir şey silmez.
 - Bir iş iki çalıştırıcıya verilmez (`SKIP LOCKED`); çalıştırıcı yeniden dönünce kare ya da iş çoğalmaz.
+- Arama dallarının hepsi dersle ayrıca süzülür (#29; `test_course_isolation.py`): anlamsal, kelime, durdurulan an,
+  video komşuları, kare araması, anın slayt yazısı, karenin transkripti ve komşu kareleri, görsel kanıt. Durdurulan an
+  ve video komşuları da onaysız videoyu kullanmaz. Gerçek iki derste (6.006, 18.06) her soru öteki derste de sorulur:
+  ders dışı sonuç sayısı 0 (`python -m harness.course_retrieval`, evaluation/README).
 
 Sınırlar: kare görüntüleri şifrelenmeden diskte durur (sunucu diskine erişen herkes görür); görüntüler
 `Cache-Control: private, no-cache` ile sunulur ama tarayıcı önbelleğinden silinmesi garanti edilmez; soru kaydındaki
