@@ -14,9 +14,11 @@ from app.embeddings.provider import get_embedder
 from app.ingestion.chunking import chunk_segments, chunk_timed_segments
 from app.ingestion.cleaning import clean_segments_with_stats, normalize_timed_segments
 from app.ingestion.documents import media_duration_error, validate_media_url
+from app.ingestion.ocr import tesseract_languages
 from app.ingestion.parsers.pdf_parser import parse_pdf
 from app.ingestion.parsers.pptx_parser import parse_pptx
 from app.ingestion.parsers.vtt_parser import ParsedVtt, parse_vtt
+from app.ingestion.text_layer import repair_pages
 from app.ingestion.types import ChunkDraft, IngestionError, RawSegment
 from app.schemas.materials import IngestionReport, MaterialType
 
@@ -107,6 +109,9 @@ def ingest_document(
                 raise
             except Exception as exc:
                 raise IngestionError("Dosya okunamadı; bozuk ya da şifreli olabilir.") from exc
+            if extension == ".pdf":
+                # Metin katmanı bozuk sayfalar OCR'a düşer ya da aramaya alınmaz.
+                segments = repair_pages(path, segments, tesseract_languages(course.language))
 
         drafts: list[ChunkDraft]
         with _timed(timings, "clean"):

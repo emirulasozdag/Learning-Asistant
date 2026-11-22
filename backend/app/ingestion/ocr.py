@@ -98,6 +98,12 @@ def read_image(image_path: Path, languages: str) -> OcrResult:
     return classify(best_reading([_tesseract(png, languages) for png in variants]))
 
 
+def read_png(png: bytes, languages: str) -> OcrResult:
+    """Temiz bir sayfa görüntüsünü (PNG baytları, ör. PDF sayfasının render'ı) tek geçişte okur.
+    Kare görüntülerindeki diyagram temizliği burada gerekmez. Tesseract çalışmazsa `OcrError`."""
+    return classify(_tesseract(png, languages))
+
+
 def best_reading(readings: list[list[Word]]) -> list[Word]:
     """Daha çok harf/rakam içeren kelimeyi güvenle okuyan okuma; eşitse güven toplamı yüksek
     olan, o da eşitse ilki."""
