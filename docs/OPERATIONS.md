@@ -37,8 +37,13 @@ Gövde sınırı istek okunurken uygulanır (`app/core/limits.py`): çok parçal
 yazıldığı için sınır orada denetlenirse sınırı aşan dosya da diske yazılmış olurdu. Önde bir ters vekil (nginx vb.)
 varsa onun gövde sınırı da en az medya sınırı kadar olmalı.
 
-Ölçülmemiş değerler: transkripsiyon süresi (CPU'da `large-v3-turbo` ile 1 saatlik ders "dakikalar", ölçüm yok) ve
-`worker`'ın bellek kullanımı (embedding modeli + whisper modeli). Pilot öncesi gerçek ders kaydıyla ölçülmeli.
+**Bellek ve süre sınırı (ölçüldü, #31).** Transkripsiyonun belleği medyanın süresiyle doğrusal büyür: faster-whisper
+sesin tamamının özelliklerini tek seferde hesaplar. `tiny` ile saat başına ~3,7 GB (aşağıda "Kaynak kullanımı ve
+süre"). `worker`'ın en yüksek belleği ≈ 1,2 GB (embedding modeli) + 3,7 GB × saat. `MAX_MEDIA_DURATION_S` bu yüzden
+`worker`'a ayrılan belleğe göre seçilmeli: 16 GB'lık bir makinede (Docker Desktop ~15,5 GB; `api` ~1 GB, `db`) **en çok
+2 saat** güvenlidir. Varsayılan 4 saat ~16 GB ister; bellek yetmezse `worker` işletim sistemince öldürülür, iş yeniden
+denenir ve ikinci denemede de ölürse doküman "İşlem yarıda kaldı" ile `failed` olur (veri bozulmaz, medya silinir).
+Daha büyük modeller (`small`, `large-v3-turbo`) daha çok bellek ve süre ister; ölçülmedi.
 
 **Kare adımı (`FRAME_EXTRACTION=ocr`, ADR-10, ADR-11).** Transkripsiyondan sonra ayrı bir `frames` işinde aynı medyadan
 çalışır (medya o iş bitince silinir); doküman kareleri beklemeden `ready` olur. Kareler önce
@@ -51,6 +56,37 @@ bir kare, geçişler doğru; iş ~20 sn. 72 sn'lik zor durumlar kaydı (konuşma
 açılan slayt, küçük yoğun yazı, fotoğraf, 1 sn'den kısa slayt, aynı slayta dönüş): 9 kare; kamera sahneleri bölmedi,
 her madde ayrı kare, fotoğraf `no_text`, kısa slayt atlandı, dönülen slayt ayrı kare; yoğun yazıda 7 satırdan ikisinin
 ilk kelimesi eksik. Uzun gerçek ders kayıtlarında ölçülmedi.
+
+## Kaynak kullanımı ve süre (#31)
+
+Ölçüm aracı: `python -m app.scripts.measure_media`. Gerçek işlem hattının adımlarını (süre okuma, transkripsiyon,
+transkript vektörleri, kare çıkarma, OCR, kare vektörleri) bir dosya üzerinde çalıştırır; veritabanına yazmaz, dosyayı
+bir yere göndermez, kareleri geçici klasöre yazıp siler. `--json` yalnızca JSON yazar.
+
+```bash
+docker compose run --rm --no-deps -v "<video klasörü>:/media:ro" worker \
+  python -m app.scripts.measure_media /media/ders.mp4 --language tr
+```
+
+Ölçüm ortamı (2026-11-22): Windows + Docker Desktop, 20 CPU, 15,5 GB; `TRANSCRIPTION_MODEL=tiny`, `multilingual-e5-base`,
+Tesseract 5.5.0. Örnek medya: 1080p/25 fps sentetik İngilizce ders (7 slayt: formül, kod, diyagram, tablo; anlatım Windows
+konuşma sentezi), 11 dakika; 1 ve 2 saatlik sürümler aynı dersin arka arkaya eklenmesiyle. Onaylı gerçek ders kaydı
+henüz yok; sayılar gerçek kayıtla yeniden ölçülmeli (özellikle konuşmacı sesi ve yoğun slaytlar).
+
+| Medya | Transkripsiyon | Kare çıkarma | OCR (kare başına) | Toplam iş | Süreye oranı | En yüksek bellek |
+|---|---|---|---|---|---|---|
+| 11 dk, 11,7 MB, 35 slayt | 29 sn (148 segment) | 20 sn (35 kare, 1,4 MB) | 37 sn (1,05 sn) | 91 sn | 0,14 | 1,9 GB |
+| 1 sa, 71,5 MB, 210 slayt | 110 sn (905 segment) | 71 sn (210 kare, 8,6 MB) | 217 sn (1,03 sn) | 424 sn | 0,11 | 5,1 GB |
+| 2 sa (yalnızca transkripsiyon) | 223 sn (1845 segment) | — | — | — | — | 7,8 GB |
+
+- Embedding modelinin yüklenmesi ~9 sn ve ~1,1 GB; çalıştırıcıda bir kez olur.
+- Transkripsiyonun kendi belleği: 11 dk 0,9 GB, 1 sa 4,1 GB, 2 sa 7,8 GB (≈ 3,7 GB/saat). Ses çözme + VAD bunun
+  ~1 GB'ı (1 saatte); geri kalanı faster-whisper'ın tüm sesin özelliklerini birden hesaplaması.
+- Uçtan uca (gerçek iş kuyruğu, test veritabanı): 11 dk'lık ders 28 sn'de `ready` (transkript), kareler 49 sn sonra;
+  1 saatlik ders 130 sn'de `ready`, kareler 306 sn sonra. Kareler gelene kadar doküman kullanılabilir.
+- Disk: kare başına ~41 KB PNG (1 saat ≈ 9 MB); medya iş bitince silinir, kalıcı olan transkript ve kareler.
+- OCR süresi slayt sayısıyla, transkripsiyon süresi medya süresiyle büyür. Slaytı sık değişen ders (örn. 1 dakikada
+  bir) için kare işi transkripsiyondan uzun sürer; video başına 300 kare sınırı OCR'ı ~5 dakikayla sınırlar.
 
 ## İş durumları
 
@@ -95,6 +131,20 @@ docker compose exec db psql -U learning learning_assistant -c "SELECT id, docume
 - **Doküman uzun süre "İşleniyor".** Önce `worker`'ın çalıştığını ve günlüğünü kontrol edin
   (`docker compose logs worker`). `queued` bekleyen iş varsa ve çalıştırıcı yoksa `docker compose up -d worker`.
   İşi durdurmak için `POST /api/documents/{id}/cancel` ile iptal edin (arayüzde düğme henüz yok).
+  Gerçek `worker` süreciyle denendi (#31, `SIGKILL`): transkripsiyonun ortasında öldürülen iş yeniden başlatınca 2.
+  denemede bitti; kare işinin ortasında öldürülen işte doküman `ready` kaldı (transkript kullanılabilir), yarım
+  `frames/<id>.partial` klasörü ve medya diskte bekledi, iş 2. denemede bitti ve ikisi de silindi. İki durumda da tüm
+  kareler geldi, kopya kare oluşmadı.
+- **`worker` bellek yüzünden öldü** (uzun video; `docker compose ps` ile `worker` yeniden başlamış, `docker compose logs
+  worker` ya da `dmesg`'de "Killed"/OOM). Yukarıdaki gibi yeniden denenir; ikinci denemede de ölürse doküman `failed`.
+  Kalıcı çözüm: `worker`'a daha çok bellek ya da daha kısa `MAX_MEDIA_DURATION_S` ("Sınırlar"daki hesap).
+- **Kareler gelmiyor ya da hepsi okunamıyor.** `docker compose exec worker tesseract --list-langs` `eng` ve `tur`
+  göstermeli. Göstermiyorsa imaj Tesseract eklenmeden önce kurulmuştur: `docker compose up -d --build`. (Tesseract
+  yokken kare adımı günlüğe uyarı yazıp kareleri atlar; doküman yine `ready` olur, bu yüzden hata kendini göstermez.)
+  Kare işi başarısız olduysa medya silinmiştir; kareler için videoyu `POST /api/documents/{id}/frames` ile yeniden
+  ekleyin.
+- **Bir karede gizli içerik yakalandı** (öğrenci listesi, açık pencere). `DELETE /api/documents/{id}/frames/{frame_id}`;
+  görüntü ve kayıt hemen silinir, eski adres ve alıntı 404 olur.
 - **Veritabanı bağlantısı koptu.** Çalıştırıcı hatayı günlüğe yazar ve yoklamaya devam eder. Bağlantı gelince süren iş
   canlılık yazamadıysa yukarıdaki gibi yeniden denenir.
 - **Disk doldu.** Medya parça parça yazılır. Yazma hatası yüklemeyi `5xx` ile bitirir; kayıt geri alınır ve yarım dosya
@@ -114,3 +164,41 @@ docker compose up --build
 Beklenen: `api` migration'ları uygular, demo dersini oluşturur, embedding modelini indirir. `worker`, `api`'den sonra
 başlar ve "İş çalıştırıcısı başladı" yazar. `TRANSCRIPTION_MODEL` boşsa medya yüklemesi `422` ile reddedilir; `.vtt`,
 PDF ve PPTX yüklenir.
+
+Medya için ek denetim (#31), sırayla:
+
+1. `docker compose ps`: `db` sağlıklı, `api` ve `worker` çalışıyor.
+2. `docker compose exec worker tesseract --list-langs` → `eng`, `tur` (yoksa imaj eski: `docker compose up -d --build`).
+3. `docker compose exec worker env | grep -E "TRANSCRIPTION_MODEL|FRAME_EXTRACTION|MAX_MEDIA_DURATION_S"`: kare
+   isteniyorsa `FRAME_EXTRACTION=ocr`; süre sınırı `worker`'ın belleğine uygun ("Sınırlar").
+4. Kısa bir video yükleyin: doküman `ready` olmalı, `GET /api/documents/{id}/jobs` iki işi (`transcription`, `frames`)
+   `succeeded` göstermeli, `GET /api/documents/{id}/frames` kareleri vermeli, `data/uploads/<ders>/` altında medya
+   (`<id>.mp4`) ve `frames/<id>.partial` kalmamalı.
+5. İsteğe bağlı: `python -m app.scripts.measure_media` ile süre ve belleği bu makinede ölçün ("Kaynak kullanımı ve süre").
+
+Durdurup yeniden başlatmak veri kaybettirmez: `docker compose restart worker` süren işi ~2 dakika sonra yeniden
+dener. `docker compose down -v` ise veritabanını siler; yüklenen dosyalar (`data/uploads`) hacim değil klasör olduğu
+için kalır ve sahipsiz kalır: temiz başlangıçta onu da elle boşaltın.
+
+## Gizlilik ve ders izolasyonu (#31)
+
+Doğrulanan kurallar (`backend/tests/test_media_isolation.py`; tek tek durumlar `test_frames_db.py`,
+`test_visual_media.py`, `test_access.py`):
+
+- Her medya/kare ucu (kare listesi, kare görüntüsü, dosya, parçalar, `frame:` alıntısı, iş listesi ve iptali, kare
+  silme, kare videosu ekleme, yorumlama, işlem iptali, doküman silme) yedi rolle denenir. Oturumsuz `401`; ders dışı,
+  başka dersin eğitmeni ve üyeliği kaldırılmış kullanıcı `404` (varlık sızdırılmaz); öğrenci ve TA okur, yönetemez
+  (`403`); yetkisiz istek hiçbir şeyi değiştirmez. Üyelik kaldırılınca açık oturum da erişimi hemen kaybeder.
+- Onaysız, işlenen ya da başarısız videonun kareleri, görüntüsü, dosyası ve alıntısı yalnızca eğitmene görünür; soruda
+  bağlam olamaz ve aramaya girmez.
+- Başka dersin videosu ya da karesi soruda bağlam olamaz (`422`); bir dokümanın yolu üzerinden başka dokümanın karesi,
+  işi ya da görüntüsü bulunmaz; aynı medya iki derste yüklenirse kareler ve dosyalar ayrı kalır.
+- Video yenilenince ya da silinince eski kare kimlikleri, görüntü adresleri ve alıntılar `404`, istekteki eski kare
+  `422`; soru kaydında yalnızca kimlik ve zaman kalır (görüntü, OCR metni ya da yol yok).
+- Her adımdan sonra diskte tam olarak veritabanının bildiği dosyalar vardır (doküman dosyası, etkin işin medyası, kare
+  görüntüleri); temizlik tutarlı depoda hiçbir şey silmez.
+- Bir iş iki çalıştırıcıya verilmez (`SKIP LOCKED`); çalıştırıcı yeniden dönünce kare ya da iş çoğalmaz.
+
+Sınırlar: kare görüntüleri şifrelenmeden diskte durur (sunucu diskine erişen herkes görür); görüntüler
+`Cache-Control: private, no-cache` ile sunulur ama tarayıcı önbelleğinden silinmesi garanti edilmez; soru kaydındaki
+kare kimliği kare silinince boşa düşer (bilerek, ADR-11).
