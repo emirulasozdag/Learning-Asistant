@@ -229,9 +229,22 @@ OCW paketinden derse özel kod olmadan içe aktarılır (`app/scripts/import_ocw
 `evaluation/gold_sets/<ders>/manifest.json`'da.
 - **Görsel soru:** tahtadaki çizime dayanır ("burada çizdiği…"). Gold item'da `playback` (durdurulan an) ve kanıt
   olarak video aralığı vardır. Altın kare, o andaki karedir. Referans cevap dersin transkriptinden alınır.
-- **Koşullar:** `transcript_only` mevcut `full_video_time` koşuludur (cevap transkriptten, kare gösterilir ama kanıt
-  değildir, ADR-10). `visual` ise karelerin kanıt olduğu koşuldur; cevap hattında açıktır (#26, ADR-12), harness'te henüz koşulmaz.
-  Karşılaştırma (görselin katkısı) #33'te raporlanır.
+- **Koşullar:** `full_video_time` transcript-only koşuldur: oynatma konumu kullanılır ama kareler cevaba girmez
+  (`service.ask(frames=False)`). `visual` aynı hattır, tek farkı durdurulan anın kareleridir (kanıt, #26, ADR-12).
+  İkisi aynı sorularla birlikte koşulunca (`--condition full_video_time visual`) fark görsel bağlamın katkısıdır;
+  karşılaştırma ve kabul #33'te raporlanır. Derste kare yoksa visual koşusu bunu boşluk olarak yazar.
+- **Görsel etiket (#30):** görsel soruda `visual {frame_kind: diagram|formula|code|ambiguous, expected:
+  answer|clarify|decline, support: text|visual|mixed|contradiction, trap: spatial|temporal|null}`. Set şu vaka
+  türlerini kapsamalıdır (`harness.validate` eksikleri yazar): diyagram, formül, kod, belirsiz kare, mekânsal tuzak
+  (ok yönü/yerleşim OCR metninde yok), zamansal tuzak ("önce neyi sildi?" tek karede görünmez), görüntü–metin
+  çelişkisi, karışık destek ve yalnızca metinle cevaplanan regresyon soruları. Sorular gerçek karelerden yazılır;
+  kare görülmeden taslak yazılmaz.
+- **Görsel metrikler (#30):** `visual_expected_behavior_rate` (cevap/netleştirme/ret beklenene uydu mu; ret beklenirken
+  netleştirme de kabul), `visual_trap_safe_rate`, `visual_contradiction_safe_rate`, `clarification_rate`,
+  `frame_insufficient_rate`, `answers_citing_frames_rate`; iddia düzeyinde görsel destek (judge kararı ile insan
+  etiketi) insan etiketi gerektirir. Koşu kaydı judge modelini, judge istem sürümlerini, üreticinin görsel kural
+  sürümünü ve her cevabın `claim_check`, `judge_model`, `visual_gap`, kare alıntısı sayısını tutar; kare alıntıları
+  video zamanıyla `cited`'e girer.
 - **Eksikler:** ekip taslağı sorular eğitmen/TA incelemesinden geçmeden koşulmaz. Her derste en az 30 görsel soru ve
   bağımsız etiket gerekir. Durum `manifest.json` → `missing_inputs`'ta.
 - **Ayrışma:** iki ders aynı veritabanında; arama, kare, video anı ve kaynak her zaman yalnızca kendi dersinden döner

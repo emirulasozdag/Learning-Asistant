@@ -1,4 +1,4 @@
-"""Q&A koşusu: gold set'i dört koşuldan (no_rag, basic_rag, full, full_video_time) geçirir.
+"""Q&A koşusu: gold set'i koşullardan (no_rag, basic_rag, full, full_video_time, visual) geçirir.
 
 Kullanım (evaluation/ içinden, backend kurulu ve veritabanı açıkken):
 
@@ -30,6 +30,7 @@ from harness.fingerprint import file_sha256, text_sha256
 from harness.metrics import accuracy, citation, hallucination, retrieval, scope
 from harness.schemas import (
     CorpusSnapshot,
+    ExpectedBehavior,
     GoldItem,
     ItemKind,
     ItemResult,
@@ -49,6 +50,14 @@ from harness.validate import (
 )
 
 RECALL_K = 5
+# Kare alıntısının kaynak kimliği öneki (`app.generation.visual.FRAME_SOURCE_PREFIX`).
+FRAME_PREFIX = "frame:"
+# Görsel soruda beklenen davranışa karşılık gelen sonuçlar (#30).
+EXPECTED_OUTCOMES: dict[ExpectedBehavior, frozenset[str]] = {
+    ExpectedBehavior.ANSWER: frozenset({"answered"}),
+    ExpectedBehavior.CLARIFY: frozenset({"needs_clarification"}),
+    ExpectedBehavior.DECLINE: frozenset({"insufficient_evidence", "needs_clarification"}),
+}
 
 
 @dataclass
@@ -65,6 +74,10 @@ class Answer:
     best_similarity: float | None
     # Getirilen parçaların metni, `retrieved_source_ids` ile aynı sırada.
     retrieved_texts: list[str | None] = field(default_factory=list)
+    # #30: iddia kontrolünün sonucu, judge modeli ve görsel kanıtın neden yetmediği.
+    claim_check: str | None = None
+    judge_model: str | None = None
+    visual_gap: str | None = None
 
 
 AskFn = Callable[[GoldItem], Answer]
@@ -134,6 +147,12 @@ def evaluate(
                 retrieved_text=retrieved_text,
                 best_similarity=answer.best_similarity,
                 latency_ms=round(elapsed_ms, 1),
+                claim_check=answer.claim_check,
+                judge_model=answer.judge_model,
+                visual_gap=answer.visual_gap,
+                cited_frames=sum(
+                    source_id.startswith(FRAME_PREFIX) for source_id in answer.cited_source_ids
+                ),
             )
         )
     return results
@@ -293,6 +312,11 @@ def compute_metrics(
         "Maliyet (token/ücret) kaydedilmiyor: soru-cevap hattı kullanım bilgisi döndürmüyor"
     )
 
+    if condition in conditions.PLAYBACK_CONDITIONS:
+        visual_metrics, visual_gaps = compute_visual_metrics(items, ok)
+        metrics.update(visual_metrics)
+        gaps += visual_gaps
+
     reviewed_answerable = sum(1 for i in items if i.kind is ItemKind.ANSWERABLE and i.reviewed)
     if reviewed_answerable < MIN_REVIEWED_ANSWERABLE:
         gaps.append(
@@ -302,6 +326,89 @@ def compute_metrics(
     oos_count = sum(1 for i in items if i.kind is ItemKind.OUT_OF_SCOPE)
     if oos_count < MIN_OUT_OF_SCOPE:
         gaps.append(f"Kapsam dışı soru {oos_count}/{MIN_OUT_OF_SCOPE}")
+    return metrics, gaps
+
+
+def compute_visual_metrics(
+    items: Sequence[GoldItem], results: Sequence[ItemResult]
+) -> tuple[dict[str, MetricValue], list[str]]:
+    """Görsel etiketli sorularda davranış metrikleri (#30). full_video_time (transcript-only) ve
+    visual koşullarında aynı sorularla hesaplanır; ikisinin farkı görsel bağlamın katkısıdır.
+
+    - visual_expected_behavior_rate: beklenen davranış (cevap / netleştirme / ret) gösterildi mi
+    - visual_trap_safe_rate: tek kareden çıkarılamayan (mekânsal/zamansal tuzak) sorularda cevap
+      verilmedi mi
+    - visual_contradiction_safe_rate: görüntü–metin çelişkili sorularda çelişen bilgi cevapta
+      kalmadı mı (cevap yok ya da çelişki bildirildi)
+    - clarification_rate, frame_insufficient_rate: tüm görsel sorularda oranlar
+    - answers_citing_frames_rate: cevaplanan görsel sorularda kare alıntısı kalan oran
+
+    İddia düzeyinde görsel destek (judge'ın kararı insan etiketiyle uyuşuyor mu) `harness.trust`
+    ile hesaplanır; burada değer yerine boşluk yazılır.
+    """
+    by_id = {item.id: item for item in items}
+    labelled = [r for r in results if (item := by_id.get(r.id)) and item.visual is not None]
+    metrics: dict[str, MetricValue] = {}
+    gaps: list[str] = []
+    if not labelled:
+        gaps.append("Görsel etiketli soru yok: görsel davranış metrikleri hesaplanmadı (#30)")
+        return metrics, gaps
+
+    def visual(r: ItemResult):
+        return by_id[r.id].visual
+
+    matched = [r.outcome in EXPECTED_OUTCOMES[visual(r).expected] for r in labelled]
+    metrics["visual_expected_behavior_rate"] = _metric(
+        lambda: sum(matched) / len(matched), denominator=len(matched), numerator=sum(matched)
+    )
+    traps = [r.outcome != "answered" for r in labelled if visual(r).trap is not None]
+    metrics["visual_trap_safe_rate"] = _metric(
+        lambda: sum(traps) / len(traps),
+        denominator=len(traps),
+        numerator=sum(traps),
+        empty_gap="mekânsal/zamansal tuzak sorusu yok",
+    )
+    conflicts = [
+        r.outcome != "answered" or r.visual_gap == "source_conflict"
+        for r in labelled
+        if visual(r).support.value == "contradiction"
+    ]
+    metrics["visual_contradiction_safe_rate"] = _metric(
+        lambda: sum(conflicts) / len(conflicts),
+        denominator=len(conflicts),
+        numerator=sum(conflicts),
+        empty_gap="görüntü–metin çelişkili soru yok",
+    )
+    clarified = [r.outcome == "needs_clarification" for r in labelled]
+    metrics["clarification_rate"] = _metric(
+        lambda: sum(clarified) / len(clarified),
+        denominator=len(clarified),
+        numerator=sum(clarified),
+    )
+    insufficient = [r.visual_gap == "frame_insufficient" for r in labelled]
+    metrics["frame_insufficient_rate"] = _metric(
+        lambda: sum(insufficient) / len(insufficient),
+        denominator=len(insufficient),
+        numerator=sum(insufficient),
+    )
+    answered = [r.cited_frames > 0 for r in labelled if r.outcome == "answered"]
+    metrics["answers_citing_frames_rate"] = _metric(
+        lambda: sum(answered) / len(answered),
+        denominator=len(answered),
+        numerator=sum(answered),
+        empty_gap="cevaplanmış görsel soru yok",
+    )
+    metrics["visual_claim_support_rate"] = MetricValue(
+        value=None,
+        denominator=0,
+        gap="iddia düzeyinde insan etiketi gerekli (eğitmen/TA); harness.trust ile hesaplanır",
+    )
+    unreviewed = sum(1 for r in labelled if not by_id[r.id].reviewed)
+    if unreviewed:
+        gaps.append(
+            f"{unreviewed}/{len(labelled)} görsel soru eğitmen/TA incelemesinden geçmedi: "
+            "görsel metrikler kabul için kullanılamaz"
+        )
     return metrics, gaps
 
 
@@ -363,7 +470,8 @@ def _backend_ask(
 ) -> AskFn:
     """Her soru ayrı işlemde: hat commit etse bile en sonda geri alınır.
 
-    `playback_documents`: video dokümanının SHA-256'sı → doküman kimliği (full_video_time).
+    `playback_documents`: video dokümanının SHA-256'sı → doküman kimliği (full_video_time,
+    visual). Kareler yalnızca visual koşulunda cevaba girer (#30).
     """
     from sqlalchemy.orm import Session
 
@@ -376,7 +484,7 @@ def _backend_ask(
         return chunk.text if chunk is not None else None
 
     def _video(item: GoldItem) -> VideoRef | None:
-        if condition is not Condition.FULL_VIDEO_TIME or item.playback is None:
+        if condition not in conditions.PLAYBACK_CONDITIONS or item.playback is None:
             return None
         document_id = (playback_documents or {}).get(item.playback.document_sha256)
         if document_id is None:
@@ -394,7 +502,9 @@ def _backend_ask(
                     request = AskRequest(
                         course_id=course_id, question=item.question, video=_video(item)
                     )
-                    response = service.ask(db, course, request, llm)
+                    response = service.ask(
+                        db, course, request, llm, frames=condition is Condition.VISUAL
+                    )
                     # Judge ve değerlendirici iddiaları modelin gördüğü pasajlara göre etiketler.
                     texts = [_chunk_text(db, hit.source_id) for hit in response.retrieval]
             finally:
@@ -409,6 +519,9 @@ def _backend_ask(
             retrieved_source_ids=[hit.source_id for hit in response.retrieval],
             best_similarity=response.best_similarity,
             retrieved_texts=texts,
+            claim_check=response.claim_check.status if response.claim_check else None,
+            judge_model=response.claim_check.judge_model if response.claim_check else None,
+            visual_gap=response.visual_gap,
         )
 
     return ask
@@ -444,6 +557,15 @@ def _baseline_answer(db, course, question: str, llm, condition: Condition) -> An
     )
 
 
+def course_frame_count(db, course) -> int:
+    """Dersin çıkarılmış video karesi sayısı (visual koşulunun koşulabilirliği, #30)."""
+    from sqlalchemy import func, select
+
+    from app.db.models import VideoFrame
+
+    return db.scalar(select(func.count()).where(VideoFrame.course_id == course.id)) or 0
+
+
 def playback_documents(db, course, locator) -> dict[str, int]:
     """Dersin video/ses dokümanları: SHA-256 → doküman kimliği."""
     from sqlalchemy import select
@@ -467,14 +589,26 @@ def _run_config(
     repo: Path,
 ) -> RunConfig:
     from app.core.config import settings
-    from app.generation.answer import ANSWER_STYLE, SYSTEM_PROMPT
+    from app.generation.answer import (
+        ANSWER_STYLE,
+        SYSTEM_PROMPT,
+        VISUAL_RULES,
+        VISUAL_RULES_VERSION,
+    )
     from app.retrieval import fusion, hybrid
+    from app.verification.judge import JUDGE_PROMPT_VERSION
+    from app.verification.visual import VISUAL_JUDGE_PROMPT_VERSION
 
     commit, dirty = git_state(repo)
     prompt = {
         Condition.NO_RAG: conditions.CLOSED_BOOK_PROMPT,
         Condition.BASIC_RAG: conditions.BASIC_RAG_PROMPT,
     }.get(condition, SYSTEM_PROMPT.replace("{style}", ANSWER_STYLE))
+    visual = condition is Condition.VISUAL
+    if visual:
+        # Görsel koşulun istemi görsel kuralları da içerir (#30).
+        prompt += VISUAL_RULES
+    checked = condition not in (Condition.NO_RAG, Condition.BASIC_RAG)
     return RunConfig(
         condition=condition.value,
         condition_settings=conditions.SETTINGS[condition],
@@ -499,6 +633,14 @@ def _run_config(
             "min_keyword_coverage": settings.retrieval_min_keyword_coverage,
             "follow_up_min_similarity": settings.retrieval_follow_up_min_similarity,
         },
+        claim_check=settings.claim_check if checked else None,
+        judge_model=(settings.judge_model or None) if checked else None,
+        judge_prompt_version=(
+            (f"{JUDGE_PROMPT_VERSION}+{VISUAL_JUDGE_PROMPT_VERSION}" if visual else JUDGE_PROMPT_VERSION)
+            if checked
+            else None
+        ),
+        visual_rules_version=VISUAL_RULES_VERSION if visual else None,
     )
 
 
@@ -567,6 +709,7 @@ def run_conditions(args: argparse.Namespace) -> list[RunRecord]:
         identity = get_embedder().identity
         index = inventory(db, course.id)
         videos = playback_documents(db, course, locator)
+        frame_count = course_frame_count(db, course)
         commit, _ = git_state(args.repo)
         batch_id = run_id_for(batch_started, Condition.FULL, split, commit).replace(
             "_full_", "_batch_"
@@ -585,7 +728,7 @@ def run_conditions(args: argparse.Namespace) -> list[RunRecord]:
             results = evaluate(items, ask, locator.locate)
             metrics, metric_gaps = compute_metrics(items, results, condition)
             gaps = selection_gaps + item_gaps(gold) + metric_gaps + _corpus_gaps(corpus)
-            gaps += condition_gaps(condition, items)
+            gaps += condition_gaps(condition, items, frame_count)
             gaps += [f"Eksik girdi: {m.what} (sorumlu: {m.owner})" for m in manifest.missing_inputs]
             if index.stale(identity):
                 gaps.append(
@@ -614,21 +757,32 @@ def run_conditions(args: argparse.Namespace) -> list[RunRecord]:
     return records
 
 
-def condition_gaps(condition: Condition, items: Sequence[GoldItem]) -> list[str]:
-    """Koşula özgü eksikler (ör. oynatma konumu olmayan sorular)."""
-    if condition is not Condition.FULL_VIDEO_TIME:
+def condition_gaps(
+    condition: Condition, items: Sequence[GoldItem], frame_count: int | None = None
+) -> list[str]:
+    """Koşula özgü eksikler (ör. oynatma konumu olmayan sorular, karesi olmayan ders).
+
+    `frame_count`: dersin çıkarılmış kare sayısı (visual koşulu için); bilinmiyorsa None.
+    """
+    if condition not in conditions.PLAYBACK_CONDITIONS:
         return []
+    gaps: list[str] = []
     with_playback = sum(1 for item in items if item.playback is not None)
     if with_playback == 0:
-        return [
-            "Hiçbir soruda oynatma konumu (playback) yok: full_video_time, full ile aynı koşuldu"
-        ]
-    if with_playback < len(items):
-        return [
+        gaps.append(
+            f"Hiçbir soruda oynatma konumu (playback) yok: {condition.value}, full ile aynı koşuldu"
+        )
+    elif with_playback < len(items):
+        gaps.append(
             f"{len(items) - with_playback}/{len(items)} soruda oynatma konumu yok; "
             "bu sorular full ile aynı koşuldu"
-        ]
-    return []
+        )
+    if condition is Condition.VISUAL and frame_count == 0:
+        gaps.append(
+            "Derste çıkarılmış kare yok (video dosyaları eksik ya da kare işi koşmadı): "
+            "visual, full_video_time ile aynı koşuldu"
+        )
+    return gaps
 
 
 def _corpus_gaps(corpus: CorpusSnapshot) -> list[str]:

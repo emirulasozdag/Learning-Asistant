@@ -47,6 +47,11 @@ class CheckedText:
     removed: int = 0
     # Görüntüde ne kastedildiği belli olmadığı için çıkarılanlar (netleştirme isteği için).
     ambiguous: int = 0
+    # #30: alıntılanan kaynakları birbiriyle çeliştiği için çıkarılanlar (`source_conflict`).
+    conflicts: int = 0
+    # #30: kareye dayandığı ama orijinal görüntü yetmediği için çıkarılanlar: tek kareden
+    # zamansal çıkarım, görüntü judge'a gidemedi ya da görüntüde gözlem yazılmadı.
+    frame_insufficient: int = 0
     # Görüntüsü judge'a gönderilen karelerin kimlikleri (kontrol sonra başarısız olsa da).
     images_sent: list[int] = field(default_factory=list)
 
@@ -137,8 +142,17 @@ def check_claims(
         check,
         removed=len(rejected),
         ambiguous=sum(result.label == "ambiguous" for result in results),
+        conflicts=sum(result.reason == "source_conflict" for result in results),
+        frame_insufficient=sum(result.reason in FRAME_INSUFFICIENT for result in results),
         images_sent=images_sent,
     )
+
+
+# Orijinal kare görüntüsünün iddiayı taşımaya yetmediği nedenler (#30). `not_checked`
+# (CLAIM_CHECK=off) ayrıca `_drop_unchecked_visual`'da sayılır.
+FRAME_INSUFFICIENT = frozenset(
+    {"temporal_inference", "image_unavailable", "images_not_supported", "no_visual_observation"}
+)
 
 
 _LABEL_TOKEN = re.compile(r"\[(S\d+)\]")
@@ -203,5 +217,8 @@ def _drop_unchecked_visual(
         for unit in dropped
     ]
     return CheckedText(
-        remove_claims(expanded, [unit.span for unit in dropped]), check, removed=len(dropped)
+        remove_claims(expanded, [unit.span for unit in dropped]),
+        check,
+        removed=len(dropped),
+        frame_insufficient=len(dropped),
     )
