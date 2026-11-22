@@ -19,11 +19,11 @@ from fastapi.testclient import TestClient
 from sqlalchemy import func, select, text, update
 from sqlalchemy.orm import Session
 
-from app.core.config import settings
+from app.core.config import Settings, settings
 from app.db.models import Course, Document, Message, ProcessingJob, VideoFrame
 from app.embeddings.fake import FakeEmbedder
 from app.ingestion import frame_interpretation, lecture_frames, media
-from app.ingestion.documents import frame_dir
+from app.ingestion.documents import frame_dir, media_duration_error
 from app.ingestion.frame_interpretation import FrameContext, InterpretationError
 from app.ingestion.frames import ExtractedFrame, FrameExtractionError
 from app.jobs import retention
@@ -306,6 +306,15 @@ def test_media_longer_than_the_duration_limit_fails_without_frames(
         ("transcription", "failed")
     ]
     assert frames_on == [] and course_files(course) == []
+
+
+def test_default_duration_limit_is_one_hour() -> None:
+    """#125: transkripsiyonun belleği süreyle büyür (~3,7 GB/saat); varsayılan 1 saat güvenli."""
+    assert Settings.model_fields["max_media_duration_s"].default == 3600
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(settings, "max_media_duration_s", 3600)
+        assert media_duration_error(3600.0) is None
+        assert media_duration_error(3600.5) == "Medya süresi 1 saat sınırını aşıyor."
 
 
 # --- kare çıkarma işi: durum, iptal, yeniden deneme -------------------------------------------
@@ -771,7 +780,7 @@ def test_frame_media_over_the_duration_limit_fails_only_the_frame_job(
 ) -> None:
     """Kısa altyazı + uzun video: altyazılı videoya eklenen medyanın süresi de sınırlıdır."""
     video = add_video(db, course)
-    monkeypatch.setattr(media, "media_duration", lambda path: 4 * 3600 + 1.0)
+    monkeypatch.setattr(media, "media_duration", lambda path: 3600 + 1.0)
 
     response = client.post(f"/documents/{video.id}/frames", files={"file": ("ders.mp4", MEDIA)})
     assert response.status_code == 200, response.text
@@ -779,7 +788,7 @@ def test_frame_media_over_the_duration_limit_fails_only_the_frame_job(
 
     (job,) = jobs_of(db, video.id)
     assert (job.kind, job.status, job.attempts) == ("frames", "failed", 1)
-    assert job.error == "Medya süresi 4 saat sınırını aşıyor."
+    assert job.error == "Medya süresi 1 saat sınırını aşıyor."
     assert frames_on == []  # kareler hiç çıkarılmadı
     document = refreshed(db, video.id)
     assert (document.status, document.media_sha256) == ("ready", None)

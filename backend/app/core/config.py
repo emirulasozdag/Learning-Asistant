@@ -88,8 +88,9 @@ class Settings(BaseSettings):
     # Tesseract ile okur. Yalnızca medya yüklemesinde çalışır (.vtt yüklemesinde video yoktur).
     frame_extraction: Literal["off", "ocr"] = "off"
     # Ders videosu/sesi ve altyazının en uzun süresi (saniye, #25). Daha uzun medya transkripsiyon
-    # başlamadan, daha uzun altyazı yüklenirken reddedilir.
-    max_media_duration_s: float = 4 * 3600
+    # başlamadan, daha uzun altyazı yüklenirken reddedilir. 1 saat (#125): transkripsiyonun belleği
+    # süreyle büyür (~3,7 GB/saat, docs/OPERATIONS.md); worker'ın belleğine göre artırılabilir.
+    max_media_duration_s: float = 3600
     # Kare yorumlayıcısı (#25, ADR-11): `ingestion/frame_interpretation.INTERPRETERS`a kayıtlı bir
     # yorumlayıcının adı. Boşsa yorumlama kapalıdır; yorumlama işi kuyruğa alınmaz.
     frame_interpreter: str = ""

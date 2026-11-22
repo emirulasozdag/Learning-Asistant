@@ -731,8 +731,9 @@ açık (ADR-12): doğrulanmış bağlamın kareleri cevaba girer ve görüntüle
 Altyazıyla yüklenip medya eklenmemiş videoda `null`.
 
 **Sınırlar.**
-- `MAX_MEDIA_DURATION_S` (varsayılan 4 saat): daha uzun altyazı yüklemede `422`; daha uzun medya transkripsiyon
-  başlamadan (faster-whisper süreyi segmentlerden önce verir) "Medya süresi 4 saat sınırını aşıyor." ile `failed`.
+- `MAX_MEDIA_DURATION_S` (varsayılan 1 saat; #125 ile 4 saatten indi, bellek nedeni: OPERATIONS.md): daha uzun
+  altyazı yüklemede `422`; daha uzun medya transkripsiyon başlamadan (faster-whisper süreyi segmentlerden önce verir)
+  "Medya süresi 1 saat sınırını aşıyor." ile `failed`.
   Her `frames` işi de kare çıkarmadan önce medyanın süresini okur (altyazılı videoya eklenen medya dahil): sınırı
   aşarsa aynı mesajla, süre okunamaz ya da sonlu ve pozitif değilse "Videonun süresi okunamadı." ile, dosya
   açılamazsa "Video dosyası açılamadı." ile iş `failed` olur (yeniden denenmez; doküman hazır kalır, medya silinir).
@@ -777,7 +778,7 @@ DocumentOut     + { media_sha256: str | null }
 Document (ORM)     + { media_sha256: str(64) | null }
 VideoFrame (ORM)   + { description: text | null, description_model: str(200) | null }
 ProcessingJob      CHECK kind IN ('transcription', 'frames', 'frame_interpretation')   (migration f7c3a9e2d415)
-Settings           + max_media_duration_s (14400), frame_interpreter (""), storage_sweep_interval_s (3600),
+Settings           + max_media_duration_s (3600; #125), frame_interpreter (""), storage_sweep_interval_s (3600),
                      storage_orphan_grace_s (3600)
 ```
 

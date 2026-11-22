@@ -20,7 +20,7 @@ Birden çok `worker` aynı veritabanında güvenle çalışabilir: iş `FOR UPDA
 |---|---|---|---|
 | PDF/PPTX/VTT dosyası | 50 MB | `pipeline.MAX_UPLOAD_BYTES` (sabit) | `422`, kayıt ve dosya kalmaz |
 | Medya dosyası (video/ses) | 2 GB | `MAX_MEDIA_BYTES` | `422`, kayıt ve dosya kalmaz |
-| Medya / altyazı süresi (#25) | 4 saat | `MAX_MEDIA_DURATION_S` | Altyazı `422`; medya transkripsiyon başlamadan `failed`; kare videosu kare çıkarmadan önce `frames` işiyle `failed` |
+| Medya / altyazı süresi (#25, #125) | 1 saat | `MAX_MEDIA_DURATION_S` | Altyazı `422`; medya transkripsiyon başlamadan `failed`; kare videosu kare çıkarmadan önce `frames` işiyle `failed` |
 | Yükleme isteğinin gövdesi | medya sınırı + 1 MB | `MAX_MEDIA_BYTES` | `413 file_too_large`, gövde okunmaz |
 | Diğer isteklerin gövdesi (JSON) | 2 MB | `MAX_REQUEST_BYTES` | `413 file_too_large` |
 | Dosya adı / başlık | 300 karakter | sabit | `422` |
@@ -40,9 +40,11 @@ varsa onun gövde sınırı da en az medya sınırı kadar olmalı.
 **Bellek ve süre sınırı (ölçüldü, #31).** Transkripsiyonun belleği medyanın süresiyle doğrusal büyür: faster-whisper
 sesin tamamının özelliklerini tek seferde hesaplar. `tiny` ile saat başına ~3,7 GB (aşağıda "Kaynak kullanımı ve
 süre"). `worker`'ın en yüksek belleği ≈ 1,2 GB (embedding modeli) + 3,7 GB × saat. `MAX_MEDIA_DURATION_S` bu yüzden
-`worker`'a ayrılan belleğe göre seçilmeli: 16 GB'lık bir makinede (Docker Desktop ~15,5 GB; `api` ~1 GB, `db`) **en çok
-2 saat** güvenlidir. Varsayılan 4 saat ~16 GB ister; bellek yetmezse `worker` işletim sistemince öldürülür, iş yeniden
-denenir ve ikinci denemede de ölürse doküman "İşlem yarıda kaldı" ile `failed` olur (veri bozulmaz, medya silinir).
+`worker`'a ayrılan belleğe göre seçilmeli. Varsayılan **1 saat** (#125; `worker` en çok ~5,3 GB). 16 GB'lık bir
+makinede (Docker Desktop ~15,5 GB; `api` ~1 GB, `db`) 2 saate kadar çıkarılabilir (~9 GB); 4 saat ~16 GB ister ve
+çalışmaz. Bellek yetmezse `worker` işletim sistemince öldürülür, iş yeniden denenir ve ikinci denemede de ölürse
+doküman "İşlem yarıda kaldı" ile `failed` olur (veri bozulmaz, medya silinir). Sınırı kaldıracak çözüm: parçalı
+transkripsiyon (#127).
 Daha büyük modeller (`small`, `large-v3-turbo`) daha çok bellek ve süre ister; ölçülmedi.
 
 **Kare adımı (`FRAME_EXTRACTION=ocr`, ADR-10, ADR-11).** Transkripsiyondan sonra ayrı bir `frames` işinde aynı medyadan
