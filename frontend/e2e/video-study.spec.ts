@@ -40,6 +40,47 @@ async function mockFrames(page: Page, videoId: number) {
   );
 }
 
+const FRAME_LABEL = "Ekran görüntüsü · cevap konuşmaya (transkript) dayanır";
+const FRAME_CITED_LABEL = "Ekran görüntüsü · cevabın bir kısmı bu kareye dayanır";
+
+/**
+ * Kareyi kaynak gösteren AI Tutor turu (#26, ADR-12). Test sistemi LLM'siz ve judge'sız olduğu
+ * için kare alıntısı üretemez; bu yüzden yalnızca bu uç `route.fulfill` ile verilir. Biçim backend
+ * sözleşmesiyle aynıdır (CONTRACTS.md §4.2, §9): kare alıntısının kimliği `frame:<kare>`.
+ */
+async function mockFrameCitedTurn(page: Page, videoId: number) {
+  const block = {
+    type: "course_answer",
+    provenance: "course",
+    response: {
+      answer: "Slaytta ikili aramanın adımları yazıyor [1].",
+      mode: "llm",
+      outcome: "answered",
+      unsupported_removed: 0,
+      coverage_gap: null,
+      citations: [{ source_id: "frame:991", document_title: TITLE, page: null, t_start: 0, t_end: 180 }],
+      declined: false,
+      decline_reason: null,
+      suggested_sources: [],
+      conversation_id: 1,
+      retrieval: [],
+      similarity_threshold: null,
+      best_similarity: null,
+      model: "e2e",
+      video_moment: null,
+      video_context: { document_id: videoId, time_s: 60, frame: null },
+    },
+  };
+  const events: [string, unknown][] = [
+    ["block", { index: 0, block }],
+    ["done", { conversation_id: 1, blocks: [block], trace: {} }],
+  ];
+  const body = events.map(([name, data]) => `event: ${name}\ndata: ${JSON.stringify(data)}\n\n`).join("");
+  await page.route("**/api/tutor/turn/stream", (route) =>
+    route.fulfill({ status: 200, contentType: "text/event-stream", body }),
+  );
+}
+
 /** Sohbette sorunun balonu: soru metni ve sorulduğu an ("Burayı anlamadım · 1:00"). */
 function questionBubble(page: Page, question: string) {
   return page.getByRole("article", { name: question }).locator("p").first();
@@ -105,6 +146,8 @@ test.describe("video ile çalışma: an, kare ve klavye", () => {
     await expect(questionBubble(page, question)).toHaveText(`${question}· 1:00`);
     const chat = page.getByRole("complementary", { name: "Videoya soru sor" });
     await expect(chat.getByRole("figure", { name: "Durdurduğun anda ekranda" })).toBeVisible();
+    // Cevap kareyi kaynak göstermedi (test sistemi LLM'siz): etiket transkripti söyler.
+    await expect(chat.getByText(FRAME_LABEL)).toBeVisible();
 
     // Sayfa yenilenince sohbet, sorunun anı ve karesiyle geri gelir.
     await page.reload();
@@ -136,6 +179,19 @@ test.describe("video ile çalışma: an, kare ve klavye", () => {
     await frame.getByRole("button", { name: "Videoda bu ana git" }).first().click();
     await expect(page).toHaveURL(new RegExp(`video=${videoId}&t=60`));
     await expect(page.getByLabel(TITLE)).toBeVisible();
+  });
+
+  test("cevap kareyi kaynak gösterince kare etiketi bunu söyler", async ({ page }) => {
+    const algorithms = course("A");
+    await mockFrameCitedTurn(page, videoId);
+    await page.goto(`/student/courses/${algorithms.id}/watch/${videoId}`);
+    await expect(page.getByLabel(TITLE)).toBeVisible();
+
+    await ask(page, "Slaytta ne yazıyor?");
+    const chat = page.getByRole("complementary", { name: "Videoya soru sor" });
+    const frame = chat.getByRole("figure", { name: "Durdurduğun anda ekranda" });
+    await expect(frame.getByText(FRAME_CITED_LABEL)).toBeVisible();
+    await expect(frame.getByText(FRAME_LABEL)).toHaveCount(0);
   });
 
   test("video çalışma ekranı dar ekranda yana taşmaz @dar-ekran", async ({ page }) => {

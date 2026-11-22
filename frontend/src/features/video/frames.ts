@@ -24,6 +24,23 @@ export function slideChangeNear(frames: FrameRef[], seconds: number): [FrameRef,
   return null;
 }
 
+/** Kare alıntısının kimlik öneki (backend `FRAME_SOURCE_PREFIX`, CONTRACTS.md §4.2). */
+const FRAME_SOURCE_PREFIX = "frame:";
+
+/**
+ * Cevabın kaynak gösterdiği karelerin kimlikleri (#26, ADR-12): `frame:<kare>` alıntıları. Judge
+ * kareyi görüntüyle doğrulamadıysa alıntı cevaptan çıkarılır; burada yalnızca kalanlar vardır.
+ */
+export function citedFrameIds(citations: readonly { source_id: string }[] | undefined): Set<number> {
+  const ids = new Set<number>();
+  for (const citation of citations ?? []) {
+    if (!citation.source_id.startsWith(FRAME_SOURCE_PREFIX)) continue;
+    const id = Number(citation.source_id.slice(FRAME_SOURCE_PREFIX.length));
+    if (Number.isInteger(id) && id > 0) ids.add(id);
+  }
+  return ids;
+}
+
 /** Görüntü tekrar denenirken tarayıcının önbelleğindeki hatayı kullanmaması için adres değişir. */
 export function retryUrl(url: string, attempt: number): string {
   if (attempt === 0) return url;
