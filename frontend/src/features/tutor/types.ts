@@ -58,4 +58,16 @@ export interface TutorTurn {
   /** Mesajın gönderildiği ve turun bittiği an (ms); cevap süresi için. */
   startedAt?: number;
   finishedAt?: number;
+  /**
+   * Soru bir ders videosu açıkken sorulduysa: hangi video, hangi saniye (#27, #32). Turla birlikte
+   * sekme oturumunda saklanır; sayfaya dönünce "durdurduğun anda ekranda" karesi yine görünür,
+   * yeniden deneme de aynı anla gider.
+   */
+  askedAt?: VideoMomentRef;
+}
+
+/** Bir ders videosunda bir an: doküman kimliği ve videonun başından saniye. */
+export interface VideoMomentRef {
+  documentId: number;
+  seconds: number;
 }

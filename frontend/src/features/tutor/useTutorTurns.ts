@@ -67,7 +67,8 @@ export function useTutorTurns(courseId: number, sessionKey: string) {
     text = text.trim();
     if (!text || busy) return;
     setBusy(true);
-    setTurns((list) => [...list, { id, question: text, segments: [], startedAt: performance.now() }]);
+    const askedAt = video ? { documentId: video.document_id, seconds: video.time_s } : undefined;
+    setTurns((list) => [...list, { id, question: text, segments: [], startedAt: performance.now(), askedAt }]);
     const controller = new AbortController();
     abortRef.current = controller;
     try {
@@ -97,9 +98,11 @@ export function useTutorTurns(courseId: number, sessionKey: string) {
     setBusy(false);
   }
 
-  function retry(turn: TutorTurn, video: VideoRef | null) {
+  /** Başarısız soruyu yeniden sorar; soru videonun bir anında sorulduysa yine o anla gider. */
+  function retry(turn: TutorTurn, fallback: VideoRef | null) {
     if (busy) return;
     setTurns((list) => list.filter((item) => item.id !== turn.id));
+    const video = turn.askedAt ? { document_id: turn.askedAt.documentId, time_s: turn.askedAt.seconds } : fallback;
     void ask(turn.question, video);
   }
 

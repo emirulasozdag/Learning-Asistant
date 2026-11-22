@@ -109,7 +109,8 @@ export default function PracticeSetup({
               value={topic}
               onChange={(event) => pick(event.target.value)}
               maxLength={MAX_TOPIC_CHARS}
-              placeholder="ör. ikili arama, Dijkstra algoritması"
+              // Örnek dersin kendi konularından; sabit örnek başka dersin konusu olurdu (#32).
+              placeholder={topics.length > 0 ? `ör. ${topics[0]}` : "Bir konu yaz"}
               autoComplete="off"
               aria-invalid={error ? true : undefined}
               aria-describedby={error ? `${inputId}-error` : undefined}

@@ -20,7 +20,14 @@ import { useCourse } from "../../features/courses/context";
 import { sortByTitle } from "../../features/materials/sortByTitle";
 import { useStudio } from "../../features/studio/useStudio";
 import AnswerBlock from "../../features/tutor/AnswerBlock";
-import { isStructurable, stripExtractiveIntro, structureAnswer, type Claim, type StructuredAnswer } from "../../features/tutor/claims";
+import {
+  isStructurable,
+  stripExtractiveIntro,
+  structureAnswer,
+  withoutLead,
+  type Claim,
+  type StructuredAnswer,
+} from "../../features/tutor/claims";
 import Composer from "../../features/tutor/Composer";
 import {
   classifyFailure,
@@ -37,7 +44,7 @@ import { courseSuggestions } from "../../features/tutor/suggestions";
 import { loadSession, saveSession } from "../../features/tutor/sessionTurns";
 import { answerOf, entryState } from "../../features/tutor/turns";
 import TurnExtras from "../../features/tutor/TutorTurnView";
-import type { Segment, TutorTurn } from "../../features/tutor/types";
+import type { Segment, TutorTurn, VideoMomentRef } from "../../features/tutor/types";
 import { useIsDesktop } from "../../features/tutor/useIsDesktop";
 import FrameAtMoment from "../../features/video/FrameAtMoment";
 import { useFrames } from "../../features/video/frames";
@@ -76,6 +83,9 @@ interface Selection {
 
 const NO_SELECTION: Selection = { turnId: null, claim: null, sourceOverride: null };
 
+/** "Nasıl bulundu" listesinin açık başlayabileceği ekran yüksekliği. */
+const TALL_SCREEN = "(min-height: 800px)";
+
 /** Cevap iddia görünümünde gösterilebilir mi; gösterilebilirse cümlelere ayrılmış hâli. */
 function structuredView(response: AskResponse | undefined): StructuredAnswer | null {
   if (!response?.answer) return null;
@@ -83,7 +93,7 @@ function structuredView(response: AskResponse | undefined): StructuredAnswer | n
   if (outcome !== "answered" && outcome !== "ai_unavailable") return null;
   const text = outcome === "ai_unavailable" ? stripExtractiveIntro(response.answer) : response.answer;
   if (!isStructurable(text)) return null;
-  const structured = structureAnswer(text);
+  const structured = outcome === "ai_unavailable" ? withoutLead(structureAnswer(text)) : structureAnswer(text);
   return structured.claims.length > 0 || structured.lead ? structured : null;
 }
 
@@ -117,9 +127,12 @@ function TutorSession({ course }: { course: Course }) {
   const startParam = Math.max(0, Number(searchParams.get("t")) || 0);
   const videoDoc = playableVideo(materials, videoParam);
   const [videoTime, setVideoTime] = useState(startParam);
-  // Her sorunun hangi videonun hangi anında sorulduğu: cevabın üstünde o andaki kare (#27).
-  const [askedAt, setAskedAt] = useState<Record<string, { documentId: number; seconds: number }>>({});
-  const frames = useFrames(videoDoc?.id ?? null);
+  // Başka video açılınca composer notu bir saniye eski videonun anını göstermesin.
+  const [shownVideo, setShownVideo] = useState(videoDoc?.id ?? null);
+  if ((videoDoc?.id ?? null) !== shownVideo) {
+    setShownVideo(videoDoc?.id ?? null);
+    setVideoTime(startParam);
+  }
   // Oynatıcı boyutu: soru yokken büyük; ilk sorudan sonra küçük (öğrenci değiştirebilir).
   const [playerSize, setPlayerSize] = useState<"auto" | "large" | "small">("auto");
 
@@ -150,6 +163,12 @@ function TutorSession({ course }: { course: Course }) {
 
   const activeTurn = turns.find((turn) => turn.id === activeId) ?? turns[turns.length - 1] ?? null;
   const activeIndex = activeTurn ? turns.indexOf(activeTurn) : -1;
+  // Soru bir videonun anında sorulduysa o andaki kare cevabın üstünde (#27). An turla saklanır;
+  // kare o an açık olan videodan değil, sorunun sorulduğu videodan okunur (#32). Video bu dersin
+  // oynatılabilir materyali değilse kare gösterilmez.
+  const askedMoment =
+    activeTurn?.askedAt && playableVideo(materials, activeTurn.askedAt.documentId) ? activeTurn.askedAt : null;
+  const frames = useFrames(askedMoment?.documentId ?? null);
   // Turun kaynaklı cevabı iddia görünümünde; pratik, genel bilgi gibi bloklar altında (TurnExtras).
   const activeAnswer = useMemo(() => (activeTurn ? answerOf(activeTurn) : null), [activeTurn]);
   const structured = useMemo(() => structuredView(activeAnswer?.response), [activeAnswer?.response]);
@@ -208,23 +227,26 @@ function TutorSession({ course }: { course: Course }) {
     [updateTurn],
   );
 
-  async function ask(text: string) {
+  async function ask(text: string, at?: VideoMomentRef) {
     text = text.trim();
     if (!text || busy) return;
     const id = `${Date.now()}`;
+    // Video açıksa soru durdurulan anla gider; yeniden denemede sorunun ilk anı kullanılır.
+    const video = at
+      ? { document_id: at.documentId, time_s: at.seconds }
+      : videoDoc
+        ? { document_id: videoDoc.id, time_s: Math.floor(playerRef.current?.currentTime() ?? 0) }
+        : null;
+    const askedAt = video ? { documentId: video.document_id, seconds: video.time_s } : undefined;
     setQuestion("");
     setBusy(true);
-    setTurns((list) => [...list, { id, question: text, segments: [], startedAt: performance.now() }]);
+    setTurns((list) => [...list, { id, question: text, segments: [], startedAt: performance.now(), askedAt }]);
     setActiveId(id);
     setSelection(NO_SELECTION);
     answerScrollRef.current?.scrollTo({ top: 0 });
     const controller = new AbortController();
     abortRef.current = controller;
     try {
-      const video = videoDoc
-        ? { document_id: videoDoc.id, time_s: Math.floor(playerRef.current?.currentTime() ?? 0) }
-        : null;
-      if (video) setAskedAt((map) => ({ ...map, [id]: { documentId: video.document_id, seconds: video.time_s } }));
       await tutorService.turn(
         courseId,
         text,
@@ -290,7 +312,7 @@ function TutorSession({ course }: { course: Course }) {
   function retry(turn: TutorTurn) {
     if (busy) return;
     setTurns((list) => list.filter((item) => item.id !== turn.id));
-    void ask(turn.question);
+    void ask(turn.question, turn.askedAt);
   }
 
   function quickAction(action: QuickAction) {
@@ -308,8 +330,6 @@ function TutorSession({ course }: { course: Course }) {
           sourceOverride: !structured && desktop ? (activeAnswer?.response?.citations[0]?.source_id ?? null) : null,
         };
   const response = activeAnswer?.response;
-  const activeAskedAt = activeTurn ? askedAt[activeTurn.id] : undefined;
-  const pausedAt = videoDoc && activeAskedAt?.documentId === videoDoc.id ? activeAskedAt.seconds : null;
   const selectedClaim = structured?.claims.find((claim) => claim.number === current.claim) ?? null;
   const claimSource = selectedClaim
     ? response?.citations[(selectedClaim.citations[0] ?? 0) - 1]?.source_id
@@ -499,12 +519,12 @@ function TutorSession({ course }: { course: Course }) {
               />
             ) : (
               <div className="flex flex-col gap-6">
-                {pausedAt != null && videoDoc && (
+                {askedMoment && (
                   <FrameAtMoment
                     frames={frames}
-                    seconds={pausedAt}
+                    seconds={askedMoment.seconds}
                     heading="Durdurduğun anda ekranda"
-                    onSeek={(seconds) => playAt(videoDoc.id, seconds)}
+                    onSeek={(seconds) => playAt(askedMoment.documentId, seconds)}
                     className="max-w-md self-start"
                   />
                 )}
@@ -608,8 +628,9 @@ function TutorSession({ course }: { course: Course }) {
             response={response}
             selectedSourceId={sourceId}
             onSelectSource={selectSource}
-            // Video açıkken kapalı başlar: oynatıcıyla birlikte cevabın yerini daraltmasın.
-            initiallyOpen={desktop && !videoDoc}
+            // Video açıkken ya da ekran alçakken (ör. 1024×768) kapalı başlar: cevabın yerini
+            // daraltmasın; 768 px yükseklikte açık liste cevaba ~100 px bırakıyordu (#32).
+            initiallyOpen={desktop && !videoDoc && window.matchMedia(TALL_SCREEN).matches}
           />
         )}
         <Composer
