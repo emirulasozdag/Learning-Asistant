@@ -59,9 +59,9 @@ class RetrievalHit(BaseModel):
 # - insufficient_evidence: materyalde yok (alakasızlık kapısı ya da model "YOK:" dedi)
 # - unsupported: model cevap yazdı ama alıntı doğrulamasından geçemedi
 # - model_refusal: model soruyu yanıtlamayı reddetti
-# - provider_failure: LLM servisine ulaşılamadı; yerine en ilgili parça alıntılandı
+# - provider_failure: üretici isteği tamamlayamadı; cevap yok
 # - verification_failure: [ekleme, #10] cevap üretildi ama iddia kontrolü yapılamadı (judge yok,
-#   erişilemedi ya da sözleşme dışı çıktı); üretilen metin gösterilmez, en ilgili parça alıntılanır
+#   erişilemedi ya da sözleşme dışı çıktı); cevap yok
 # - needs_clarification: [ekleme, #26] videodaki sahne belirsiz; cevap yerine öğrenciye bir
 #   netleştirme sorusu sorulur (`decline_reason`, `declined = true`). Yalnızca kare verildiğinde.
 AskOutcome = Literal[
@@ -162,10 +162,10 @@ class VisualTrace(BaseModel):
 
 
 class AskResponse(BaseModel):
-    """Cite-or-decline cevabı: ya alıntılı cevap ya da gerekçeli reddetme.
+    """Kaynaklı cevap, gerekçeli ret ya da üretim/doğrulama hatası.
 
     `answer` içindeki [1], [2] işaretleri `citations` listesindeki sıraya karşılık gelir.
-    mode: "llm" = model kaynaklardan cevap yazdı; "extractive" = LLM yok/erişilemedi,
+    mode: "llm" = modelle üretim yolu; "extractive" = LLM yapılandırılmadı,
     en ilgili parça alıntılandı.
 
     Akışta (`/ask/stream`) gelen `delta` metni taslaktır; yalnızca bu yanıt doğrulanmıştır
@@ -201,3 +201,12 @@ class AskResponse(BaseModel):
     visual: VisualTrace | None = Field(default=None, exclude=True)
     # [ekleme, #30] Görsel kanıt yetmediyse nedeni; yoksa None. Yalnızca kare verilen cevapta.
     visual_gap: VisualGap | None = None
+
+    @property
+    def transcript_text(self) -> str:
+        """Sohbet geçmişinde kullanıcıya bildirilen hatanın da anlamlı bir kaydı olur."""
+        if self.outcome == "verification_failure":
+            return "Cevap kaynaklarla doğrulanamadı."
+        if self.outcome == "provider_failure":
+            return "Cevap üretilirken bir hata oluştu."
+        return self.answer or self.decline_reason or ""

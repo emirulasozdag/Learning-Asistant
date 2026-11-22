@@ -33,7 +33,6 @@ import {
   classifyFailure,
   classifyResponse,
   describeTutorTurn,
-  extractiveNotice,
 } from "../../features/tutor/outcome";
 import SourceViewer from "../../features/tutor/SourceViewer";
 import ClaimAnswer from "../../features/tutor/studio/ClaimAnswer";
@@ -539,9 +538,7 @@ function TutorSession({ course }: { course: Course }) {
                   <>
                     {classifyResponse(response) === "ai_unavailable" && (
                       <p className="rounded-panel border border-line bg-surface px-3 py-2 text-sm text-graphite">
-                        {response.outcome === "verification_failure"
-                          ? extractiveNotice(response)
-                          : "Yapay zekâ şu an kullanılamıyor; ders materyalindeki ilgili bölüm olduğu gibi, cümle cümle gösteriliyor."}
+                        Yapay zekâ şu an kullanılamıyor; ders materyalindeki ilgili bölüm olduğu gibi, cümle cümle gösteriliyor.
                       </p>
                     )}
                     <ClaimAnswer

@@ -125,9 +125,8 @@ export interface VideoMoment {
  * - insufficient_evidence: materyalde yok
  * - unsupported: model yazdı ama alıntı doğrulamasından geçemedi
  * - model_refusal: model yanıtlamayı reddetti
- * - provider_failure: modele ulaşılamadı; en ilgili parça alıntılandı
- * - verification_failure: cevap üretildi ama iddia kontrolü yapılamadı (#10); üretilen metin
- *   gösterilmez, en ilgili parça alıntılandı
+ * - provider_failure: model cevabı tamamlayamadı, answer null
+ * - verification_failure: cevap üretildi ama iddia kontrolü tamamlanamadı (#10), answer null
  * - needs_clarification: videodaki sahne belirsiz (#26) ya da görüntü ile anlatılan çelişiyor
  *   (#30); `decline_reason` öğrenciye sorulan netleştirme sorusudur
  */

@@ -12,7 +12,7 @@ Engineering Design II · Project 8. Pilot ders: Veri Yapıları ve Algoritmalar.
 > - **Ders oluşturma** ve dersler arası tam izolasyon.
 > - **Materyal yükleme hattı:** PDF/PPTX okuma → temizleme → sayfa numaralı parçalama → multilingual-e5 ile vektörleştirme (pgvector). Her yüklemede adım adım rapor.
 > - **Hibrit RAG arama:** anlamsal (e5 + pgvector) ve kelime (PostgreSQL tam metin) aramaları RRF ile birleşir. Alakasız sorular modele hiç gitmeden elenir.
-> - **AI chat:** Gemini (varsayılan) ya da OpenRouter üzerinden Claude; cevap akarak gelir, her bilgi [1], [2] ile kaynağına bağlanır, kaynak yetmezse reddeder. Takip sorularını hatırlar.
+> - **AI chat:** Gemini (varsayılan), doğrudan OpenAI veya Anthropic ve OpenRouter desteklenir. Her bilgi [1], [2] ile kaynağına bağlanır, kaynak yetmezse cevap reddedilir. Takip sorularını hatırlar.
 > - **Kaynak gösterme:** alıntıya tıklayınca PDF'in gerçek sayfası açılır, alıntılanan satırlar işaretlenir. "Nasıl bulundu" paneli arama skorlarını gösterir.
 > - **Eğitmen etkinliği:** dersin soru-cevap özeti (sayılar, son 14 gün, en çok alıntılanan kaynaklar, materyalde cevabı bulunamayan sorular) kayıtlı mesajlardan hesaplanır.
 > - **Henüz yok:** video, pratik, değerlendirme, sık hatalar ve eğitmen onayı, hallucination ölçümü, arayüzde gerçek giriş (#12). Backend'de kimlik ve ders düzeyinde yetki var (#11): her istek oturum çerezi ve ders üyeliği ister; arayüzdeki giriş hâlâ sahte olduğu için #12 gelene kadar arayüz backend'e oturumsuz istek atar ve `401` alır. Rubrik endpoint'leri yetki denetiminden sonra `501` döner. Öğrenme kaydı, sık hatalar, eğitmen onay/düzeltmesi, veri silme ekranları ve Tutor'da ders videosu oynatıcısı çalışıyor (#20, #22).
@@ -143,17 +143,23 @@ LLM_API_KEY=<Gemini API anahtarı>
 ```
 
 - Anahtar **yalnızca `.env`** dosyasına yazılır, asla commit'lenmez.
-- Modeller boş bırakılırsa: üretici `gemini-3.8-flash`, orkestratör `gemini-3.5-flash-lite`
+- Gemini modelleri boş bırakılırsa: üretici `gemini-3.8-flash`, orkestratör `gemini-3.5-flash-lite`
   (`LLM_MODEL`, `LLM_ORCHESTRATOR_MODEL` ile değiştirilebilir).
 - **Ücretsiz katman yalnızca geliştirme içindir:** gönderilen içerik Google ürünlerini geliştirmede kullanılabilir.
   Kişisel veri ve onaysız ders materyali gönderilmez; pilot ücretli katmanla yapılır.
 - OpenRouter ile Claude da kullanılabilir: `LLM_PROVIDER=openrouter`, `LLM_MODEL=anthropic/claude-opus-5.5`.
   Bu sağlayıcıda orkestratör yoktur; AI Tutor sabit akışla çalışır.
+- Doğrudan OpenAI API için `.env` içinde `LLM_PROVIDER=openai` seçin ve OpenAI anahtarınızı
+  `LLM_API_KEY` alanına yazın. Üretici ve orkestratör varsayılan olarak `gpt-5.4-mini` kullanır.
+  Modelleri `LLM_MODEL` ve `LLM_ORCHESTRATOR_MODEL` ile seçebilirsiniz. Ayarları uygulamak için
+  `docker compose up -d api` çalıştırın.
 - Anahtar boşsa sistem **LLM'siz** çalışır: cevap yerine en ilgili ders parçasını kaynağıyla gösterir.
 
-> **Önemli (#10):** Artık varsayılan `CLAIM_CHECK=required`. Judge tanımlı değilse LLM cevabı yerine kaynaktan
-> alıntı gösterilir. Judge, üreticiden farklı model ailesinden olmalıdır (Gemini dışı; örneğin OpenRouter
-> üzerinden Claude):
+> **Önemli (#10):** Varsayılan `CLAIM_CHECK=required`. Judge tanımlı değilse veya kontrolü tamamlayamazsa
+> öğrenci doğrulama hatasını görür ve sorusunu yeniden gönderebilir. Judge, üreticiden farklı model ailesinden olmalıdır.
+> OpenAI üreticiyle örneğin Gemini veya Claude kullanılabilir. Gemini üreticiyle doğrudan OpenAI judge için
+> `JUDGE_PROVIDER=openai`, `JUDGE_MODEL=gpt-5.4-mini` ve `JUDGE_API_KEY` ayarlanır.
+> OpenRouter üzerinden Claude örneği:
 >
 > ```
 > JUDGE_PROVIDER=openrouter
@@ -221,7 +227,8 @@ Hata olursa `error` olayı gelir.
   - `insufficient_evidence`: materyalde yok
   - `unsupported`: doğrulamadan geçemedi
   - `model_refusal`: model reddetti
-  - `provider_failure`: modele ulaşılamadı; en ilgili parça alıntılandı
+  - `provider_failure`: model cevabı tamamlayamadı, `answer` boş
+  - `verification_failure`: zorunlu iddia kontrolü tamamlanamadı, `answer` boş. Hatanın nedeni asistan mesajının `meta.claim_check.error` alanında kayıtlıdır.
 
   `unsupported_removed` kaç cümlenin çıkarıldığını söyler.
 - **Gecikme:**

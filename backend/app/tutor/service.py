@@ -168,7 +168,7 @@ def transcript(blocks: list[TutorBlock]) -> str:
     lines: list[str] = []
     for block in blocks:
         if isinstance(block, CourseAnswerBlock):
-            lines.append(block.response.answer or block.response.decline_reason or "")
+            lines.append(block.response.transcript_text)
         elif isinstance(block, GeneralExplanationBlock):
             lines.append(f"(Genel bilgi, ders materyalinden değil) {block.text}")
         elif isinstance(block, PracticeBlock):

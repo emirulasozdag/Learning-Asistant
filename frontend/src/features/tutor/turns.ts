@@ -49,7 +49,9 @@ export function entryState(turn: TutorTurn): ConversationEntry["state"] {
   if (answer) {
     const outcome = classifyResponse(answer);
     if (outcome === "out_of_scope") return "declined";
-    if (outcome === "not_generated") return "failed";
+    if (outcome === "not_generated" || outcome === "verification_failure" || outcome === "provider_failure") {
+      return "failed";
+    }
     return "answered";
   }
   const notice = turn.segments.find((segment) => segment.block?.type === "notice")?.block;

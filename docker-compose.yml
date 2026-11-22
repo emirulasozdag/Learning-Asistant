@@ -34,7 +34,7 @@ services:
       LLM_STUDENT_WORK_ROUTE: ${LLM_STUDENT_WORK_ROUTE:-hosted}
       LLM_LOCAL_BASE_URL: ${LLM_LOCAL_BASE_URL:-}
       LLM_LOCAL_MODEL: ${LLM_LOCAL_MODEL:-}
-      # İddia kontrolü (#10, ADR-8): required = judge yoksa LLM cevabı yerine alıntı gösterilir;
+      # İddia kontrolü (#10, ADR-8): required = judge yoksa doğrulama hatası bildirilir;
       # off yalnızca yerel geliştirme içindir. Judge üreticiden farklı model ailesinden olmalı.
       CLAIM_CHECK: ${CLAIM_CHECK:-required}
       JUDGE_PROVIDER: ${JUDGE_PROVIDER:-}
