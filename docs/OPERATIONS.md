@@ -32,6 +32,15 @@ Birden çok `worker` aynı veritabanında güvenle çalışabilir: iş `FOR UPDA
 | Video başına kare (ADR-10) | 300 | sabit (`FrameParams.max_frames`) | Sonraki sahneler atlanır, günlüğe uyarı |
 | Kare görüntüsü genişliği | 1920 px | sabit (`FrameParams.max_image_width`) | Küçültülür |
 | Tek karenin OCR süresi | 120 sn | sabit (`ocr.TIMEOUT_S`) | Kare `unreadable` |
+| PDF başına OCR'lanan bozuk sayfa | 30 | sabit (`text_layer.MAX_OCR_PAGES`) | Kalan bozuk sayfalar aramaya alınmaz, uyarı yazılır |
+
+**Bozuk PDF metin katmanı.** Bazı PDF'lerde (eski LaTeX/Type3 yazı tipleri) sayfa ekranda doğru görünür ama
+çıkarılan metin anlamsız işaretlere döner ya da noktalama/sembol/rakamlar kaybolur. `app/ingestion/text_layer.py`
+böyle sayfaları tanır, 300 dpi görüntüye çevirip Tesseract ile okur (sayfa başına ~1,5 sn, yükleme süresine eklenir).
+OCR metni daha iyi değilse bozuk sayfa aramaya alınmaz; sembolleri eksik sayfa ise kelimeleriyle kalır. Her iki
+durumda yükleme raporunda sayfa numarasıyla uyarı çıkar. Tesseract yoksa (imaj eski) bozuk sayfa aramaya alınmaz:
+`docker compose up -d --build`. OCR'lanan sayfada kaynak görüntüleyicideki satır işaretleri çıkmaz (PDF'in metin
+katmanı OCR metniyle eşleşmez); sayfa görüntüsü yine gösterilir.
 
 Gövde sınırı istek okunurken uygulanır (`app/core/limits.py`): çok parçalı form uç fonksiyondan önce geçici dosyaya
 yazıldığı için sınır orada denetlenirse sınırı aşan dosya da diske yazılmış olurdu. Önde bir ters vekil (nginx vb.)
