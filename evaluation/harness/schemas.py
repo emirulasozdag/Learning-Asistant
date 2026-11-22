@@ -89,6 +89,49 @@ class Playback(_Strict):
     time_s: float = Field(ge=0)
 
 
+class FrameKind(StrEnum):
+    """Sorunun dayandığı karede ne olduğu (#30)."""
+
+    DIAGRAM = "diagram"
+    FORMULA = "formula"
+    CODE = "code"
+    # Karede birden fazla aday öğe var ya da okunamıyor: soru netleştirme gerektirir.
+    AMBIGUOUS = "ambiguous"
+
+
+class ExpectedBehavior(StrEnum):
+    """Görsel soruda doğru davranış (#30): cevap, netleştirme sorusu ya da gerekçeli ret."""
+
+    ANSWER = "answer"
+    CLARIFY = "clarify"
+    DECLINE = "decline"
+
+
+class VisualSupport(StrEnum):
+    """Cevabın hangi kanıta dayanması gerektiği (#30)."""
+
+    # Yalnızca konuşma/ders metni yeter; kare katkı vermez (görsel koşulda regresyon kontrolü).
+    TEXT = "text"
+    # Bilgi yalnızca karenin görüntüsünde (diyagram, ok, formül).
+    VISUAL = "visual"
+    MIXED = "mixed"
+    # Görüntü ile konuşma/ders metni çelişiyor: sistem bir kaynağı sessizce seçmemeli.
+    CONTRADICTION = "contradiction"
+
+
+class VisualLabel(_Strict):
+    """Görsel soru etiketi (#30). Eğitmen/TA inceleyene kadar ekip taslağıdır (`review`).
+
+    `trap`: soru bilerek tek kareden çıkarılamayan bir mekânsal/zamansal çıkarım ister
+    (ör. "hoca önce neyi sildi?"); doğru davranış genellikle netleştirme ya da rettir.
+    """
+
+    frame_kind: FrameKind
+    expected: ExpectedBehavior
+    support: VisualSupport
+    trap: Literal["spatial", "temporal"] | None = None
+
+
 class GoldItem(_Strict):
     id: str = Field(pattern=r"^[A-Za-z0-9_.-]{1,64}$")
     split: Split
@@ -102,14 +145,20 @@ class GoldItem(_Strict):
     origin: Literal["instructor", "past_exam", "team_draft"]
     review: Review | None = None
     notes: str | None = Field(default=None, max_length=2000)
-    # Video bağlamlı soruda oynatma konumu; yalnızca full_video_time koşulunda kullanılır.
+    # Video bağlamlı soruda oynatma konumu; full_video_time ve visual koşullarında kullanılır.
     playback: Playback | None = None
+    # Görsel soru etiketi (#30); yalnızca oynatma konumu olan cevaplanabilir soruda.
+    visual: VisualLabel | None = None
 
     @model_validator(mode="after")
     def _check_kind(self) -> Self:
         if self.kind is ItemKind.OUT_OF_SCOPE:
             if self.evidence or self.reference_answer:
                 raise ValueError(f"{self.id}: kapsam dışı soruda kanıt/referans cevap olmaz")
+            if self.visual is not None:
+                raise ValueError(f"{self.id}: kapsam dışı soruda görsel etiket olmaz")
+        if self.visual is not None and self.playback is None:
+            raise ValueError(f"{self.id}: görsel etiketli soruda oynatma konumu (playback) gerekli")
         return self
 
     @property
@@ -240,6 +289,12 @@ class RunConfig(_Strict):
     # sorularla birlikte koşulan koşulların ortak kimliği. Eski kayıtlarda boştur.
     condition_settings: dict[str, str | bool | int] = {}
     batch_id: str | None = None
+    # İddia kontrolünün kökeni (#30): mod, judge modeli, judge istem sürümleri ve üreticinin
+    # görsel kural sürümü. Eski kayıtlarda boştur.
+    claim_check: str | None = None
+    judge_model: str | None = None
+    judge_prompt_version: str | None = None
+    visual_rules_version: str | None = None
 
 
 class ItemResult(_Strict):
@@ -260,6 +315,13 @@ class ItemResult(_Strict):
     best_similarity: float | None = None
     latency_ms: float | None = None
     error: str | None = None
+    # #30: iddia kontrolünün sonucu ve judge modeli, görsel kanıtın neden yetmediği, cevapta kalan
+    # kare alıntısı sayısı (kareler `cited` içinde video zamanıyla da yer alır). Eski kayıtlarda
+    # boştur.
+    claim_check: str | None = None
+    judge_model: str | None = None
+    visual_gap: str | None = None
+    cited_frames: int = 0
 
 
 class MetricValue(_Strict):

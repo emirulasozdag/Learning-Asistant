@@ -3,7 +3,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from app.schemas.common import Citation, DbId
-from app.schemas.sources import FrameRef
+from app.schemas.sources import FrameRef, FrameStatus
 
 
 class VideoRef(BaseModel):
@@ -74,6 +74,13 @@ AskOutcome = Literal[
     "needs_clarification",
 ]
 
+# [ekleme, #30] Görsel kanıtın neden yetmediği (yalnızca kare verilen cevapta dolar):
+# - scene_ambiguous: görüntüde neyin kastedildiği belli değil (netleştirme sorusu)
+# - source_conflict: görüntü ile konuşma/ders metni çelişiyor; çelişen kısım cevaptan çıkarıldı
+# - frame_insufficient: orijinal kare iddiayı taşımaya yetmiyor (ör. tek kareden önce/sonra
+#   çıkarımı, görüntü judge'a gidemedi)
+VisualGap = Literal["scene_ambiguous", "source_conflict", "frame_insufficient"]
+
 
 class ClaimCheck(BaseModel):
     """[ekleme, #10] İddia kontrolünün özeti. Ayrıntılı kayıt (atomik bilgiler, kararlar)
@@ -131,6 +138,9 @@ class FrameTrace(BaseModel):
     t_start: float
     t_end: float
     t_frame: float
+    # [ekleme, #30] Kare durumu ve OCR güveni (köken; OCR metni kayda girmez).
+    status: FrameStatus | None = None
+    confidence: float | None = None
 
 
 class VisualTrace(BaseModel):
@@ -145,6 +155,10 @@ class VisualTrace(BaseModel):
     frames: list[FrameTrace]
     judge_images: list[int] = Field(default_factory=list)
     cited: list[int] = Field(default_factory=list)
+    # [ekleme, #30] Üreticinin görsel kurallarının sürümü (`generation/answer.py` VISUAL_RULES).
+    rules_version: str | None = None
+    # [ekleme, #30] Görsel kanıt yetmediyse nedeni (AskResponse.visual_gap ile aynı).
+    gap: VisualGap | None = None
 
 
 class AskResponse(BaseModel):
@@ -185,3 +199,5 @@ class AskResponse(BaseModel):
     # [ekleme, #26] Cevaba kare girdiyse görsel kanıtın kaydı; mesaj meta'sına yazılır, API
     # yanıtına girmez. Kare verilmeyen cevapta None.
     visual: VisualTrace | None = Field(default=None, exclude=True)
+    # [ekleme, #30] Görsel kanıt yetmediyse nedeni; yoksa None. Yalnızca kare verilen cevapta.
+    visual_gap: VisualGap | None = None

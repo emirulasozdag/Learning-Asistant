@@ -602,8 +602,13 @@ AskOutcome += "needs_clarification"                 # §5
 AskResponse.visual: VisualTrace | null              # API yanıtına girmez; meta.visual olarak kaydedilir
 VisualTrace { frames: FrameTrace[],                 # üreticiye verilen kareler
               judge_images: int[],                  # görüntüsü judge'a gönderilen kare kimlikleri
-              cited: int[] }                        # cevapta kalan kare alıntılarının kimlikleri
-FrameTrace  { frame_id, document_id, t_start, t_end, t_frame }
+              cited: int[],                         # cevapta kalan kare alıntılarının kimlikleri
+              rules_version: str | null,            # #30: üreticinin görsel kural sürümü
+              gap: VisualGap | null }               # #30: AskResponse.visual_gap ile aynı
+FrameTrace  { frame_id, document_id, t_start, t_end, t_frame,
+              status: FrameStatus | null, confidence: float | null }   # #30
+AskResponse.visual_gap: VisualGap | null            # #30; API yanıtına girer, meta.visual_gap olarak kaydedilir
+VisualGap = "scene_ambiguous" | "source_conflict" | "frame_insufficient"
 VisionClient { accepts_images: bool,
                complete_json_with_images(system, parts: (TextPart | ImagePart)[], schema) -> schema }
 supports_images(client) -> bool;  ImageInputUnsupported(LLMError)
@@ -622,28 +627,48 @@ supports_images(client) -> bool;  ImageInputUnsupported(LLMError)
   gider. Görüntü üreticiye gitmez (akış yalnızca metin). Kare verildiğinde taslak (`delta`) hiç akıtılmaz,
   `CLAIM_CHECK=off` iken de: görüntüyle kontrol edilmemiş kare iddiası öğrenciye hiçbir parçada ulaşmaz.
 - **Kontrol.** Bir kareyi alıntılayan iddia birimi metin judge'ına gitmez. Görsel judge'a (istem sürümü
-  `visual-claim-judge-v1`) metin kaynakları ve karenin **yalnızca görüntüsü** gider; türetilmiş metin ve konuşma
+  `visual-claim-judge-v2`, #30) metin kaynakları ve karenin **yalnızca görüntüsü** gider; türetilmiş metin ve konuşma
   gitmez, böylece "supported" kararı görüntüde görünen şeye dayanır. Kodda ek kurallar: her iddiaya tam bir karar;
   desteğin kaynağı iddianın kendi kaynaklarından biri; kareyle desteklenen bilgi için görüntüde ne görüldüğü
   (`observed`) boş olamaz. Karışık alıntıda ([S1][S3], S3 kare) kare alıntısı yalnızca judge onu görüntüden
   doğruladıysa kalır; destek yalnızca metinden geldiyse iddia metin kaynağıyla kalır, kare etiketi cevaptan silinir
-  ve kayda `dropped_frame_citations` olarak yazılır.
+  ve kayda `dropped_frame_citations` olarak yazılır (hiçbir iddia çıkarılmasa da; #30 öncesi bu durumda etiket
+  cevapta kalıyordu).
+- **Mekânsal ve zamansal çıkarım (#30).** Judge her atomik bilgiye bir tür verir (`kind`: `content` yazı/formül/kod/
+  etiket · `spatial` yerleşim/ok yönü/bağlantı · `temporal` sıra/önce-sonra/silme-değiştirme; eski çıktıda yoksa
+  `content`). Mekânsal bilgi kareyle ancak görüntüde görülen öğe `observed`'a yazılırsa desteklenir (yoksa
+  `no_visual_observation`). Tek kare durağan bir görüntüdür: zamansal bilgi yalnızca karelerle ve ikiden az kareyle
+  desteklendiyse kod iddiayı `unsupported` / `temporal_inference` yapar; sıra ya bir metin kaynağında (konuşma, ders
+  metni) yazmalı ya da en az iki karenin görüntüsü değişikliği göstermelidir. Judge istemine karenin `time`
+  özniteliğinin yalnızca kimlik olduğu, kanıt olmadığı yazılır. Üreticinin görsel kuralları (`visual-rules-v2`) aynı
+  şeyi ister: tek kareden önce/sonra çıkarma, görüntü ile metin çelişiyorsa birini seçme.
+- **Kaynak çelişkisi (#30).** Judge, iddianın alıntıladığı bir kaynak bilgiyi söylerken başka bir alıntılanan kaynak
+  (ör. görüntü ile konuşma) onunla açıkça çelişiyorsa `contradicted` der; iddia `unsupported` / `source_conflict` olur
+  ve çıkarılır, kaynaklardan biri sessizce seçilmez. Cevap kalırsa `coverage_gap`'e sabit not (`answer.CONFLICT_NOTE`)
+  eklenir ve `visual_gap = "source_conflict"`.
 - **Sonuçlar** (`meta.claim_check.records[].label` / `reason`): `supported`; `unsupported` (`unsupported_fact`,
-  `source_mismatch`); `ambiguous` (`ambiguous_scene`: görüntüde ne kastedildiği belli değil); `unverifiable`
+  `source_mismatch`, `source_conflict`, `temporal_inference`); `ambiguous` (`ambiguous_scene`: görüntüde ne kastedildiği belli değil); `unverifiable`
   (`images_not_supported`: judge görüntü almıyor ya da model reddetti; `image_unavailable`: görüntü okunamadı;
   `no_visual_observation`; `not_checked`: `CLAIM_CHECK=off`). `supported` dışındakiler cevaptan çıkarılır;
   kapsama yetmezse cevap reddedilir. Hiçbir durumda görsel iddia türetilmiş metinle kabul edilmez.
 - **Sayımlar.** `ClaimCheck.unsupported` yalnızca `unsupported` sayar (hallucination oranı, §5); `unverifiable` ve
   `ambiguous` çıkarılır, `unsupported_removed`e girer, `claims`ta sayılır. Görsel birim varsa
-  `ClaimCheck.prompt_version = "claim-judge-v1+visual-claim-judge-v1"`. Görsel kayıt metin kaydının alanlarına ek
+  `ClaimCheck.prompt_version = "claim-judge-v1+visual-claim-judge-v2"`. Görsel kayıt metin kaydının alanlarına ek
   olarak `frames` (her kare için `source_id, frame_id, document_id, t_start, t_end, t_frame, status, derived_by,
-  image_sent`), `dropped_frame_citations` ve `prompt_version` taşır; atomik bilgilerde `observed` vardır. Kayıtlardaki `claim_id` cevaptaki
+  image_sent`), `dropped_frame_citations` ve `prompt_version` taşır; atomik bilgilerde `observed` ve `kind` vardır. Kayıtlardaki `claim_id` cevaptaki
   sıradır (C1, C2…).
 - **Netleştirme.** Model sahneyi belirsiz bulursa yalnızca `NETLEŞTİR:` yazar: `declined = true`,
   `outcome = "needs_clarification"`, `decline_reason` = içerik taşımayan sabit soru (`answer.CLARIFY`); judge
   çağrılmaz, taslak akmaz. Modelin `NETLEŞTİR:`den sonra yazdığı metin judge'dan geçmediği için (kontrol edilmemiş
   kare iddiası taşıyabilir) öğrenciye, tutor bloğuna ve kayda girmez. Judge kareli iddiaları `ambiguous` bulur ve
   kalan cevap kapsamaya yetmezse aynı sabit soru döner. Kare verilmeyen cevapta `NETLEŞTİR:` özel değildir.
+- **Görsel kanıt yetmediğinde (#30).** Kareli iddialar çıkarılıp kalan cevap kapsamaya yetmezse sonuç nedene göre
+  seçilir (öncelik bu sırayla): çelişki → `needs_clarification`, `decline_reason = answer.CONFLICT`,
+  `visual_gap = "source_conflict"`; belirsizlik → `needs_clarification`, `answer.CLARIFY`, `"scene_ambiguous"`;
+  orijinal kare yetmedi (`temporal_inference`, `image_unavailable`, `images_not_supported`, `no_visual_observation`,
+  `not_checked`) → `insufficient_evidence`, `answer.FRAME_INSUFFICIENT`, `"frame_insufficient"`. Üreticinin
+  `NETLEŞTİR:` cevabı da `"scene_ambiguous"` taşır. Hepsi içerik taşımayan sabit metinlerdir. Görsel neden yoksa önceki
+  gibi `unsupported`.
 - **Sağlayıcılar ve rota.** Görüntü kabul edenler: Gemini, Anthropic, OpenRouter (model görüntü almıyorsa uç noktanın
   4xx yanıtı `ImageInputUnsupported` olur) ve yapılandırılmış yerel model; `ReleasingClient` (#88) aynı yeteneği
   taşır. Diğer istemciler görüntü almaz; kareli iddialar `unverifiable` olur. Kare görüntüsü onaylı ders materyalidir:
@@ -651,7 +676,8 @@ supports_images(client) -> bool;  ImageInputUnsupported(LLMError)
   gitmez. Eğitmen beyanı (ADR-3) video görüntülerini kapsar ve kareler metin ders kanıtıyla aynı kurallarla hosted
   modele gider (ADR-12; OCR yine yereldir, ADR-10).
 - **Kayıt** (`meta.visual`, yalnızca cevaba kare girdiyse): `{frames: [{frame_id, document_id, t_start, t_end,
-  t_frame}], judge_images: [kare kimliği], cited: [kare kimliği]}`. `judge_images` görüntüsü judge'a gönderilen
+  t_frame, status, confidence}], judge_images: [kare kimliği], cited: [kare kimliği], rules_version, gap}`; ayrıca
+  `meta.visual_gap` (yalnızca görsel kanıt yetmediyse). `judge_images` görüntüsü judge'a gönderilen
   karelerdir: görsel istek gönderilirken yazılır (istek sonra hata verse de); istek hiç gitmediyse (metin judge'ı
   önce hata verdi, görüntü yok, judge görüntü almıyor) boştur. `cited` cevapta kalan kare alıntılarıdır. Görüntü baytı, OCR metni,
   konuşma ve betimleme kayda ve günlüklere girmez.
@@ -670,7 +696,9 @@ supports_images(client) -> bool;  ImageInputUnsupported(LLMError)
 4. Frontend: `needs_clarification` netleştirme sorusu olarak gösterilir (`outcome.ts` → `clarification`).
 
 **Koddan farklar.** Hepsi **[ekleme]**: yeni tipler ve modüller, `stream_answer(visual=)`, `check_claims(frames=)`,
-`CheckedText.removed/ambiguous/images_sent` (iç API), sağlayıcılarda `complete_json_with_images` ve `accepts_images`,
+`CheckedText.removed/ambiguous/conflicts/frame_insufficient/images_sent` (iç API),
+`answer_stream/ask(frames=)` (değerlendirmenin transcript-only koşulu için; ürün her zaman `True`),
+`AskResponse.visual_gap` ve frontend `VisualGap` tipi (#30), sağlayıcılarda `complete_json_with_images` ve `accepts_images`,
 `ClaimLabel.label/reason` için genişletilmiş değer kümeleri (metin kayıtlarının değerleri aynı kaldı),
 `StoredFrameSource.moment(frame_id=)`, `AskOutcome.needs_clarification`, `AskResponse.visual` ve `meta.visual`,
 `CourseActivity.clarification`. Netleştirme önceden `insufficient_evidence` dönüyordu; artık `needs_clarification`

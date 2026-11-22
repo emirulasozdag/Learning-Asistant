@@ -196,5 +196,8 @@ def _summary(ctx: TurnContext) -> dict:
             frames=list(frames.values()),
             judge_images=list(dict.fromkeys(i for v in visuals for i in v.judge_images)),
             cited=list(dict.fromkeys(i for v in visuals for i in v.cited)),
+            rules_version=next((v.rules_version for v in visuals if v.rules_version), None),
+            # #30: turdaki ilk görsel boşluk (ör. bir cevap çelişki yüzünden kısaltıldı).
+            gap=next((v.gap for v in visuals if v.gap), None),
         ).model_dump()
     return summary

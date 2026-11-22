@@ -22,6 +22,8 @@ MIN_REVIEWED_ANSWERABLE = 30
 MIN_OUT_OF_SCOPE = 30
 # Dört koşullu değerlendirmenin planlanan tam seti (ANALYSIS §9, issue #18).
 PLANNED_ANSWERABLE = 150
+# Ders başına en az incelenmiş görsel soru (ANALYSIS §9.1).
+MIN_REVIEWED_VISUAL = 30
 
 
 def structural_errors(gold: GoldSet, manifest: CorpusManifest) -> list[str]:
@@ -87,12 +89,48 @@ def set_gaps(gold: GoldSet, manifest: CorpusManifest) -> list[str]:
     oos = sum(1 for i in gold.items if i.kind is ItemKind.OUT_OF_SCOPE)
     if oos < MIN_OUT_OF_SCOPE:
         gaps.append(f"Kapsam dışı soru {oos}/{MIN_OUT_OF_SCOPE}")
+    gaps += visual_coverage_gaps(gold)
     if not any(i.split is Split.HELDOUT for i in gold.items):
         gaps.append("Held-out soru yok: ölçüm yapılamaz")
     if manifest.approved_by is None:
         gaps.append("Envanter eğitmen tarafından onaylanmamış (approved_by boş)")
     if not manifest.approved_hashes():
         gaps.append("Envanterde onaylı doküman yok")
+    return gaps
+
+
+# Görsel değerlendirmenin kapsaması gereken vaka türleri (#30, ANALYSIS §9.1).
+REQUIRED_VISUAL_CASES: dict[str, str] = {
+    "diagram": "diyagram",
+    "formula": "formül",
+    "code": "kod",
+    "ambiguous": "belirsiz kare",
+    "spatial": "mekânsal tuzak",
+    "temporal": "zamansal tuzak",
+    "contradiction": "görüntü–metin çelişkisi",
+    "mixed": "karışık metin+görsel destek",
+    "text": "yalnızca metinle cevaplanan (regresyon)",
+}
+
+
+def visual_coverage_gaps(gold: GoldSet) -> list[str]:
+    """Görsel etiketli sorularda eksik vaka türleri ve hedef sayı (#30). Görsel soru yoksa boş."""
+    labelled = [i for i in gold.items if i.visual is not None]
+    if not labelled:
+        return []
+    seen: set[str] = set()
+    for item in labelled:
+        assert item.visual is not None
+        seen |= {item.visual.frame_kind.value, item.visual.support.value}
+        if item.visual.trap:
+            seen.add(item.visual.trap)
+    gaps = []
+    missing = [name for key, name in REQUIRED_VISUAL_CASES.items() if key not in seen]
+    if missing:
+        gaps.append("Görsel sette eksik vaka türleri (#30): " + ", ".join(missing))
+    reviewed = sum(1 for i in labelled if i.reviewed)
+    if reviewed < MIN_REVIEWED_VISUAL:
+        gaps.append(f"Eğitmen/TA incelemeli görsel soru {reviewed}/{MIN_REVIEWED_VISUAL}")
     return gaps
 
 

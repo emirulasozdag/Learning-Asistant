@@ -5,7 +5,7 @@ from pathlib import Path
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.db.models import Chunk, Course, Document
+from app.db.models import Chunk, Course, Document, VideoFrame
 from harness.fingerprint import file_sha256
 from harness.schemas import CorpusDocument, CorpusManifest, CorpusSnapshot, SourceLocator
 
@@ -14,8 +14,13 @@ class CorpusError(RuntimeError):
     """Koşu güvenilir olmaz: envanter dışı materyal indekste ya da ders yok."""
 
 
+FRAME_PREFIX = "frame:"
+
+
 class Locator:
-    """Chunk id → SourceLocator. Doküman parmak izleri bir kez hesaplanır."""
+    """Chunk id ya da kare (`frame:<id>`, #30) → SourceLocator. Doküman parmak izleri bir kez
+    hesaplanır. Kare, videonun içerik parmak izi ve ekranda kaldığı aralıkla gösterilir; böylece
+    gold kanıtının video zamanıyla eşleşir."""
 
     def __init__(self, db: Session, files_root: Path) -> None:
         self._db = db
@@ -31,6 +36,8 @@ class Locator:
         return self._document_hashes[document.id]
 
     def locate(self, source_id: str) -> SourceLocator | None:
+        if source_id.startswith(FRAME_PREFIX):
+            return self._locate_frame(source_id.removeprefix(FRAME_PREFIX))
         if not source_id.isdigit():
             return None
         chunk = self._db.get(Chunk, int(source_id))
@@ -46,6 +53,19 @@ class Locator:
             t_start=chunk.t_start if has_time else None,
             t_end=chunk.t_end if has_time else None,
         )
+
+
+    def _locate_frame(self, frame_id: str) -> SourceLocator | None:
+        if not frame_id.isdigit():
+            return None
+        frame = self._db.get(VideoFrame, int(frame_id))
+        if frame is None:
+            return None
+        document = self._db.get(Document, frame.document_id)
+        sha = self.document_sha256(document) if document is not None else None
+        if sha is None:
+            return None
+        return SourceLocator(document_sha256=sha, t_start=frame.t_start, t_end=frame.t_end)
 
 
 def find_course(db: Session, course_code: str) -> Course:

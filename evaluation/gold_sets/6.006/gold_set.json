@@ -18,10 +18,16 @@
         }
       ],
       "origin": "team_draft",
-      "notes": "Görsel soru (#28): tahtadaki çizime dayanır. Referans cevap dersin transkriptinden alınmıştır; altın kare = playback anındaki kare. Koşullar: transcript_only = full_video_time; visual = #26.",
+      "notes": "Görsel soru (#28): tahtadaki çizime dayanır. Referans cevap dersin transkriptinden alınmıştır; altın kare = playback anındaki kare. Koşullar: transcript_only = full_video_time; visual = #26. Görsel etiket (#30) ekip taslağıdır; eğitmen/TA incelemesi bekler.",
       "playback": {
         "document_sha256": "a19c6ae66b4b243b7a8cff782bc0a38d2f7b0b94e0a8188d286dd623a33040f1",
         "time_s": 280
+      },
+      "visual": {
+        "frame_kind": "diagram",
+        "expected": "answer",
+        "support": "mixed",
+        "trap": null
       }
     }
   ]

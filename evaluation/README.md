@@ -82,7 +82,7 @@ DATABASE_URL=postgresql+psycopg://learning:learning@localhost:5432/learning_assi
   eksik girdi). Skor uydurulmaz.
 - `--files-root`: veritabanındaki göreli dosya yollarının kökü. Varsayılan `..` (repo kökü,
   docker-compose'un `./data` bağlaması).
-## Dört koşul (#18)
+## Koşullar (#18; görsel koşul #30)
 
 ```bash
 # Dört koşul aynı sorular, aynı üretici model ve aynı indeksle (tek parmak izi) koşulur.
@@ -91,12 +91,19 @@ python -m harness.run --gold gold_sets/BLM2512/gold_set.json --split heldout \
 # Tek ya da birkaç koşul: --condition full  |  --condition no_rag basic_rag
 ```
 
-| Koşul | Arama | Kapı | Alıntı doğrulama / iddia kontrolü | Oynatma konumu |
-|---|---|---|---|---|
-| `no_rag` | yok | yok | yok (alıntısız) | yok |
-| `basic_rag` | yalnız anlamsal, ilk 5 | yok | yok (etiketler yalnızca kaynağa çevrilir) | yok |
-| `full` | hibrit + RRF | var | var (ürün hattı, `/ask`) | yok |
-| `full_video_time` | hibrit + RRF + video komşuları | var | var | gold sorudaki `playback` |
+| Koşul | Arama | Kapı | Alıntı doğrulama / iddia kontrolü | Oynatma konumu | Kareler |
+|---|---|---|---|---|---|
+| `no_rag` | yok | yok | yok (alıntısız) | yok | yok |
+| `basic_rag` | yalnız anlamsal, ilk 5 | yok | yok (etiketler yalnızca kaynağa çevrilir) | yok | yok |
+| `full` | hibrit + RRF | var | var (ürün hattı, `/ask`) | yok | yok |
+| `full_video_time` | hibrit + RRF + video komşuları | var | var | gold sorudaki `playback` | yok (transcript-only) |
+| `visual` | `full_video_time` ile aynı | var | var; kare iddiaları görüntüyle | `playback` | durdurulan anın kareleri |
+
+- `full_video_time` ile `visual` arasındaki tek fark karelerdir; görsel bağlamın katkısı için ikisini birlikte koşun:
+  `--condition full_video_time visual`. Görsel etiketli sorularda (`"visual": {...}`, ANALYSIS §9) ikisi de
+  `visual_expected_behavior_rate`, `visual_trap_safe_rate`, `visual_contradiction_safe_rate`, `clarification_rate`,
+  `frame_insufficient_rate` ve `answers_citing_frames_rate` yazar. Derste çıkarılmış kare yoksa `visual` koşusu bunu
+  boşluk olarak kaydeder (kareler mp4 dosyasından çıkarılır; altyazıyla yüklenen videonun karesi olmaz).
 
 - `no_rag` ve `basic_rag` karşılaştırma için minimal hatlardır (`harness/conditions.py`); ürün davranışı değildir.
   İkisi de LLM olmadan koşulamaz.

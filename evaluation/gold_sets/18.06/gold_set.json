@@ -18,10 +18,16 @@
         }
       ],
       "origin": "team_draft",
-      "notes": "Görsel soru (#28): tahtadaki çizime dayanır. Referans cevap dersin transkriptinden alınmıştır; altın kare = playback anındaki kare. Koşullar: transcript_only = full_video_time; visual = #26.",
+      "notes": "Görsel soru (#28): tahtadaki çizime dayanır. Referans cevap dersin transkriptinden alınmıştır; altın kare = playback anındaki kare. Koşullar: transcript_only = full_video_time; visual = #26. Görsel etiket (#30) ekip taslağıdır; eğitmen/TA incelemesi bekler.",
       "playback": {
         "document_sha256": "9fa6200af463b9e099735faf930e08ff55d4f9e13e09e107be19fe870d6e3d93",
         "time_s": 290
+      },
+      "visual": {
+        "frame_kind": "diagram",
+        "expected": "answer",
+        "support": "mixed",
+        "trap": null
       }
     },
     {
@@ -39,10 +45,16 @@
         }
       ],
       "origin": "team_draft",
-      "notes": "Görsel soru (#28): tahtadaki çizime dayanır. Referans cevap dersin transkriptinden alınmıştır; altın kare = playback anındaki kare. Koşullar: transcript_only = full_video_time; visual = #26.",
+      "notes": "Görsel soru (#28): tahtadaki çizime dayanır. Referans cevap dersin transkriptinden alınmıştır; altın kare = playback anındaki kare. Koşullar: transcript_only = full_video_time; visual = #26. Görsel etiket (#30) ekip taslağıdır; eğitmen/TA incelemesi bekler.",
       "playback": {
         "document_sha256": "9fa6200af463b9e099735faf930e08ff55d4f9e13e09e107be19fe870d6e3d93",
         "time_s": 545
+      },
+      "visual": {
+        "frame_kind": "diagram",
+        "expected": "answer",
+        "support": "mixed",
+        "trap": null
       }
     },
     {
@@ -60,10 +72,16 @@
         }
       ],
       "origin": "team_draft",
-      "notes": "Görsel soru (#28): tahtadaki çizime dayanır. Referans cevap dersin transkriptinden alınmıştır; altın kare = playback anındaki kare. Koşullar: transcript_only = full_video_time; visual = #26.",
+      "notes": "Görsel soru (#28): tahtadaki çizime dayanır. Referans cevap dersin transkriptinden alınmıştır; altın kare = playback anındaki kare. Koşullar: transcript_only = full_video_time; visual = #26. Görsel etiket (#30) ekip taslağıdır; eğitmen/TA incelemesi bekler.",
       "playback": {
         "document_sha256": "9fa6200af463b9e099735faf930e08ff55d4f9e13e09e107be19fe870d6e3d93",
         "time_s": 1900
+      },
+      "visual": {
+        "frame_kind": "diagram",
+        "expected": "answer",
+        "support": "mixed",
+        "trap": null
       }
     }
   ]
