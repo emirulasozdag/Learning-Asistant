@@ -12,7 +12,7 @@ import { answerOf } from "../../features/tutor/turns";
 import type { TutorTurn } from "../../features/tutor/types";
 import { useTutorTurns } from "../../features/tutor/useTutorTurns";
 import FrameAtMoment from "../../features/video/FrameAtMoment";
-import { useFrames } from "../../features/video/frames";
+import { citedFrameIds, useFrames } from "../../features/video/frames";
 import LecturePlayer, { type PlayerHandle } from "../../features/video/LecturePlayer";
 import SlideStrip from "../../features/video/SlideStrip";
 import { courseService } from "../../services/courseService";
@@ -595,7 +595,13 @@ function StudyTurn({
         {askedAt != null && <span className="ml-2 font-mono text-xs text-graphite">· {formatTime(askedAt)}</span>}
       </p>
       {askedAt != null && (
-        <FrameAtMoment frames={frames} seconds={askedAt} heading="Durdurduğun anda ekranda" onSeek={onSeek} />
+        <FrameAtMoment
+          frames={frames}
+          seconds={askedAt}
+          heading="Durdurduğun anda ekranda"
+          onSeek={onSeek}
+          cited={citedFrameIds(response?.citations)}
+        />
       )}
       {response && (moment || fromVideo > 0 || fromDocs > 0) && (
         <p className="flex flex-wrap items-center gap-2 text-xs">

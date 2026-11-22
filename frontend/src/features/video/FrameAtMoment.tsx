@@ -9,8 +9,13 @@ import Dialog from "../../ui/Dialog";
 import FrameImage from "./FrameImage";
 import { frameAt, slideChangeNear } from "./frames";
 
-/** Karenin ne olduğunu söyleyen etiket (ADR-10: görüntü kanıt değil, cevap transkripte dayanır). */
+/** Karenin ne olduğunu söyleyen etiket: cevap bu kareyi kaynak göstermiyorsa konuşmaya dayanır. */
 export const FRAME_LABEL = "Ekran görüntüsü · cevap konuşmaya (transkript) dayanır";
+/**
+ * Cevap bu kareyi kaynak gösterdiğinde (#26, ADR-12): kare judge tarafından görüntüyle kontrol
+ * edilmiş bir kanıttır; "cevap transkripte dayanır" demek yanlış olur.
+ */
+export const FRAME_CITED_LABEL = "Ekran görüntüsü · cevabın bir kısmı bu kareye dayanır";
 
 /**
  * Videonun `seconds` anında ekranda olan kare: küçük görüntü, tıklayınca büyür; "Videoda bu
@@ -22,12 +27,15 @@ export default function FrameAtMoment({
   seconds,
   heading,
   onSeek,
+  cited,
   className,
 }: {
   frames: FrameRef[] | null;
   seconds: number;
   heading?: string;
   onSeek?: (seconds: number) => void;
+  /** Cevabın kaynak gösterdiği kareler (`citedFrameIds`); yoksa cevap transkripte dayanır. */
+  cited?: ReadonlySet<number>;
   className?: string;
 }) {
   const [enlarged, setEnlarged] = useState<FrameRef | null>(null);
@@ -36,6 +44,8 @@ export default function FrameAtMoment({
   const single = change ? null : frameAt(frames, seconds);
   const shown = change ?? (single ? [single] : []);
   if (shown.length === 0) return null;
+  const isCited = (frame: FrameRef) => cited?.has(frame.frame_id) ?? false;
+  const label = shown.some(isCited) ? FRAME_CITED_LABEL : FRAME_LABEL;
 
   return (
     <figure
@@ -59,12 +69,13 @@ export default function FrameAtMoment({
             {change && (
               <span className="font-mono text-xs text-graphite">
                 {index === 0 ? "Önceki slayt" : "Sonraki slayt"} · {formatTime(frame.t_start)}
+                {isCited(frame) && <span className="text-accent"> · cevapta kaynak</span>}
               </span>
             )}
           </div>
         ))}
       </div>
-      <figcaption className="text-xs text-graphite">{FRAME_LABEL}</figcaption>
+      <figcaption className="text-xs text-graphite">{label}</figcaption>
       {onSeek && (
         <Button size="sm" variant="ghost" icon={PlayCircle} className="self-start" onClick={() => onSeek(seconds)}>
           Videoda bu ana git
@@ -75,7 +86,7 @@ export default function FrameAtMoment({
         onClose={() => setEnlarged(null)}
         size="lg"
         title={enlarged ? `Videonun ${formatTime(enlarged.t_frame)} anında ekranda` : ""}
-        description={FRAME_LABEL}
+        description={enlarged && isCited(enlarged) ? FRAME_CITED_LABEL : FRAME_LABEL}
         footer={
           enlarged && onSeek ? (
             <Button
