@@ -14,6 +14,7 @@ import PageTitle from "../../ui/PageTitle";
 import { useToast } from "../../ui/toast/context";
 import { ROLE_LABELS } from "../../layouts/navigation";
 import ThemeSwitcher from "../../theme/ThemeSwitcher";
+import { clearStudyCache } from "../../auth/studyCache";
 
 type Pending = "data" | "account" | null;
 
@@ -57,6 +58,8 @@ export default function AccountPage() {
     try {
       if (pending === "data") {
         await authService.deleteMyData();
+        // Silinen sohbet ve pratik, sekmedeki önbellekten geri gelmesin (#134).
+        clearStudyCache();
         setPending(null);
         await refresh();
         toast.show({
@@ -66,6 +69,7 @@ export default function AccountPage() {
         });
       } else {
         await authService.deleteAccount();
+        clearStudyCache();
         setPending(null);
         await refresh();
         navigate("/login", { replace: true });

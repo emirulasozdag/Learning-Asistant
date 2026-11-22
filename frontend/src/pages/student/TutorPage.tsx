@@ -40,6 +40,7 @@ import EvidencePanel from "../../features/tutor/studio/EvidencePanel";
 import EvidenceThread from "../../features/tutor/studio/EvidenceThread";
 import RetrievalMeter from "../../features/tutor/studio/RetrievalMeter";
 import { courseSuggestions } from "../../features/tutor/suggestions";
+import { useAuth } from "../../auth/useAuth";
 import { loadSession, saveSession } from "../../features/tutor/sessionTurns";
 import { answerOf, entryState } from "../../features/tutor/turns";
 import TurnExtras from "../../features/tutor/TutorTurnView";
@@ -107,8 +108,9 @@ function TutorSession({ course }: { course: Course }) {
   const [materials, setMaterials] = useState<DocumentOut[] | null>(null);
   const [materialsFailed, setMaterialsFailed] = useState(false);
   const [materialsAttempt, setMaterialsAttempt] = useState(0);
-  // Ders içinde başka sayfaya gidip dönünce sohbet yerinde olsun (#106).
-  const [restored] = useState(() => loadSession(courseId));
+  // Ders içinde başka sayfaya gidip dönünce sohbet yerinde olsun (#106); kayıt kullanıcıya bağlı (#134).
+  const userId = useAuth().user?.id;
+  const [restored] = useState(() => loadSession(userId, courseId));
   const [turns, setTurns] = useState<TutorTurn[]>(restored.turns);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [selection, setSelection] = useState<Selection>(NO_SELECTION);
@@ -154,7 +156,7 @@ function TutorSession({ course }: { course: Course }) {
   // Sayfadan ya da dersten ayrılırken süren soruyu iptal et.
   useEffect(() => () => abortRef.current?.abort(), []);
 
-  useEffect(() => saveSession(courseId, turns, conversationId), [courseId, turns, conversationId]);
+  useEffect(() => saveSession(userId, courseId, turns, conversationId), [userId, courseId, turns, conversationId]);
 
   // Durdurulan anı her saniye okur: composer'ın altındaki "videonun 12:34 anı" notu için.
   useEffect(() => {

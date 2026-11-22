@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import { setUnauthorizedHandler } from "../api/client";
 import { authService, type RegisterInput, type Role, type User } from "../services/authService";
 import { AuthContext } from "./context";
+import { clearStudyCache } from "./studyCache";
 
 export default function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -35,7 +36,10 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
       });
     // Oturum süresi dolarsa (herhangi bir istekte 401) kullanıcı çıkış yapmış sayılır;
     // korumalı sayfalar girişe yönlendirir.
-    setUnauthorizedHandler(() => setUser(null));
+    setUnauthorizedHandler(() => {
+      clearStudyCache();
+      setUser(null);
+    });
     return () => {
       cancelled = true;
       setUnauthorizedHandler(null);
@@ -69,6 +73,9 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const logout = useCallback(async () => {
+    // Paylaşılan bilgisayarda bir sonraki kullanıcı bu sohbeti ve pratiği görmesin (#134).
+    // Çıkış isteği başarısız olsa da yerel önbellek temizlenir.
+    clearStudyCache();
     await authService.logout();
     setUser(null);
   }, []);
