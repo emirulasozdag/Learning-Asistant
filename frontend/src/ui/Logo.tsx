@@ -1,38 +1,49 @@
 import { cx } from "./cx";
 
 // Ürün adı tek yerden değiştirilir.
-export const PRODUCT_NAME = "Learning Assistant";
+export const PRODUCT_NAME = "Dipnot";
 
 /**
- * Ürün işareti: açık bir sayfa ve üzerinde işaretlenmiş bir satır —
- * "her cevap kaynağına bağlı" fikrinin kendisi.
+ * Ürün işareti: küçük harf "d" ve sağ üstte fosforlu bir dipnot noktası — "her cevabın bir
+ * dipnotu var" fikri. `inverse`: lacivert zemin üzerinde (üst çubuk) beyaz kare, lacivert harf.
  */
-export function LogoMark({ className }: { className?: string }) {
+export function LogoMark({ className, inverse = false }: { className?: string; inverse?: boolean }) {
+  const square = inverse ? "var(--color-chrome-ink)" : "var(--color-accent)";
+  const letter = inverse ? "var(--color-chrome)" : "var(--color-on-accent)";
   return (
-    <svg viewBox="0 0 24 24" aria-hidden className={cx("size-6", className)}>
-      <rect x="2" y="2" width="20" height="20" rx="5" fill="currentColor" />
-      <rect x="6.5" y="7" width="11" height="1.6" rx="0.8" fill="var(--color-on-accent)" opacity="0.55" />
-      <rect x="6.5" y="11" width="11" height="2.6" rx="0.6" fill="var(--color-marker)" />
-      <rect x="6.5" y="15.6" width="7.5" height="1.6" rx="0.8" fill="var(--color-on-accent)" opacity="0.55" />
+    <svg viewBox="0 0 32 32" aria-hidden className={cx("size-7 shrink-0", className)}>
+      <rect width="32" height="32" rx="8" fill={square} />
+      <circle cx="13.5" cy="19" r="5.6" fill="none" stroke={letter} strokeWidth="3.2" />
+      <path d="M19.1 7.5v17.2" fill="none" stroke={letter} strokeWidth="3.2" strokeLinecap="round" />
+      <circle cx="25.2" cy="7.2" r="4.4" fill="#ffd23f" />
     </svg>
   );
 }
 
-/** "Learning Assistant": ilk kelime kalın, ikincisi ince — kurumsal sözcük işareti. */
-function Wordmark() {
-  const [first, ...rest] = PRODUCT_NAME.split(" ");
+/**
+ * "dipnot" sözcük işareti ve ürünün işareti. `inverse`: lacivert üst çubukta beyaz.
+ * `subtitle`: işaretin altında küçük kurum adı (giriş ekranı).
+ */
+export default function Logo({
+  className,
+  inverse = false,
+  subtitle,
+}: {
+  className?: string;
+  inverse?: boolean;
+  subtitle?: string;
+}) {
   return (
-    <span className="text-lg leading-none tracking-tight">
-      <span className="font-bold">{first}</span> <span className="font-light">{rest.join(" ")}</span>
-    </span>
-  );
-}
-
-export default function Logo({ className }: { className?: string }) {
-  return (
-    <span className={cx("inline-flex items-center gap-2 text-ink", className)}>
-      <LogoMark className="text-accent" />
-      <Wordmark />
+    <span className={cx("inline-flex items-center gap-2.5", inverse ? "text-chrome-ink" : "text-ink", className)}>
+      <LogoMark inverse={inverse} />
+      <span className="flex flex-col">
+        <span className="text-xl leading-none font-bold tracking-tight">{PRODUCT_NAME.toLocaleLowerCase("tr")}</span>
+        {subtitle && (
+          <span className={cx("mt-1 text-xs leading-none", inverse ? "text-chrome-muted" : "text-graphite")}>
+            {subtitle}
+          </span>
+        )}
+      </span>
     </span>
   );
 }

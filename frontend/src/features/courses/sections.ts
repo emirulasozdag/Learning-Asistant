@@ -43,7 +43,7 @@ export const MATERIAL_SECTIONS: MaterialSection[] = [
   {
     path: "lecture-notes",
     label: "Ders notları",
-    description: "Ders ve recitation notları, slaytlar ve ders kitabı bölümleri.",
+    description: "Ders ve uygulama notları, slaytlar ve ders kitabı bölümleri.",
     icon: NotebookText,
     types: ["notes", "slides", "textbook"],
     empty: "Bu derse henüz ders notu eklenmedi.",
@@ -111,6 +111,7 @@ export function contentSections(role: "student" | "instructor", base: string): S
 export const SECTION_LABELS: Record<string, string> = {
   tutor: "AI Tutor",
   learning: "Öğrenme kaydım",
+  practice: "Pratik",
   materials: "Materyaller",
   activity: "Etkinlik ve analitik",
   review: "İnceleme ve sık hatalar",

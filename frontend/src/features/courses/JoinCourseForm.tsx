@@ -1,10 +1,12 @@
-import { useState, type FormEvent } from "react";
+import { useId, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router";
 
 import { ApiError } from "../../api/client";
+import { userMessage } from "../../api/errors";
 import { useDemoInfo } from "../../auth/useDemoInfo";
 import { courseService } from "../../services/courseService";
 import Button from "../../ui/Button";
+import ErrorText from "../../ui/ErrorText";
 import Field from "../../ui/Field";
 import { useToast } from "../../ui/toast/context";
 import { useCourses } from "./context";
@@ -20,6 +22,7 @@ export default function JoinCourseForm() {
   const [code, setCode] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const errorId = useId();
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -35,9 +38,7 @@ export default function JoinCourseForm() {
       setError(
         reason instanceof ApiError && reason.status === 404
           ? "Bu kodla bir ders bulunamadı. Kod yanlış ya da süresi dolmuş olabilir."
-          : reason instanceof Error
-            ? reason.message
-            : String(reason),
+          : userMessage(reason, "Derse katılamadın. Tekrar dene."),
       );
     } finally {
       setSaving(false);
@@ -45,43 +46,51 @@ export default function JoinCourseForm() {
   }
 
   return (
-    <div className="flex flex-col gap-2">
-      <form onSubmit={submit} className="flex flex-col gap-3 sm:flex-row sm:items-start" noValidate>
-        <Field
-          label="Katılım kodu"
-          placeholder="Eğitmenin verdiği kod"
-          value={code}
-          onChange={(event) => {
-            setCode(event.target.value);
-            if (error) setError(null);
-          }}
-          error={error}
-          autoComplete="off"
-          className="sm:w-72"
-        />
-        <Button type="submit" loading={saving} disabled={!code.trim()} className="sm:mt-[1.6rem]">
-          Derse katıl
-        </Button>
+    <div className="flex flex-col gap-3">
+      <form onSubmit={submit} className="flex flex-col gap-2" noValidate>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <Field
+            label="Katılım kodu"
+            placeholder="Eğitmenin verdiği kod"
+            value={code}
+            onChange={(event) => {
+              setCode(event.target.value);
+              if (error) setError(null);
+            }}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? errorId : undefined}
+            autoComplete="off"
+            className="sm:w-72"
+          />
+          <Button type="submit" variant="primary" loading={saving} disabled={!code.trim()}>
+            Derse katıl
+          </Button>
+        </div>
+        {error && (
+          <div id={errorId}>
+            <ErrorText>{error}</ErrorText>
+          </div>
+        )}
       </form>
       {demoCodes.length > 0 && (
-        <p className="flex flex-wrap items-center gap-2 text-sm text-graphite">
-          <span>Demo kodları:</span>
+        <div className="flex flex-wrap items-center gap-1.5 text-sm text-graphite">
+          <span className="mr-1">Demo kodları:</span>
           {demoCodes.map((c) => (
-            <button
+            <Button
               key={c.course_id}
-              type="button"
+              variant="ghost"
+              size="sm"
               onClick={() => {
                 setCode(c.join_code);
                 setError(null);
               }}
-              className="rounded-control border border-line bg-surface px-2 py-1 text-ink hover:border-line-strong hover:bg-canvas"
               title={c.name}
             >
-              <span className="font-semibold">{c.code}</span>{" "}
-              <code className="font-mono tracking-wider">{c.join_code}</code>
-            </button>
+              {c.code}
+              <code className="font-mono font-normal text-graphite">{c.join_code}</code>
+            </Button>
           ))}
-        </p>
+        </div>
       )}
     </div>
   );

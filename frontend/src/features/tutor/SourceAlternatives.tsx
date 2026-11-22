@@ -15,7 +15,7 @@ export default function SourceAlternatives({
   if (alternatives.length === 0) return null;
   return (
     <section aria-labelledby="source-alternatives" className="mt-4">
-      <h3 id="source-alternatives" className="text-sm font-medium text-ink">
+      <h3 id="source-alternatives" className="text-sm font-semibold text-ink">
         Aynı içerik dokümanda
       </h3>
       <ul className="mt-2 flex flex-col gap-1.5">
@@ -27,7 +27,7 @@ export default function SourceAlternatives({
               className="flex w-full items-baseline justify-between gap-3 rounded-control border border-line bg-surface px-3 py-2 text-left text-sm text-ink transition-colors hover:bg-subtle focus-visible:outline-2 focus-visible:outline-accent"
             >
               <span className="min-w-0 truncate">{alternative.document_title}</span>
-              <span className="shrink-0 font-mono text-xs text-graphite">
+              <span className="shrink-0 text-sm text-graphite tabular-nums">
                 {alternative.page != null ? pageLabel(alternative.page) : materialLabel(alternative.material_type)}
               </span>
             </button>

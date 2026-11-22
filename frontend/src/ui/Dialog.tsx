@@ -69,7 +69,7 @@ export default function Dialog({
   if (!open) return null;
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[8vh]">
-      <div className="fade-in absolute inset-0 bg-ink/25" onClick={onClose} aria-hidden />
+      <div className="fade-in absolute inset-0 bg-scrim" onClick={onClose} aria-hidden />
       <div
         ref={panelRef}
         role="dialog"
@@ -116,7 +116,7 @@ export function Drawer({
   if (!open) return null;
   return createPortal(
     <div className="fixed inset-0 z-50 flex justify-end">
-      <div className="fade-in absolute inset-0 bg-ink/20" onClick={onClose} aria-hidden />
+      <div className="fade-in absolute inset-0 bg-scrim" onClick={onClose} aria-hidden />
       <div
         ref={panelRef}
         role="dialog"
@@ -128,17 +128,17 @@ export function Drawer({
           width,
         )}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-line px-6 py-4">
+        <div className="flex items-start justify-between gap-4 border-b border-line px-5 py-4">
           <div className="min-w-0">
-            <h2 id="drawer-title" className="truncate text-md font-semibold text-ink">
+            <h2 id="drawer-title" className="truncate text-lg font-bold text-ink">
               {title}
             </h2>
             {description && <p className="mt-0.5 text-base text-graphite">{description}</p>}
           </div>
           <IconButton icon={X} label="Kapat" size="sm" onClick={onClose} />
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">{children}</div>
-        {footer && <div className="flex justify-end gap-2 border-t border-line px-6 py-3">{footer}</div>}
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">{children}</div>
+        {footer && <div className="flex justify-end gap-2 border-t border-line bg-canvas/60 px-5 py-3">{footer}</div>}
       </div>
     </div>,
     document.body,

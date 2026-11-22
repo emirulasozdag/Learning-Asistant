@@ -13,6 +13,7 @@ import {
 
 import type { QuickAction } from "../../services/tutorService";
 import Button from "../../ui/Button";
+import Card from "../../ui/Card";
 import { LogoMark } from "../../ui/Logo";
 import CitedText from "./CitedText";
 import RichText from "./RichText";
@@ -131,7 +132,7 @@ function Body({ turn, isLatest, onQuickAction, onRetry, ...select }: AnswerBlock
             <ShieldCheck size={14} aria-hidden className="text-accent" />
             Kaynaklarla kontrol ediliyor…
           </p>
-          <div className="text-md leading-7 text-graphite opacity-80">
+          <div className="font-serif text-md text-graphite opacity-80">
             <RichText text={draftText(turn.streamText)} />
             <span aria-hidden className="ml-0.5 inline-block h-4 w-[7px] translate-y-0.5 animate-pulse bg-accent" />
           </div>
@@ -189,7 +190,7 @@ function Body({ turn, isLatest, onQuickAction, onRetry, ...select }: AnswerBlock
         </div>
         {response.suggested_sources.length > 0 && (
           <div>
-            <p className="mb-2 text-sm text-graphite">Notlardaki en yakın bölümler</p>
+            <p className="mb-2 text-sm font-semibold text-graphite">Notlardaki en yakın bölümler</p>
             <SourceCards citations={response.suggested_sources} numbered={false} {...select} />
           </div>
         )}
@@ -202,13 +203,13 @@ function Body({ turn, isLatest, onQuickAction, onRetry, ...select }: AnswerBlock
     // Videodaki sahne belirsiz (#26): cevap yerine öğrenciye netleştirme sorusu sorulur.
     return (
       <div className="flex flex-col gap-4">
-        <div className="rounded-panel border border-line bg-canvas px-4 py-3">
+        <Card variant="inset" padding="sm">
           <p className="flex items-center gap-2 text-base font-medium text-ink">
             <HelpCircle size={16} aria-hidden className="text-accent" />
             Neyi kastettiğini netleştirir misin?
           </p>
-          <p className="mt-1 text-md leading-7 text-ink">{clarificationQuestion(response)}</p>
-        </div>
+          <p className="mt-1 font-serif text-md text-ink">{clarificationQuestion(response)}</p>
+        </Card>
         <RetrievalDetails response={response} {...select} />
       </div>
     );
@@ -217,16 +218,16 @@ function Body({ turn, isLatest, onQuickAction, onRetry, ...select }: AnswerBlock
   if (outcome === "out_of_scope") {
     return (
       <div className="flex flex-col gap-4">
-        <div className="rounded-panel border border-line bg-canvas px-4 py-3">
+        <Card variant="inset" padding="sm">
           <p className="flex items-center gap-2 text-base font-medium text-ink">
             <SearchX size={16} aria-hidden className="text-graphite" />
             Bu soru için ders materyalinde yeterli bilgi bulunamadı
           </p>
           <p className="mt-1 text-base text-graphite">{declineExplanation(response)}</p>
-        </div>
+        </Card>
         {response.suggested_sources.length > 0 && (
           <div>
-            <p className="mb-2 text-sm text-graphite">Notlardaki en yakın bölümler</p>
+            <p className="mb-2 text-sm font-semibold text-graphite">Notlardaki en yakın bölümler</p>
             <SourceCards citations={response.suggested_sources} numbered={false} {...select} />
           </div>
         )}
@@ -245,7 +246,7 @@ function Body({ turn, isLatest, onQuickAction, onRetry, ...select }: AnswerBlock
       )}
       {extractive ? (
         // LLM'siz alıntı: materyalin kendi metni, biçimlendirilmeden.
-        <div className="border-l-2 border-marker pl-4 font-mono text-sm leading-7 whitespace-pre-wrap text-ink">
+        <div className="border-l-2 border-marker pl-4 font-serif text-md whitespace-pre-wrap text-ink">
           <CitedText
             text={stripIntro(response.answer ?? "")}
             pattern={/(\[\d+\])/}
@@ -254,7 +255,8 @@ function Body({ turn, isLatest, onQuickAction, onRetry, ...select }: AnswerBlock
           />
         </div>
       ) : (
-        <div className="text-md leading-7 text-ink">
+        // Okuma metni: serif, rahat satır aralığı; [n] işaretleri dipnot olur.
+        <div className="font-serif text-md text-ink">
           <RichText
             text={response.answer ?? ""}
             citations={{ resolve: (n) => response.citations[n - 1], ...select }}
@@ -263,13 +265,13 @@ function Body({ turn, isLatest, onQuickAction, onRetry, ...select }: AnswerBlock
       )}
 
       {response.coverage_gap && (
-        <p className="flex items-start gap-2 rounded-panel bg-canvas px-3 py-2 text-sm text-graphite">
-          <SearchX size={14} aria-hidden className="mt-0.5 shrink-0" />
-          <span>
+        <Card variant="inset" padding="sm" className="flex items-start gap-2 text-sm text-graphite">
+          <SearchX size={15} aria-hidden className="mt-0.5 shrink-0" />
+          <p>
             <span className="font-medium text-ink-2">Materyalde olmayan kısım: </span>
             {response.coverage_gap}
-          </span>
-        </p>
+          </p>
+        </Card>
       )}
 
       {response.unsupported_removed > 0 && (
@@ -279,7 +281,7 @@ function Body({ turn, isLatest, onQuickAction, onRetry, ...select }: AnswerBlock
       )}
 
       <div>
-        <p className="mb-2 text-sm text-graphite">Kaynaklar</p>
+        <p className="mb-2 text-sm font-semibold text-graphite">Dipnotlar</p>
         <SourceCards citations={response.citations} {...select} />
       </div>
 

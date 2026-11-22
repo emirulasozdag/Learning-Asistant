@@ -53,11 +53,11 @@ export default function FrameAtMoment({
       className={cx("flex flex-col gap-2 rounded-panel border border-line bg-surface p-3", className)}
     >
       {heading && (
-        <p className="text-xs font-medium text-ink">
-          {heading} <span className="font-mono font-normal text-graphite">· {formatTime(seconds)}</span>
+        <p className="text-sm font-semibold text-ink">
+          {heading} <span className="font-normal text-graphite tabular-nums">· {formatTime(seconds)}</span>
         </p>
       )}
-      {change && <p className="text-xs font-medium text-accent">Tam bu anda slayt değişiyor</p>}
+      {change && <p className="text-sm font-medium text-accent">Tam bu anda slayt değişiyor</p>}
       <div className={cx("grid gap-2", change ? "grid-cols-2" : "max-w-xs grid-cols-1")}>
         {shown.map((frame, index) => (
           <div key={frame.frame_id} className="flex min-w-0 flex-col gap-1">
@@ -67,7 +67,7 @@ export default function FrameAtMoment({
               openLabel={`${formatTime(frame.t_frame)} karesini büyüt`}
             />
             {change && (
-              <span className="font-mono text-xs text-graphite">
+              <span className="text-xs text-graphite tabular-nums">
                 {index === 0 ? "Önceki slayt" : "Sonraki slayt"} · {formatTime(frame.t_start)}
                 {isCited(frame) && <span className="text-accent"> · cevapta kaynak</span>}
               </span>

@@ -1,4 +1,4 @@
-import { BookOpen, ChevronRight, Plus, ServerOff } from "lucide-react";
+import { BookOpen, ChevronRight, FolderOpen, Plus, ServerOff } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
 
@@ -6,16 +6,18 @@ import { useAuth } from "../../auth/useAuth";
 import { useCourses } from "../../features/courses/context";
 import { useCourseActivities } from "../../features/courses/useCourseActivities";
 import { useMaterialSummaries, type MaterialSummary } from "../../features/courses/useMaterialSummaries";
-import { compactTotals } from "../../labels";
+import { describeTotals } from "../../labels";
 import type { Course } from "../../services/courseService";
-import { formatRelative, formatTime, greeting } from "../../text";
-import Badge from "../../ui/Badge";
+import { formatRelative, formatTime, firstName, greeting } from "../../text";
 import Button from "../../ui/Button";
+import Card from "../../ui/Card";
 import EmptyState from "../../ui/EmptyState";
 import PageTitle from "../../ui/PageTitle";
 import Skeleton, { SkeletonRows } from "../../ui/Skeleton";
 import StatRow from "../../ui/StatRow";
-import { Table, TD, TH, THead, TR } from "../../ui/Table";
+import { buttonClasses } from "../../ui/buttonStyles";
+
+const CODE_CHIP = "rounded-full bg-accent-soft px-2.5 py-0.5 text-xs font-semibold text-accent";
 
 /** Eğitmen ana sayfası: dersler, bilgi tabanlarının durumu ve öğrenci etkinliği (gerçek veri). */
 export default function InstructorDashboard() {
@@ -42,119 +44,111 @@ export default function InstructorDashboard() {
     .slice(0, 5);
 
   return (
-    <div className="page">
-      <p className="text-md text-graphite">
-        {greeting()}, {user?.name}
-      </p>
-      <PageTitle
-        className="mt-1"
-        title="Derslerim"
-        description="AI Tutor öğrencilere yalnızca yüklediğin materyalden cevap verir."
-        actions={
-          <Button variant="primary" icon={Plus} onClick={openCreate}>
-            Ders oluştur
-          </Button>
-        }
-      />
-
-      {totalsReady && (
-        <StatRow
-          className="mb-10"
-          stats={[
-            { label: "Ders", value: courses.length },
-            { label: "Doküman", value: known.reduce((sum, s) => sum + s.documents, 0) },
-            ...(known.some((s) => s.totals.hasPages)
-              ? [{ label: "Sayfa", value: known.reduce((sum, s) => sum + s.totals.pages, 0) }]
-              : []),
-            ...(known.some((s) => s.totals.hasVideo)
-              ? [
-                  {
-                    label: "Video süresi",
-                    value: formatTime(known.reduce((sum, s) => sum + s.totals.videoSeconds, 0)),
-                  },
-                ]
-              : []),
-            {
-              label: "Öğrenci sorusu",
-              value: courses.reduce((sum, course) => sum + (activities[course.id]?.questions ?? 0), 0),
-              // Sıfır "soru yok" demek olmayabilir: yalnızca kaydı açık, en az üç öğrenci sayılır (#105).
-              hint: "kaydı açık, en az 3 öğrenci",
-            },
-          ]}
-        />
-      )}
-
-      {loading ? (
-        <SkeletonRows rows={3} />
-      ) : error ? (
-        <EmptyState
-          icon={ServerOff}
-          tone="danger"
-          title="Dersler yüklenemedi"
-          description="Ders listesine şu an ulaşılamıyor. Bağlantını kontrol edip tekrar dene."
-          action={
-            <Button loading={retrying} onClick={() => void retry()}>
-              Tekrar dene
-            </Button>
-          }
-        />
-      ) : courses.length === 0 ? (
-        <EmptyState
-          icon={BookOpen}
-          title="İlk dersini oluştur"
-          description="Dersi oluştur ve notlarını yükle; öğrencilerin hemen soru sormaya başlayabilir."
-          action={
+    <div className="page flex flex-col gap-10">
+      <section>
+        <p className="text-md text-graphite">
+          {greeting()}, {firstName(user?.name)}
+        </p>
+        <PageTitle
+          className="mt-1"
+          title="Derslerim"
+          description="AI Tutor öğrencilere yalnızca yüklediğin materyalden cevap verir."
+          actions={
             <Button variant="primary" icon={Plus} onClick={openCreate}>
               Ders oluştur
             </Button>
           }
         />
-      ) : (
-        <Table label="Derslerim">
-          <THead>
-            <tr>
-              <TH>Kod</TH>
-              <TH>Ders</TH>
-              <TH className="hidden md:table-cell">Dönem</TH>
-              <TH className="hidden text-right sm:table-cell">Doküman</TH>
-              <TH className="hidden text-right lg:table-cell">Sayfa / süre</TH>
-              <TH className="text-right">Soru</TH>
-            </tr>
-          </THead>
-          <tbody>
+
+        {totalsReady && (
+          <StatRow
+            className="mb-8"
+            stats={[
+              { label: "Ders", value: courses.length },
+              { label: "Doküman", value: known.reduce((sum, s) => sum + s.documents, 0) },
+              ...(known.some((s) => s.totals.hasPages)
+                ? [{ label: "Sayfa", value: known.reduce((sum, s) => sum + s.totals.pages, 0) }]
+                : []),
+              ...(known.some((s) => s.totals.hasVideo)
+                ? [
+                    {
+                      label: "Video süresi",
+                      value: formatTime(known.reduce((sum, s) => sum + s.totals.videoSeconds, 0)),
+                    },
+                  ]
+                : []),
+              {
+                label: "Öğrenci sorusu",
+                value: courses.reduce((sum, course) => sum + (activities[course.id]?.questions ?? 0), 0),
+                // Sıfır "soru yok" demek olmayabilir: yalnızca kaydı açık, en az üç öğrenci sayılır (#105).
+                hint: "araştırma kaydı açık olanlar",
+              },
+            ]}
+          />
+        )}
+
+        {loading ? (
+          <SkeletonRows rows={3} />
+        ) : error ? (
+          <EmptyState
+            icon={ServerOff}
+            tone="danger"
+            title="Dersler yüklenemedi"
+            description="Ders listesine şu an ulaşılamıyor. Bağlantını kontrol edip tekrar dene."
+            action={
+              <Button loading={retrying} onClick={() => void retry()}>
+                Tekrar dene
+              </Button>
+            }
+          />
+        ) : courses.length === 0 ? (
+          <EmptyState
+            icon={BookOpen}
+            title="İlk dersini oluştur"
+            description="Dersi oluştur ve notlarını yükle; öğrencilerin hemen soru sormaya başlayabilir."
+            action={
+              <Button variant="primary" icon={Plus} onClick={openCreate}>
+                Ders oluştur
+              </Button>
+            }
+          />
+        ) : (
+          <ul aria-label="Derslerim" className="flex flex-col gap-3">
             {courses.map((course) => (
-              <CourseRow
+              <CourseItem
                 key={course.id}
                 course={course}
                 summary={summaries[course.id]}
                 questions={activities[course.id]?.questions}
               />
             ))}
-          </tbody>
-        </Table>
-      )}
+          </ul>
+        )}
+      </section>
 
       {gaps.length > 0 && (
-        <section className="mt-12">
+        <section>
           <PageTitle
             level={2}
             title="Materyalde bulunamayan son sorular"
             description="Öğrencilerin sorduğu ama ders materyalinde dayanağı olmayan konular. Bu konular için materyal eklemeyi düşünebilirsin."
           />
-          <ul className="divide-y divide-line border-y border-line">
+          <ul className="flex flex-col gap-2">
             {gaps.map((gap, index) => (
               <li key={`${gap.course.id}-${gap.asked_at}-${index}`}>
-                <Link
-                  to={`/instructor/courses/${gap.course.id}/activity`}
-                  className="group flex items-center gap-4 py-3.5 transition-colors hover:bg-surface"
-                >
-                  <Badge>{gap.course.code}</Badge>
-                  <p className="min-w-0 flex-1 truncate text-md text-ink">{gap.question}</p>
-                  <span className="hidden shrink-0 text-sm text-graphite sm:block">
-                    {formatRelative(gap.asked_at)}
-                  </span>
-                  <ChevronRight size={16} aria-hidden className="shrink-0 text-faint group-hover:text-accent" />
-                </Link>
+                <Card padding="none" interactive>
+                  <Link
+                    to={`/instructor/courses/${gap.course.id}/activity`}
+                    className="group flex items-center gap-4 px-4 py-3"
+                  >
+                    <span className={CODE_CHIP}>{gap.course.code}</span>
+                    <p className="min-w-0 flex-1 truncate text-base text-ink">{gap.question}</p>
+                    <span className="hidden shrink-0 text-sm text-graphite sm:block">
+                      {formatRelative(gap.asked_at)}
+                    </span>
+                    <ChevronRight size={16} aria-hidden className="shrink-0 text-faint group-hover:text-accent" />
+                  </Link>
+                </Card>
               </li>
             ))}
           </ul>
@@ -164,7 +158,8 @@ export default function InstructorDashboard() {
   );
 }
 
-function CourseRow({
+/** Ders kartı: kod, ad bağlantısı, dönem ve materyal özeti, soru sayısı ve "Materyaller". */
+function CourseItem({
   course,
   summary,
   questions,
@@ -173,27 +168,38 @@ function CourseRow({
   summary: MaterialSummary | null | undefined;
   questions: number | undefined;
 }) {
-  const number = (value: number | undefined | null) =>
-    value === undefined ? <Skeleton className="ml-auto h-3.5 w-6" /> : (value ?? "—");
+  const base = `/instructor/courses/${course.id}`;
   return (
-    <TR>
-      <TD className="font-semibold whitespace-nowrap text-ink-2">{course.code}</TD>
-      <TD>
-        <Link to={`/instructor/courses/${course.id}`} className="link text-md font-medium">
-          {course.name}
-        </Link>
-        {summary?.documents === 0 && (
-          <span className="block text-sm text-warning">Materyal yok; öğrenciler soru soramaz</span>
-        )}
-      </TD>
-      <TD className="hidden whitespace-nowrap text-graphite md:table-cell">{course.term ?? "—"}</TD>
-      <TD className="hidden text-right tabular-nums sm:table-cell">
-        {number(summary === null ? null : summary?.documents)}
-      </TD>
-      <TD className="hidden text-right tabular-nums lg:table-cell">
-        {summary ? compactTotals(summary.totals) : number(summary === null ? null : undefined)}
-      </TD>
-      <TD className="text-right tabular-nums">{number(questions)}</TD>
-    </TR>
+    <Card as="li" className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span className={CODE_CHIP}>{course.code}</span>
+          {course.term && <span className="text-sm text-graphite">{course.term}</span>}
+        </div>
+        <h2 className="mt-2 text-lg font-bold tracking-tight">
+          <Link to={base} className="text-ink hover:text-link hover:underline hover:underline-offset-4">
+            {course.name}
+          </Link>
+        </h2>
+        <p className="mt-1 text-sm text-graphite">
+          {summary === undefined ? (
+            <Skeleton className="inline-block h-3.5 w-32 align-middle" />
+          ) : summary === null ? (
+            "Materyal bilgisi alınamadı"
+          ) : summary.documents === 0 ? (
+            <span className="text-warning">Materyal yok; öğrenciler soru soramaz</span>
+          ) : (
+            [`${summary.documents} doküman`, describeTotals(summary.totals)].filter(Boolean).join(", ")
+          )}
+          {questions !== undefined && questions > 0 && (
+            <span className="tabular-nums"> &nbsp;/&nbsp; {questions} soru</span>
+          )}
+        </p>
+      </div>
+      <Link to={`${base}/materials`} className={buttonClasses("secondary", "sm")}>
+        <FolderOpen size={14} aria-hidden />
+        Materyaller
+      </Link>
+    </Card>
   );
 }

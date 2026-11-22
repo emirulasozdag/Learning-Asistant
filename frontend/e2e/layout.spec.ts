@@ -27,7 +27,7 @@ test("dar ekran menüsü: ürün adı görünür, Escape kapatır @dar-ekran", a
 
   const menu = page.getByRole("dialog", { name: "Menü" });
   await expect(menu).toBeVisible();
-  const name = menu.getByText("Learning", { exact: true });
+  const name = menu.getByText("dipnot", { exact: true });
   await expect(name).toBeVisible();
   // Beyaz zemin üstüne beyaz yazı olmasın (#106).
   const color = await name.evaluate((element) => getComputedStyle(element).color);

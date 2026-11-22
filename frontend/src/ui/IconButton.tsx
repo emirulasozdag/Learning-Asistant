@@ -29,7 +29,7 @@ export default function IconButton({
       className={cx(
         "inline-flex shrink-0 items-center justify-center rounded-control transition-colors disabled:cursor-not-allowed disabled:opacity-40",
         tone === "dark"
-          ? "text-nav-muted hover:bg-white/10 hover:text-white"
+          ? "text-chrome-muted hover:bg-white/10 hover:text-chrome-ink"
           : "text-graphite hover:bg-subtle hover:text-ink",
         size === "sm" ? "size-7" : "size-8",
         className,

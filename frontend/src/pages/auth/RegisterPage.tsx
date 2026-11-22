@@ -1,10 +1,13 @@
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router";
 
+import { userMessage } from "../../api/errors";
 import { useAuth } from "../../auth/useAuth";
 import { authService } from "../../services/authService";
 import Button from "../../ui/Button";
+import ErrorText from "../../ui/ErrorText";
 import Field from "../../ui/Field";
+import { usePageTitle } from "../../ui/usePageTitle";
 import PasswordField from "./PasswordField";
 import { emailError } from "./validation";
 
@@ -16,6 +19,7 @@ export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null);
   const [emailProblem, setEmailProblem] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  usePageTitle("Hesap oluştur");
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -28,14 +32,14 @@ export default function RegisterPage() {
       // Yönlendirmeyi AuthLayout yapar.
       await register({ name: name.trim(), email: email.trim(), password });
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : String(reason));
+      setError(userMessage(reason, "Hesap oluşturulamadı. Tekrar dene."));
       setSaving(false);
     }
   }
 
   return (
     <>
-      <h2 className="text-2xl font-semibold tracking-tight text-ink">Hesap oluştur</h2>
+      <h2 className="text-2xl font-bold tracking-tight text-ink">Hesap oluştur</h2>
       <p className="mt-1.5 text-base text-graphite">
         Öğrenci hesabını oluştur; derslerine eğitmenin verdiği katılım koduyla katılırsın. Eğitmen hesaplarını
         üniversite açar.
@@ -74,11 +78,7 @@ export default function RegisterPage() {
           required
           minLength={authService.minPassword}
         />
-        {error && (
-          <p role="alert" className="text-base text-danger">
-            {error}
-          </p>
-        )}
+        {error && <ErrorText>{error}</ErrorText>}
         <Button type="submit" variant="primary" size="lg" loading={saving} className="mt-2 w-full">
           Öğrenci hesabı oluştur
         </Button>
@@ -86,7 +86,7 @@ export default function RegisterPage() {
 
       <p className="mt-10 text-base text-graphite">
         Zaten hesabın var mı?{" "}
-        <Link to="/login" className="font-medium text-accent hover:text-accent-hover">
+        <Link to="/login" className="link font-semibold">
           Giriş yap
         </Link>
       </p>

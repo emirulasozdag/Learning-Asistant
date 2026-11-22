@@ -1,9 +1,9 @@
 /**
- * Arayüz temaları. Renk değerleri `themes.css` içinde, `html[data-theme]` altında tanımlıdır;
- * burada yalnızca seçicinin gösterdiği bilgi durur. "Sade" uygulamanın taban paletidir
- * (index.css `@theme`), üzerine bir şey yazmaz.
+ * Arayüz temaları. Açık tema ("Dipnot") uygulamanın taban paletidir (index.css `@theme`); koyu tema
+ * ("Gece") themes.css'te `html[data-theme="gece"]` altında üzerine yazar. Burada yalnızca
+ * seçicinin gösterdiği bilgi durur.
  */
-export type ThemeId = "pastel-acik" | "pastel-koyu" | "bordo-pastel" | "sade" | "kagit";
+export type ThemeId = "dipnot" | "gece";
 
 export type ColorScheme = "light" | "dark";
 
@@ -19,44 +19,33 @@ export interface ThemeOption {
 
 export const THEMES: readonly ThemeOption[] = [
   {
-    id: "pastel-acik",
-    label: "Pastel açık",
+    id: "dipnot",
+    label: "Açık",
     scheme: "light",
-    swatch: { ground: "#f6f5fb", accent: "#5b57c9" },
-    description: "Açık lavanta zemin, sakin mor vurgu.",
+    swatch: { ground: "#f6f7f9", accent: "#102e6e" },
+    description: "Açık zemin, üniversite lacivertı.",
   },
   {
-    id: "pastel-koyu",
-    label: "Pastel koyu",
+    id: "gece",
+    label: "Koyu",
     scheme: "dark",
-    swatch: { ground: "#1f1e27", accent: "#e3a3b8" },
-    description: "Koyu zemin, gözü yormayan pastel gül vurgu.",
-  },
-  {
-    id: "bordo-pastel",
-    label: "Bordo pastel",
-    scheme: "light",
-    swatch: { ground: "#f4f1ec", accent: "#9a1f36" },
-    description: "Sıcak kırık beyaz zemin, akademik bordo vurgu.",
-  },
-  {
-    id: "sade",
-    label: "Sade",
-    scheme: "light",
-    swatch: { ground: "#f3f4f8", accent: "#9a1f36" },
-    description: "Soğuk nötr zemin, kurumsal görünüm.",
-  },
-  {
-    id: "kagit",
-    label: "Kâğıt",
-    scheme: "light",
-    swatch: { ground: "#f7f6f1", accent: "#2b5a8a" },
-    description: "Defter kâğıdı zemin, mürekkep mavisi vurgu.",
+    swatch: { ground: "#0e1626", accent: "#8fb0ff" },
+    description: "Koyu zemin; gece çalışırken gözü yormaz.",
   },
 ];
 
-export const DEFAULT_THEME: ThemeId = "bordo-pastel";
+export const DEFAULT_THEME: ThemeId = "dipnot";
+
+/** Önceki sürümün tema kimlikleri: koyu temayı seçen koyuda, diğerleri açıkta kalır. */
+const LEGACY_THEMES: Record<string, ThemeId> = {
+  "pastel-koyu": "gece",
+  "pastel-acik": "dipnot",
+  "bordo-pastel": "dipnot",
+  sade: "dipnot",
+  kagit: "dipnot",
+};
 
 export function findTheme(id: string | null | undefined): ThemeOption | undefined {
-  return THEMES.find((theme) => theme.id === id);
+  const resolved = id && id in LEGACY_THEMES ? LEGACY_THEMES[id] : id;
+  return THEMES.find((theme) => theme.id === resolved);
 }

@@ -24,7 +24,7 @@ export default function SourceFrames({
   if (frames.length === 0) return null;
   return (
     <section aria-labelledby="source-frames" className={className}>
-      <h3 id="source-frames" className="text-sm font-medium text-ink">
+      <h3 id="source-frames" className="text-sm font-semibold text-ink">
         Bu kısımda ekranda
       </h3>
       <ul className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -38,7 +38,7 @@ export default function SourceFrames({
                 className="flex w-full flex-col gap-1 rounded-control p-1 text-left hover:bg-subtle focus-visible:outline-2 focus-visible:outline-accent"
               >
                 <FrameImage frame={frame} compact />
-                <span className="font-mono text-xs text-graphite tabular-nums">{formatTime(frame.t_start)}</span>
+                <span className="text-xs text-graphite tabular-nums">{formatTime(frame.t_start)}</span>
               </button>
             ) : (
               <div className="flex flex-col gap-1 p-1">
@@ -47,7 +47,7 @@ export default function SourceFrames({
                   onOpen={() => setEnlarged(frame)}
                   openLabel={`${formatTime(frame.t_start)} karesini büyüt`}
                 />
-                <span className="font-mono text-xs text-graphite tabular-nums">{formatTime(frame.t_start)}</span>
+                <span className="text-xs text-graphite tabular-nums">{formatTime(frame.t_start)}</span>
               </div>
             )}
           </li>

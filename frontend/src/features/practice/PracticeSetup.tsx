@@ -5,10 +5,15 @@ import { Link } from "react-router";
 import { MAX_TOPIC_CHARS, type ConceptProgress, type Difficulty, type PracticeType } from "../../api/types";
 import Button from "../../ui/Button";
 import { cx } from "../../ui/cx";
+import ErrorText from "../../ui/ErrorText";
 import { inputClasses } from "../../ui/Field";
+import Notice from "../../ui/Notice";
 import SegmentedControl, { type SegmentOption } from "../../ui/SegmentedControl";
 import { DIFFICULTY_LABEL, TYPE_DETAILS, TYPE_LABEL, conceptLabel } from "./labels";
 import type { PracticeSettings } from "./usePracticeSession";
+
+/** Konu alanı: sayfanın ana girdisi olduğu için standart alandan yüksek ve büyük yazılı. */
+const setupField = cx(inputClasses.replace(/(^|\s)(h-10|text-base)(?=\s|$)/g, "$1").trim(), "h-12 text-md");
 
 const TYPES: PracticeType[] = ["mcq", "short_answer", "code_tracing"];
 const DIFFICULTIES: Difficulty[] = ["easy", "medium", "hard"];
@@ -80,19 +85,21 @@ export default function PracticeSetup({
   return (
     <form onSubmit={submit} noValidate className="flex flex-col gap-8">
       {activeQuestions > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-panel border border-accent-line bg-accent-soft/50 px-4 py-3">
-          <p className="text-base text-ink">
-            Süren bir oturumun var: <span className="font-semibold">{activeQuestions} soru</span>. Ayarları
-            değiştirip yeni soruyla sürdürebilir ya da kaldığın yere dönebilirsin.
-          </p>
-          <Button size="sm" trailingIcon={ArrowRight} onClick={onResume}>
-            Oturuma dön
-          </Button>
-        </div>
+        <Notice
+          tone="info"
+          action={
+            <Button size="sm" trailingIcon={ArrowRight} onClick={onResume}>
+              Oturuma dön
+            </Button>
+          }
+        >
+          Süren bir oturumun var: <span className="font-semibold text-ink">{activeQuestions} soru</span>. Ayarları
+          değiştirip yeni soruyla sürdürebilir ya da kaldığın yere dönebilirsin.
+        </Notice>
       )}
 
       <section aria-labelledby={`${inputId}-title`}>
-        <h2 id={`${inputId}-title`} className="text-xl font-semibold text-ink">
+        <h2 id={`${inputId}-title`} className="text-xl font-bold text-ink">
           Ne çalışmak istiyorsun?
         </h2>
         <p className="mt-1 text-base text-graphite">
@@ -114,7 +121,7 @@ export default function PracticeSetup({
               autoComplete="off"
               aria-invalid={error ? true : undefined}
               aria-describedby={error ? `${inputId}-error` : undefined}
-              className={cx(inputClasses, "h-12 text-md")}
+              className={setupField}
             />
           </div>
           {pool.length > 1 && (
@@ -124,14 +131,14 @@ export default function PracticeSetup({
           )}
         </div>
         {error && (
-          <p id={`${inputId}-error`} className="mt-1.5 text-sm text-danger">
-            {error}
-          </p>
+          <div id={`${inputId}-error`} className="mt-1.5">
+            <ErrorText>{error}</ErrorText>
+          </div>
         )}
 
         {gaps.length > 0 && (
           <div className="mt-6">
-            <h3 className="text-sm font-semibold text-ink-2">Tekrar etmen gerekenler</h3>
+            <h3 className="text-sm font-semibold text-graphite">Tekrar etmen gerekenler</h3>
             <p className="text-sm text-graphite">Öğrenme kaydında hâlâ eksiği görünen kavramlar.</p>
             <ul className="mt-2 grid gap-2 sm:grid-cols-2">
               {gaps.map((gap) => {
@@ -146,7 +153,9 @@ export default function PracticeSetup({
                       onClick={() => pick(label)}
                       className={cx(
                         "flex w-full flex-col gap-2 rounded-panel border px-3 py-2.5 text-left transition-colors",
-                        active ? "border-accent bg-accent-soft/60" : "border-line bg-surface hover:border-line-strong",
+                        active
+                          ? "border-accent-line bg-accent-soft"
+                          : "border-line bg-surface hover:border-line-strong",
                       )}
                     >
                       <span className="text-base font-medium text-ink">{label}</span>
@@ -171,25 +180,22 @@ export default function PracticeSetup({
 
         {topics.length > 0 && (
           <div className="mt-6">
-            <h3 className="text-sm font-semibold text-ink-2">Dersin konuları</h3>
-            <ul className="mt-2 flex flex-wrap gap-1.5">
+            <h3 className="text-sm font-semibold text-graphite">Dersin konuları</h3>
+            <ul className="mt-2 flex flex-wrap gap-2">
               {topics.map((candidate) => {
                 const active = topic.trim() === candidate;
                 return (
-                  <li key={candidate}>
-                    <button
-                      type="button"
+                  <li key={candidate} className="max-w-full">
+                    <Button
+                      size="sm"
                       aria-pressed={active}
                       onClick={() => pick(candidate)}
-                      className={cx(
-                        "rounded-full border px-3 py-1 text-sm transition-colors",
-                        active
-                          ? "border-accent bg-accent text-on-accent"
-                          : "border-line bg-surface text-ink-2 hover:border-line-strong hover:text-ink",
-                      )}
+                      // Seçili konu: `!` ikincil düğmenin zeminini ve çizgisini ezer (sınıflar birleştirilmez).
+                      title={candidate}
+                      className={cx("max-w-full", active && "border-accent-line! bg-accent-soft! text-accent!")}
                     >
-                      {candidate}
-                    </button>
+                      <span className="min-w-0 truncate">{candidate}</span>
+                    </Button>
                   </li>
                 );
               })}

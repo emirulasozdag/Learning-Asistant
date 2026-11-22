@@ -69,7 +69,7 @@ export default function EvidencePanel({
             <Skeleton className="h-4 w-48" />
           )}
         </div>
-        {location && <span className="shrink-0 font-mono text-xs text-graphite">{location}</span>}
+        {location && <span className="shrink-0 text-sm text-graphite tabular-nums">{location}</span>}
         {source && (
           <IconButton
             icon={copied ? Check : Copy}
@@ -104,7 +104,7 @@ export default function EvidencePanel({
       ) : !source ? (
         <Skeleton className="aspect-[1/1.25] w-full rounded-panel" />
       ) : (
-        <div className="flex flex-col gap-4 rounded-panel border border-line bg-sheet p-4 shadow-lift">
+        <div className="flex flex-col gap-4 rounded-panel border border-line bg-sheet p-4">
           {isPdf ? (
             <PageImage
               key={source.source_id}
@@ -115,7 +115,7 @@ export default function EvidencePanel({
             />
           ) : isVideo ? (
             <div className="flex flex-col gap-3">
-              <p className="flex items-center gap-2 font-mono text-sm text-ink">
+              <p className="flex items-center gap-2 text-sm font-medium text-ink tabular-nums">
                 <PlayCircle size={16} aria-hidden className="text-accent" />
                 {source.t_start != null ? formatTimeRange(source.t_start, source.t_end) : "Ders videosu"}
               </p>
@@ -130,7 +130,7 @@ export default function EvidencePanel({
                   Videoda bu ana git
                 </Button>
               )}
-              <blockquote className="border-l-2 border-marker pl-3 font-mono text-sm leading-relaxed whitespace-pre-wrap text-ink">
+              <blockquote className="border-l-2 border-marker pl-3 font-serif text-md whitespace-pre-wrap text-ink">
                 <span key={source.source_id} ref={anchorRef} className="marker-sweep">
                   {source.text}
                 </span>
@@ -138,7 +138,7 @@ export default function EvidencePanel({
               <SourceFrames frames={source.frames ?? []} onPlayAt={source.media_url ? onPlayAt : undefined} className="" />
             </div>
           ) : (
-            <p className="font-mono text-sm leading-relaxed whitespace-pre-wrap text-ink">
+            <p className="font-serif text-md whitespace-pre-wrap text-ink">
               <span key={source.source_id} ref={anchorRef} className="marker-sweep">
                 {source.text}
               </span>
@@ -150,7 +150,7 @@ export default function EvidencePanel({
               <summary className="cursor-pointer text-sm text-graphite hover:text-ink">
                 Alıntılanan bölümü metin olarak göster
               </summary>
-              <p className="mt-2 font-mono text-sm leading-relaxed whitespace-pre-wrap text-ink">
+              <p className="mt-2 font-serif text-md whitespace-pre-wrap text-ink">
                 {source.text}
               </p>
             </details>
@@ -163,10 +163,10 @@ export default function EvidencePanel({
       )}
 
       {source && (
-        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 font-mono text-xs">
+        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm">
           {claimNumber != null && (
-            <span className="text-accent">
-              {claimNumber} → {source.document_title}
+            <span className="font-medium text-accent">
+              {claimNumber}. cümlenin kaynağı: {source.document_title}
               {location ? `, ${location}` : ""}
             </span>
           )}

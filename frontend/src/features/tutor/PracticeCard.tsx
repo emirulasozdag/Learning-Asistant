@@ -2,10 +2,13 @@ import { ClipboardCheck, Repeat, Target } from "lucide-react";
 import { useId, useState } from "react";
 
 import { ApiError } from "../../api/client";
+import { userMessage } from "../../api/errors";
 import type { AnswerFeedback, PracticeItem } from "../../api/types";
 import { practiceService } from "../../services/practiceService";
 import Badge from "../../ui/Badge";
 import Button from "../../ui/Button";
+import Card from "../../ui/Card";
+import ErrorText from "../../ui/ErrorText";
 import { AnswerText, ChoiceList } from "../practice/AnswerInput";
 import { DIFFICULTY_LABEL, TYPE_LABEL } from "../practice/labels";
 import PracticeFeedback from "../practice/PracticeFeedback";
@@ -62,7 +65,7 @@ function PracticeCard({
       );
     } catch (reason) {
       const failure = classifyFailure(reason);
-      setError(failure.detail || "Cevap şu an değerlendirilemedi. Biraz sonra tekrar dene.");
+      setError(failure.detail || userMessage(reason, "Cevap şu an değerlendirilemedi. Biraz sonra tekrar dene."));
     } finally {
       setSubmitting(false);
     }
@@ -87,17 +90,16 @@ function PracticeCard({
       const failure = classifyFailure(reason);
       // Yapay zekâya ulaşılamıyorsa backend'in açıklaması gösterilir (503, `ai_unavailable`).
       const unavailable = reason instanceof ApiError && reason.code === "ai_unavailable";
-      setError((unavailable ? reason.message : failure.detail) || "Yeni soru şu an hazırlanamadı.");
+      setError(
+        (unavailable ? reason.message : failure.detail) || userMessage(reason, "Yeni soru şu an hazırlanamadı. Tekrar dene."),
+      );
     } finally {
       setNextLoading(null);
     }
   }
 
   return (
-    <section
-      aria-label="Pratik sorusu"
-      className="rounded-panel border border-line bg-surface px-4 py-4 shadow-card"
-    >
+    <Card as="section" aria-label="Pratik sorusu" padding="md">
       <div className="mb-3 flex flex-wrap items-center gap-1.5">
         <span className="mr-1 flex items-center gap-1.5 text-sm font-medium text-ink-2">
           <ClipboardCheck size={14} aria-hidden className="text-accent" />
@@ -108,7 +110,7 @@ function PracticeCard({
         {item.topic && <Badge tone="accent">{item.topic}</Badge>}
       </div>
 
-      <div className="text-md leading-7 text-ink">
+      <div className="font-serif text-md text-ink">
         <RichText text={item.prompt} />
       </div>
 
@@ -136,11 +138,7 @@ function PracticeCard({
         </div>
       )}
 
-      {error && (
-        <p role="alert" className="mt-3 text-sm text-danger">
-          {error}
-        </p>
-      )}
+      {error && <ErrorText className="mt-3">{error}</ErrorText>}
 
       {feedback && (
         <div className="mt-4 border-t border-line pt-4">
@@ -149,7 +147,7 @@ function PracticeCard({
       )}
 
       <div className="mt-4">
-        <p className="mb-2 text-sm text-graphite">Sorunun dayandığı bölüm</p>
+        <p className="mb-2 text-sm font-semibold text-graphite">Sorunun dayandığı bölüm</p>
         <SourceCards citations={[item.source]} numbered={false} {...select} />
       </div>
 
@@ -182,6 +180,6 @@ function PracticeCard({
           )}
         </div>
       )}
-    </section>
+    </Card>
   );
 }

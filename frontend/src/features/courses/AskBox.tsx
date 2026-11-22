@@ -3,6 +3,12 @@ import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router";
 
 import type { Course } from "../../services/courseService";
+import Button from "../../ui/Button";
+import { cx } from "../../ui/cx";
+import { inputClasses } from "../../ui/Field";
+
+/** Alan biçimi, karşılama alanına göre daha yüksek: yükseklik, iç boşluk ve yazı boyu burada verilir. */
+const askField = inputClasses.replace(/(^|\s)(h-10|px-3|text-base)(?=\s|$)/g, "$1").trim();
 
 /**
  * Ana sayfadaki büyük soru kutusu: ders seç, sorunu yaz, AI Tutor'da cevabı al.
@@ -22,10 +28,7 @@ export default function AskBox({ courses }: { courses: Course[] }) {
   }
 
   return (
-    <form
-      onSubmit={submit}
-      className="flex flex-col overflow-hidden rounded-panel border border-line-strong bg-surface shadow-card focus-within:border-accent focus-within:ring-3 focus-within:ring-accent/12 sm:flex-row"
-    >
+    <form onSubmit={submit} className="flex flex-col gap-2 sm:flex-row sm:items-center">
       <label htmlFor="home-question" className="sr-only">
         Sorun
       </label>
@@ -34,18 +37,18 @@ export default function AskBox({ courses }: { courses: Course[] }) {
         value={question}
         onChange={(event) => setQuestion(event.target.value)}
         placeholder="Ders notlarına bir soru sor…"
-        className="h-14 w-full min-w-0 shrink-0 bg-transparent px-5 text-md text-ink placeholder:text-faint focus:outline-none sm:w-auto sm:flex-1"
+        className={cx(askField, "h-12 min-w-0 px-4 text-md sm:flex-1")}
       />
-      <div className="flex border-t border-line sm:border-t-0 sm:border-l">
+      <div className="flex items-center gap-2">
         <label htmlFor="home-course" className="sr-only">
           Ders
         </label>
-        <div className="relative flex-1 sm:flex-none">
+        <div className="relative min-w-0 flex-1 sm:w-60 sm:flex-none">
           <select
             id="home-course"
             value={courseId}
             onChange={(event) => setCourseId(Number(event.target.value))}
-            className="h-14 w-full appearance-none truncate bg-transparent pr-9 pl-4 text-base font-medium text-ink-2 focus:outline-none sm:w-64"
+            className={cx(askField, "h-12 appearance-none truncate pr-9 pl-3 text-base font-medium")}
           >
             {courses.map((course) => (
               <option key={course.id} value={course.id}>
@@ -59,13 +62,7 @@ export default function AskBox({ courses }: { courses: Course[] }) {
             className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-graphite"
           />
         </div>
-        <button
-          type="submit"
-          aria-label="Sor"
-          className="flex h-14 w-14 shrink-0 items-center justify-center bg-accent text-on-accent transition-colors hover:bg-accent-hover"
-        >
-          <ArrowRight size={20} aria-hidden />
-        </button>
+        <Button type="submit" variant="primary" size="icon" icon={ArrowRight} aria-label="Sor" />
       </div>
     </form>
   );

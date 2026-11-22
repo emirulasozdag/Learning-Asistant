@@ -65,7 +65,7 @@ export default function AppShell() {
           {mobileOpen && (
             <div className="fixed inset-0 z-40 md:hidden">
               <div
-                className="fade-in absolute inset-0 bg-ink/30"
+                className="fade-in absolute inset-0 bg-scrim"
                 onClick={() => setMobileOpen(false)}
                 aria-hidden
               />

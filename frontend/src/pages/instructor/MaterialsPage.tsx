@@ -1,8 +1,9 @@
-import { CircleAlert, ServerOff } from "lucide-react";
+import { FileUp, ServerOff } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router";
 
 import { ApiError } from "../../api/client";
+import { userMessage } from "../../api/errors";
 import type { DocumentOut, IngestionReport } from "../../api/types";
 import DocumentDrawer from "../../features/materials/DocumentDrawer";
 import Dropzone from "../../features/materials/Dropzone";
@@ -13,13 +14,16 @@ import { courseService, guessMaterialType } from "../../services/courseService";
 import { documentExtent, materialTotals } from "../../labels";
 import { formatTime } from "../../text";
 import Button from "../../ui/Button";
+import CheckboxCard from "../../ui/CheckboxCard";
 import Dialog from "../../ui/Dialog";
 import EmptyState from "../../ui/EmptyState";
+import Notice from "../../ui/Notice";
 import PageTitle from "../../ui/PageTitle";
 import { SkeletonRows } from "../../ui/Skeleton";
+import StatRow from "../../ui/StatRow";
 import { useToast } from "../../ui/toast/context";
 
-/** Dersin bilgi tabanı: yükle → parçala → vektörleştir; AI Tutor yalnızca buradan cevap verir. */
+/** Dersin bilgi tabanı: yükle → bölümlere ayır → aranabilir yap; AI Tutor yalnızca buradan cevap verir. */
 export default function MaterialsPage() {
   const courseId = Number(useParams().courseId);
   const toast = useToast();
@@ -102,7 +106,7 @@ export default function MaterialsPage() {
             : {
                 tone: "success",
                 title: `${document.title} yüklendi`,
-                description: `${documentExtent(document)}, ${document.chunk_count} parça; öğrenciler artık bu dokümandan soru sorabilir.`,
+                description: `${documentExtent(document)}, ${document.chunk_count} bölüm; öğrenciler artık bu dokümandan soru sorabilir.`,
               },
         );
         if (document.report) {
@@ -110,7 +114,7 @@ export default function MaterialsPage() {
           setReports((map) => ({ ...map, [document.id]: report }));
         }
       } catch (reason) {
-        const message = reason instanceof Error ? reason.message : String(reason);
+        const message = userMessage(reason, "Dosya yüklenemedi. Tekrar dene.");
         setPending((list) =>
           list.map((p) => (p.key === item.key ? { ...p, status: "failed", error: message } : p)),
         );
@@ -173,7 +177,7 @@ export default function MaterialsPage() {
       reloadDocuments();
       setToDelete(null);
     } catch (reason) {
-      setNotice(reason instanceof Error ? reason.message : String(reason));
+      setNotice(userMessage(reason, "Doküman silinemedi. Tekrar dene."));
     } finally {
       setDeleting(false);
     }
@@ -198,7 +202,7 @@ export default function MaterialsPage() {
         await courseService.materials(courseId).then(setDocuments, () => undefined);
         reloadDocuments();
       } else {
-        setNotice(reason instanceof Error ? reason.message : String(reason));
+        setNotice(userMessage(reason, "İşlem iptal edilemedi. Tekrar dene."));
       }
     } finally {
       setCancelling(false);
@@ -212,34 +216,30 @@ export default function MaterialsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageTitle
-        title="Materyaller"
-        description="Bu dersin AI Tutor'u yalnızca buradaki dokümanlardan cevap verir ve her cevabında dayandığı sayfayı gösterir."
-        actions={
-          documents &&
-          documents.length > 0 && (
-            <dl className="flex gap-8">
-              <Stat label="doküman" value={documents.length} />
-              {totals.hasPages && <Stat label="sayfa" value={totals.pages} />}
-              {totals.hasVideo && <Stat label="video süresi" value={formatTime(totals.videoSeconds)} />}
-              <Stat label="parça" value={totalChunks} />
-            </dl>
-          )
-        }
-      />
-
-      <label className="flex cursor-pointer items-start gap-3 rounded-panel border border-line bg-surface px-4 py-3">
-        <input
-          type="checkbox"
-          checked={declared}
-          onChange={(event) => setDeclared(event.target.checked)}
-          className="mt-1 size-4 accent-accent"
+      <div>
+        <PageTitle
+          title="Materyaller"
+          description="Bu dersin AI Tutor'u yalnızca buradaki dokümanlardan cevap verir ve her cevabında dayandığı sayfayı gösterir."
         />
-        <span className="text-base text-ink">
-          Yükleyeceğim dosyaların bu ders için kullanılmasına izin verilmiş materyal olduğunu ve cevap üretmek
-          için yapay zekâ servisine gönderilebileceğini (videolardan alınan slayt kareleri dahil) beyan ederim.
-        </span>
-      </label>
+        {documents && documents.length > 0 && (
+          <StatRow
+            className="mb-2"
+            stats={[
+              { label: "Doküman", value: documents.length },
+              ...(totals.hasPages ? [{ label: "Sayfa", value: totals.pages }] : []),
+              ...(totals.hasVideo ? [{ label: "Video süresi", value: formatTime(totals.videoSeconds) }] : []),
+              { label: "Aranabilir bölüm", value: totalChunks },
+            ]}
+          />
+        )}
+      </div>
+
+      <CheckboxCard
+        checked={declared}
+        onChange={setDeclared}
+        label="Materyal beyanı"
+        description="Yükleyeceğim dosyaların bu ders için kullanılmasına izin verilmiş materyal olduğunu ve cevap üretmek için yapay zekâ servisine gönderilebileceğini (videolardan alınan slayt kareleri dahil) beyan ederim."
+      />
 
       <Dropzone
         onFiles={(files) => void addFiles(files)}
@@ -257,12 +257,7 @@ export default function MaterialsPage() {
         />
       )}
 
-      {notice && (
-        <p role="alert" className="flex items-center gap-2 rounded-control bg-danger-soft px-3 py-2 text-base text-danger">
-          <CircleAlert size={14} aria-hidden />
-          {notice}
-        </p>
-      )}
+      {notice && <Notice tone="danger">{notice}</Notice>}
 
       {loadFailed ? (
         <EmptyState
@@ -275,10 +270,12 @@ export default function MaterialsPage() {
       ) : documents === null ? (
         <SkeletonRows rows={3} />
       ) : documents.length === 0 && pending.length === 0 ? (
-        <p className="py-4 text-center text-base text-graphite">
-          Henüz materyal yok. İlk ders notunu yükle; işlendikten sonra öğrenciler bu dersten soru
-          sorabilir.
-        </p>
+        <EmptyState
+          icon={FileUp}
+          title="Henüz materyal yok"
+          description="İlk ders notunu yükle; işlendikten sonra öğrenciler bu dersten soru sorabilir."
+          className="py-10"
+        />
       ) : (
         <MaterialsTable
           documents={documents}
@@ -343,7 +340,7 @@ export default function MaterialsPage() {
         title="Doküman silinsin mi?"
         description={
           toDelete
-            ? `“${toDelete.title}” ve ${toDelete.chunk_count} parçası bilgi tabanından kaldırılacak. AI Tutor bu dokümandan artık cevap veremez.`
+            ? `“${toDelete.title}” ve ${toDelete.chunk_count} bölümü bilgi tabanından kaldırılacak. AI Tutor bu dokümandan artık cevap veremez.`
             : undefined
         }
         footer={
@@ -359,15 +356,6 @@ export default function MaterialsPage() {
       >
         <p className="text-base text-graphite">Bu işlem geri alınamaz.</p>
       </Dialog>
-    </div>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: number | string }) {
-  return (
-    <div className="flex flex-col-reverse">
-      <dt className="text-sm text-graphite">{label}</dt>
-      <dd className="text-xl leading-tight font-bold text-ink tabular-nums">{value}</dd>
     </div>
   );
 }

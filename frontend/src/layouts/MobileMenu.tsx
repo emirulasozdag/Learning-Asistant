@@ -9,7 +9,7 @@ import { NAVIGATION, coursePath } from "./navigation";
 const itemClass = ({ isActive }: { isActive: boolean }) =>
   cx(
     "block rounded-control px-3 py-2.5 text-md",
-    isActive ? "font-semibold text-accent" : "text-ink hover:bg-subtle",
+    isActive ? "bg-accent-soft font-semibold text-accent" : "text-ink hover:bg-subtle",
   );
 
 /** Dar ekran menüsü: ana gezinme ve dersler (geniş ekranda üst bar ve ders sayfasının solu). */
@@ -19,7 +19,7 @@ export default function MobileMenu({ onNavigate }: { onNavigate: () => void }) {
   if (!user) return null;
   return (
     <aside aria-label="Menü" className="flex h-full flex-col overflow-y-auto bg-surface">
-      <div className="flex h-[4.5rem] shrink-0 items-center border-b border-line bg-surface px-5">
+      <div className="flex h-16 shrink-0 items-center border-b border-line bg-surface px-5">
         <Logo />
       </div>
       <nav className="flex flex-col gap-6 px-3 py-5">
@@ -38,7 +38,7 @@ export default function MobileMenu({ onNavigate }: { onNavigate: () => void }) {
           </li>
         </ul>
         <div className="border-t border-line pt-5">
-          <p className="px-3 text-sm font-bold tracking-wide text-ink uppercase">Derslerim</p>
+          <p className="px-3 text-sm font-semibold text-graphite">Derslerim</p>
           <ul className="mt-2">
             {courses.map((course) => (
               <li key={course.id}>

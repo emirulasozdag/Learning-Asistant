@@ -4,6 +4,7 @@ import { Link } from "react-router";
 
 import Button from "../../ui/Button";
 import { buttonClasses } from "../../ui/buttonStyles";
+import Card from "../../ui/Card";
 import StatRow from "../../ui/StatRow";
 import { conceptLabel } from "./labels";
 import { EntryRow } from "./PracticeSession";
@@ -61,7 +62,7 @@ export default function PracticeSummary({
   return (
     <section aria-labelledby={headingId} className="flex flex-col gap-8">
       <div>
-        <h2 ref={headingRef} id={headingId} tabIndex={-1} className="text-xl font-semibold text-ink outline-none">
+        <h2 ref={headingRef} id={headingId} tabIndex={-1} className="text-xl font-bold text-ink outline-none">
           Oturum özeti
         </h2>
         {settings && <p className="mt-1 text-base text-graphite">Konu: {settings.topic}</p>}
@@ -77,15 +78,17 @@ export default function PracticeSummary({
 
       {missing.length > 0 && (
         <div>
-          <h3 className="text-base font-semibold text-ink">Üzerinde çalışman gerekenler</h3>
+          <h3 className="text-lg font-bold text-ink">Üzerinde çalışman gerekenler</h3>
           <p className="text-sm text-graphite">Cevaplarında eksik ya da yanlış görünen kavramlar.</p>
           <ul className="mt-3 flex flex-col gap-2">
             {missing.map((concept) => (
-              <li
+              <Card
+                as="li"
+                padding="sm"
                 key={concept}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-panel border border-warning/30 bg-warning-soft px-3 py-2"
+                className="flex flex-wrap items-center justify-between gap-2 border-l-4 border-l-warning"
               >
-                <span className="text-base text-ink">{concept}</span>
+                <span className="min-w-0 text-base text-ink">{concept}</span>
                 <Button
                   size="sm"
                   icon={Target}
@@ -99,7 +102,7 @@ export default function PracticeSummary({
                 >
                   Bu kavramla çalış
                 </Button>
-              </li>
+              </Card>
             ))}
           </ul>
         </div>
@@ -107,7 +110,7 @@ export default function PracticeSummary({
 
       {understood.length > 0 && (
         <div>
-          <h3 className="text-base font-semibold text-ink">Kavradıkların</h3>
+          <h3 className="text-lg font-bold text-ink">Kavradıkların</h3>
           <ul className="mt-2 flex flex-wrap gap-1.5">
             {understood.map((concept) => (
               <li key={concept} className="rounded-full bg-success-soft px-3 py-1 text-sm text-success">
@@ -120,14 +123,16 @@ export default function PracticeSummary({
 
       {entries.length > 0 && (
         <div>
-          <h3 className="text-base font-semibold text-ink">Sorular</h3>
-          <ol className="mt-2 flex flex-col divide-y divide-line rounded-panel border border-line bg-surface px-4">
-            {entries.map((entry, index) => (
-              <li key={entry.item.id} className="py-2.5">
-                <EntryRow entry={entry} number={index + 1} />
-              </li>
-            ))}
-          </ol>
+          <h3 className="text-lg font-bold text-ink">Sorular</h3>
+          <Card padding="none" className="mt-3 px-4">
+            <ol className="flex flex-col divide-y divide-line">
+              {entries.map((entry, index) => (
+                <li key={entry.item.id} className="py-3">
+                  <EntryRow entry={entry} number={index + 1} />
+                </li>
+              ))}
+            </ol>
+          </Card>
         </div>
       )}
 

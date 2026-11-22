@@ -4,7 +4,10 @@ import { useEffect, useId, useRef, useState } from "react";
 import type { AnswerFeedback, AnswerSubmission } from "../../api/types";
 import Badge from "../../ui/Badge";
 import Button from "../../ui/Button";
+import Card from "../../ui/Card";
 import { cx } from "../../ui/cx";
+import ErrorText from "../../ui/ErrorText";
+import Notice from "../../ui/Notice";
 import { classifyFailure } from "../tutor/outcome";
 import RichText from "../tutor/RichText";
 import SourceCards from "../tutor/SourceCards";
@@ -44,12 +47,9 @@ export default function PracticeSessionView({
       {generating ? (
         <GeneratingCard topic={settings?.topic} onCancel={session.cancel} />
       ) : failure ? (
-        <div role="alert" className="rounded-panel border border-danger/30 bg-danger-soft px-5 py-4">
-          <p className="text-base font-medium text-ink">{failure.detail}</p>
+        <Notice tone="danger" title={failure.detail}>
           {failure.kind === "no_item" && (
-            <p className="mt-1 text-sm text-graphite">
-              Konuyu farklı kelimelerle yazmayı ya da başka bir soru türü seçmeyi dene.
-            </p>
+            <p className="text-sm">Konuyu farklı kelimelerle yazmayı ya da başka bir soru türü seçmeyi dene.</p>
           )}
           <div className="mt-3 flex flex-wrap gap-2">
             {failure.kind !== "rejected" && (
@@ -61,7 +61,7 @@ export default function PracticeSessionView({
               Konuyu ya da türü değiştir
             </Button>
           </div>
-        </div>
+        </Notice>
       ) : current ? (
         <QuestionCard
           key={current.item.id}
@@ -84,9 +84,9 @@ function SessionBar({ session }: { session: PracticeSession }) {
   const correct = answered.filter((entry) => entry.feedback!.score >= entry.feedback!.max_score).length;
   return (
     // Geniş ekranda kaydırırken üstte kalır; telefonda yer kaplamasın diye akışta durur.
-    <div className="z-10 flex flex-wrap items-center gap-x-5 gap-y-3 rounded-panel border border-line bg-surface/95 px-4 py-3 shadow-card backdrop-blur sm:sticky sm:top-0">
+    <div className="z-10 flex flex-wrap items-center gap-x-5 gap-y-3 rounded-panel border border-line bg-surface/95 px-4 py-3 backdrop-blur sm:sticky sm:top-0">
       <div className="min-w-0 flex-1">
-        <p className="text-xs font-medium tracking-wide text-graphite uppercase">Konu</p>
+        <p className="text-sm font-semibold text-graphite">Konu</p>
         <p className="truncate text-md font-semibold text-ink">{settings?.topic ?? "Pratik"}</p>
         {settings && (
           <p className="mt-0.5 flex flex-wrap gap-1.5">
@@ -115,7 +115,7 @@ function SessionBar({ session }: { session: PracticeSession }) {
             );
           })}
           {generating && (
-            <li aria-hidden className="size-2.5 animate-pulse rounded-full border border-line-strong bg-subtle" />
+            <li aria-hidden className="skeleton size-2.5 rounded-full" />
           )}
         </ol>
         <p className="text-sm text-graphite tabular-nums">
@@ -137,11 +137,7 @@ function SessionBar({ session }: { session: PracticeSession }) {
 
 function GeneratingCard({ topic, onCancel }: { topic?: string; onCancel: () => void }) {
   return (
-    <div
-      role="status"
-      aria-live="polite"
-      className="rounded-panel border border-line bg-surface px-5 py-6 shadow-card"
-    >
+    <Card role="status" aria-live="polite">
       <p className="flex items-center gap-2 text-base font-medium text-ink">
         <LoaderCircle size={16} aria-hidden className="animate-spin text-accent" />
         Soru hazırlanıyor
@@ -151,16 +147,16 @@ function GeneratingCard({ topic, onCancel }: { topic?: string; onCancel: () => v
         bağımsız bir çözümle kontrol ediliyor. Bu genellikle 5–15 saniye sürer.
       </p>
       <div aria-hidden className="mt-5 flex flex-col gap-2.5">
-        <span className="h-4 w-4/5 animate-pulse rounded bg-subtle" />
-        <span className="h-4 w-3/5 animate-pulse rounded bg-subtle" />
+        <span className="skeleton block h-4 w-4/5 rounded" />
+        <span className="skeleton block h-4 w-3/5 rounded" />
         {[0, 1, 2, 3].map((index) => (
-          <span key={index} className="h-10 w-full animate-pulse rounded-panel bg-subtle/70" />
+          <span key={index} className="skeleton block h-10 w-full rounded-control" />
         ))}
       </div>
       <Button size="sm" variant="ghost" className="mt-4" onClick={onCancel}>
         Vazgeç
       </Button>
-    </div>
+    </Card>
   );
 }
 
@@ -261,16 +257,13 @@ function QuestionCard({
   }, [feedback, mcq, optionCount, session]);
 
   return (
-    <section
-      aria-labelledby={`${name}-title`}
-      className="rounded-panel border border-line bg-surface px-5 py-5 shadow-card sm:px-6"
-    >
+    <Card as="section" aria-labelledby={`${name}-title`}>
       <div className="flex flex-wrap items-center gap-2">
         <h2
           ref={headingRef}
           id={`${name}-title`}
           tabIndex={-1}
-          className="text-sm font-semibold tracking-wide text-accent uppercase outline-none focus-visible:underline"
+          className="text-sm font-semibold text-accent outline-none focus-visible:underline"
         >
           Soru {number}
         </h2>
@@ -324,11 +317,7 @@ function QuestionCard({
         </div>
       ) : null}
 
-      {error && (
-        <p role="alert" className="mt-3 text-sm text-danger">
-          {error}
-        </p>
-      )}
+      {error && <ErrorText className="mt-3">{error}</ErrorText>}
 
       {feedback && (
         <>
@@ -337,7 +326,7 @@ function QuestionCard({
           </div>
 
           <div className="mt-5">
-            <p className="mb-2 text-sm font-medium text-ink-2">Cevabını kaynakla karşılaştır</p>
+            <p className="mb-2 text-sm font-semibold text-graphite">Cevabını kaynakla karşılaştır</p>
             <SourceCards
               citations={[item.source]}
               numbered={false}
@@ -362,7 +351,7 @@ function QuestionCard({
           </div>
         </>
       )}
-    </section>
+    </Card>
   );
 }
 

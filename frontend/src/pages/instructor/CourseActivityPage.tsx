@@ -1,4 +1,4 @@
-import { CircleCheck, MessageSquareText, ServerOff } from "lucide-react";
+import { CircleCheck, MessageSquareText, PenLine, ServerOff } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router";
 
@@ -81,7 +81,7 @@ function ActivityBody() {
 
   const rate = (count: number) => `%${Math.round((count / activity.questions) * 100)}`;
   return (
-    <div className="flex flex-col gap-12">
+    <div className="flex flex-col gap-10">
       <section>
         <StatRow
           stats={[
@@ -94,7 +94,7 @@ function ActivityBody() {
         <OutcomeBar activity={activity} />
       </section>
 
-      <div className="grid gap-12 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+      <div className="grid gap-10 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
         <section>
           <SectionHeader title="Son 14 günde sorular" />
           <DailyChart daily={activity.daily} />
@@ -146,7 +146,7 @@ function ReviewableQuestions({ activity }: { activity: CourseActivity }) {
   };
 
   return (
-    <div className="grid gap-12 xl:grid-cols-2">
+    <div className="grid gap-10 xl:grid-cols-2">
       <section>
         <SectionHeader
           title="Materyalde bulunamayan sorular"
@@ -209,7 +209,6 @@ function OutcomeBar({ activity }: { activity: CourseActivity }) {
   );
 }
 
-
 /** Tek seri sütun grafiği: ince çubuklar, üzerine gelince değer; ekran okuyucu için tablo. */
 function DailyChart({ daily }: { daily: CourseActivity["daily"] }) {
   const max = Math.max(1, ...daily.map((d) => d.questions));
@@ -237,7 +236,7 @@ function DailyChart({ daily }: { daily: CourseActivity["daily"] }) {
                 )}
                 style={{ height: `${(day.questions / max) * 100}%` }}
               />
-              <span className="pointer-events-none absolute bottom-full mb-1.5 hidden rounded-control bg-nav px-2 py-1 text-xs whitespace-nowrap text-white group-hover:block">
+              <span className="pointer-events-none absolute bottom-full mb-1.5 hidden rounded-control bg-chrome px-2 py-1 text-xs whitespace-nowrap text-chrome-ink group-hover:block">
                 {formatDay(day.day)}: {day.questions} soru
               </span>
             </div>
@@ -264,7 +263,7 @@ function DailyChart({ daily }: { daily: CourseActivity["daily"] }) {
 }
 
 function TopSources({ sources }: { sources: CourseActivity["top_sources"] }) {
-  if (sources.length === 0) return <p className="text-base text-graphite">Henüz alıntı yok.</p>;
+  if (sources.length === 0) return <EmptyList>Henüz alıntı yok.</EmptyList>;
   const max = Math.max(...sources.map((s) => s.citations));
   return (
     <ol className="flex flex-col divide-y divide-line border-y border-line">
@@ -303,7 +302,7 @@ const OUTCOME_BADGES: Record<string, { label: string; tone: "success" | "neutral
 };
 
 function QuestionList({ items, empty, review }: { items: QuestionItem[]; empty: string; review: ReviewControls }) {
-  if (items.length === 0) return <p className="text-base text-graphite">{empty}</p>;
+  if (items.length === 0) return <EmptyList>{empty}</EmptyList>;
   return (
     <ul className="flex flex-col divide-y divide-line border-y border-line">
       {items.map((item, index) => {
@@ -342,24 +341,30 @@ function ReviewActions({ messageId, item, review }: { messageId: number; item: Q
     );
   }
   return (
-    <div className="mt-1.5 flex gap-3 text-sm">
-      <button
-        type="button"
-        className="link disabled:opacity-50"
-        disabled={review.approving === messageId}
-        onClick={() => review.onApprove(messageId)}
-        aria-label={`Cevabı onayla: ${item.question}`}
-      >
-        Onayla
-      </button>
-      <button
-        type="button"
-        className="link"
+    <div className="mt-2 flex flex-wrap gap-2">
+      <Button
+        size="sm"
+        icon={PenLine}
         onClick={() => review.onCorrect(item)}
         aria-label={`Cevabı düzelt: ${item.question}`}
       >
         Düzelt
-      </button>
+      </Button>
+      <Button
+        size="sm"
+        variant="primary"
+        icon={CircleCheck}
+        loading={review.approving === messageId}
+        onClick={() => review.onApprove(messageId)}
+        aria-label={`Cevabı onayla: ${item.question}`}
+      >
+        Onayla
+      </Button>
     </div>
   );
+}
+
+/** Boş liste: bölüm başlığının altında tek satır, kartsız. */
+function EmptyList({ children }: { children: string }) {
+  return <p className="border-y border-line py-4 text-base text-graphite">{children}</p>;
 }

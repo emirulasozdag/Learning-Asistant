@@ -26,7 +26,7 @@ export default function Button({
   type = "button",
   ...props
 }: ButtonProps) {
-  const iconSize = size === "lg" ? 16 : 14;
+  const iconSize = size === "lg" || size === "icon" ? 18 : size === "md" ? 16 : 14;
   return (
     <button
       type={type}

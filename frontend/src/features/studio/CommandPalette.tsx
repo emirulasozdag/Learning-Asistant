@@ -96,7 +96,7 @@ function PaletteDialog({ onClose, courseId, base, onAsk }: Omit<CommandPalettePr
   const positions = new Map(commands.map((command, position) => [command.id, position]));
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[12vh]" onKeyDown={onKeyDown}>
-      <div className="fade-in absolute inset-0 bg-ink/30" onClick={onClose} aria-hidden />
+      <div className="fade-in absolute inset-0 bg-scrim" onClick={onClose} aria-hidden />
       <div
         role="dialog"
         aria-modal="true"

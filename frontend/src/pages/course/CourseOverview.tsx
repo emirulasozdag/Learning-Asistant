@@ -1,4 +1,4 @@
-import { MessageSquareText, Pencil, Upload } from "lucide-react";
+import { ArrowRight, MessageSquareText, Pencil, Upload } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
 
@@ -13,6 +13,8 @@ import { instructorService } from "../../services/instructorService";
 import { buttonClasses } from "../../ui/buttonStyles";
 import InlineError from "../../ui/InlineError";
 import Button from "../../ui/Button";
+import Card from "../../ui/Card";
+import Notice from "../../ui/Notice";
 import PageTitle from "../../ui/PageTitle";
 import { SkeletonRows } from "../../ui/Skeleton";
 import StatRow from "../../ui/StatRow";
@@ -41,19 +43,32 @@ export default function CourseOverview() {
         />
         {course.description ? (
           <p className="max-w-3xl text-md leading-relaxed whitespace-pre-line text-ink">{course.description}</p>
+        ) : instructor ? (
+          <Notice
+            action={
+              <Button size="sm" icon={Pencil} onClick={() => setEditing(true)}>
+                Açıklama ekle
+              </Button>
+            }
+          >
+            Dersin açıklaması henüz eklenmedi. Öğrencilerin dersi tanıması için kapsamı ve ön koşulları yaz.
+          </Notice>
         ) : (
-          <p className="text-md text-graphite">
-            {instructor
-              ? "Dersin açıklaması henüz eklenmedi. Öğrencilerin dersi tanıması için kapsamı ve ön koşulları yaz."
-              : "Bu dersin açıklaması henüz eklenmedi."}
-          </p>
+          <p className="text-md text-graphite">Bu dersin açıklaması henüz eklenmedi.</p>
         )}
       </section>
 
       {!instructor && (
-        <section className="flex flex-col gap-4 rounded-panel border border-line border-l-4 border-l-accent bg-surface px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
+        <Card
+          as="section"
+          variant="callout"
+          aria-labelledby="tutor-cta-title"
+          className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
+        >
           <div>
-            <h2 className="text-lg font-bold text-ink">AI Tutor'a soru sor</h2>
+            <h2 id="tutor-cta-title" className="text-lg font-bold text-ink">
+              AI Tutor'a soru sor
+            </h2>
             <p className="mt-1 text-base text-graphite">
               Cevaplar bu dersin materyaline dayanır ve dayandığı sayfayla birlikte gelir.
             </p>
@@ -62,7 +77,7 @@ export default function CourseOverview() {
             <MessageSquareText size={18} aria-hidden />
             AI Tutor'u aç
           </Link>
-        </section>
+        </Card>
       )}
 
       <section>
@@ -70,8 +85,9 @@ export default function CourseOverview() {
           level={2}
           title="Bu dersin materyali"
           actions={
-            <Link to={`${base}/materials`} className="link text-base">
+            <Link to={`${base}/materials`} className={buttonClasses("secondary", "sm")}>
               {instructor ? "Materyalleri yönet" : "Tüm materyaller"}
+              <ArrowRight size={14} aria-hidden className="opacity-70" />
             </Link>
           }
         />
@@ -112,15 +128,17 @@ function MaterialSummary({
   if (documents === null) return <SkeletonRows rows={2} />;
   if (documents.length === 0) {
     return instructor ? (
-      <div className="flex flex-col items-start gap-3">
-        <p className="text-md text-graphite">
-          Henüz materyal yok; öğrenciler bu derste AI Tutor'a soru soramaz.
-        </p>
-        <Link to={`${base}/materials`} className={buttonClasses("primary")}>
-          <Upload size={16} aria-hidden />
-          Materyal yükle
-        </Link>
-      </div>
+      <Notice
+        tone="warning"
+        action={
+          <Link to={`${base}/materials`} className={buttonClasses("primary", "sm")}>
+            <Upload size={14} aria-hidden />
+            Materyal yükle
+          </Link>
+        }
+      >
+        Henüz materyal yok; öğrenciler bu derste AI Tutor'a soru soramaz.
+      </Notice>
     ) : (
       <p className="text-md text-graphite">Eğitmen henüz materyal yüklemedi.</p>
     );
@@ -182,8 +200,9 @@ function ActivitySummary({ courseId, base }: { courseId: number; base: string })
         level={2}
         title="Öğrenci etkinliği"
         actions={
-          <Link to={`${base}/activity`} className="link text-base">
+          <Link to={`${base}/activity`} className={buttonClasses("secondary", "sm")}>
             Etkinlik ve analitik
+            <ArrowRight size={14} aria-hidden className="opacity-70" />
           </Link>
         }
       />

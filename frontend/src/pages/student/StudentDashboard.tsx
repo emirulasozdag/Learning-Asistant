@@ -1,5 +1,5 @@
-import { BookOpen, ServerOff } from "lucide-react";
-import { Fragment, useState } from "react";
+import { BookOpen, FolderOpen, MessageSquareText, ServerOff } from "lucide-react";
+import { useState } from "react";
 import { Link } from "react-router";
 
 import { useAuth } from "../../auth/useAuth";
@@ -9,19 +9,22 @@ import { useCourses } from "../../features/courses/context";
 import { useMaterialSummaries, type MaterialSummary } from "../../features/courses/useMaterialSummaries";
 import { courseMetaParts, describeTotals } from "../../labels";
 import type { Course } from "../../services/courseService";
-import { greeting } from "../../text";
+import { firstName, greeting } from "../../text";
 import Button from "../../ui/Button";
+import { buttonClasses } from "../../ui/buttonStyles";
+import Card from "../../ui/Card";
 import EmptyState from "../../ui/EmptyState";
 import PageTitle from "../../ui/PageTitle";
 import Skeleton, { SkeletonRows } from "../../ui/Skeleton";
+import { usePageTitle } from "../../ui/usePageTitle";
 
-/** Öğrenci ana sayfası: soru kutusu ve kayıtlı dersler (katalog listesi). */
+/** Öğrenci ana sayfası: soru kutusu ve kayıtlı dersler. */
 export default function StudentDashboard() {
   const { user } = useAuth();
   const { courses, loading, error, refresh } = useCourses();
   const summaries = useMaterialSummaries(courses);
   const [retrying, setRetrying] = useState(false);
-  const firstName = user?.name.split(" ")[0] ?? "";
+  usePageTitle("Derslerim");
 
   async function retry() {
     setRetrying(true);
@@ -32,14 +35,14 @@ export default function StudentDashboard() {
   return (
     <>
       <section className="border-b border-line bg-surface">
-        <div className="mx-auto max-w-[72rem] px-5 py-10 sm:px-8 lg:px-10">
+        <div className="mx-auto max-w-[76rem] px-5 py-10 sm:px-8 lg:py-12">
           <p className="text-md text-graphite">
-            {greeting()}, {firstName}
+            {greeting()}, {firstName(user?.name)}
           </p>
-          <h1 className="mt-1 text-[2.25rem] leading-tight font-bold tracking-tight text-ink">
+          <h1 className="mt-1 text-3xl font-semibold tracking-tight text-balance text-ink">
             Ders materyaline soru sor
           </h1>
-          <p className="mt-2 max-w-2xl text-md text-ink-2">
+          <p className="mt-3 max-w-2xl text-md text-ink-2">
             Cevaplar yalnızca dersinin materyaline dayanır ve dayandığı sayfayla birlikte gelir.
           </p>
           {courses.length > 0 && (
@@ -50,69 +53,70 @@ export default function StudentDashboard() {
         </div>
       </section>
 
-      <div className="page">
-        <PageTitle level={2} title="Derslerim" />
+      <div className="page flex flex-col gap-10">
+        <section>
+          <PageTitle level={2} title="Derslerim" />
+          {loading ? (
+            <SkeletonRows rows={3} />
+          ) : error ? (
+            <EmptyState
+              icon={ServerOff}
+              tone="danger"
+              title="Dersler yüklenemedi"
+              description="Ders listesine şu an ulaşılamıyor. Bağlantını kontrol edip tekrar dene."
+              action={
+                <Button loading={retrying} onClick={() => void retry()}>
+                  Tekrar dene
+                </Button>
+              }
+            />
+          ) : courses.length === 0 ? (
+            <EmptyState
+              icon={BookOpen}
+              title="Henüz kayıtlı dersin yok"
+              description="Eğitmeninden dersin katılım kodunu iste ve aşağıya gir."
+              action={<JoinCourseForm />}
+            />
+          ) : (
+            <ul className="grid gap-4 lg:grid-cols-2">
+              {courses.map((course) => (
+                <CourseCard key={course.id} course={course} summary={summaries[course.id]} />
+              ))}
+            </ul>
+          )}
+        </section>
+
         {!loading && !error && courses.length > 0 && (
-          <div className="mb-6">
+          <section aria-labelledby="join-heading">
+            <h2 id="join-heading" className="mb-3 text-lg font-bold text-ink">
+              Başka bir derse katıl
+            </h2>
             <JoinCourseForm />
-          </div>
-        )}
-        {loading ? (
-          <SkeletonRows rows={3} />
-        ) : error ? (
-          <EmptyState
-            icon={ServerOff}
-            tone="danger"
-            title="Dersler yüklenemedi"
-            description="Ders listesine şu an ulaşılamıyor. Bağlantını kontrol edip tekrar dene."
-            action={
-              <Button loading={retrying} onClick={() => void retry()}>
-                Tekrar dene
-              </Button>
-            }
-          />
-        ) : courses.length === 0 ? (
-          <EmptyState
-            icon={BookOpen}
-            title="Henüz kayıtlı dersin yok"
-            description="Eğitmeninden dersin katılım kodunu iste ve aşağıya gir."
-            action={<JoinCourseForm />}
-          />
-        ) : (
-          <ul className="divide-y divide-line border-y border-line">
-            {courses.map((course) => (
-              <li key={course.id}>
-                <CourseRow course={course} summary={summaries[course.id]} />
-              </li>
-            ))}
-          </ul>
+          </section>
         )}
       </div>
     </>
   );
 }
 
-/** Katalog satırı: "BLM2512 | Güz 2026 | Lisans", ders adı bağlantısı, eğitmen ve kapsam. */
-function CourseRow({ course, summary }: { course: Course; summary: MaterialSummary | null | undefined }) {
+/** Ders kartı: ders kodu, ad bağlantısı, eğitmen ve materyal özeti, iki eylem. */
+function CourseCard({ course, summary }: { course: Course; summary: MaterialSummary | null | undefined }) {
   const base = `/student/courses/${course.id}`;
+  const [code, ...meta] = courseMetaParts(course);
   return (
-    <div className="flex flex-col gap-4 py-6 sm:flex-row sm:items-start sm:justify-between">
+    <Card as="li" className="flex flex-col gap-4">
       <div className="min-w-0">
-        <p className="flex flex-wrap items-center text-sm font-semibold text-graphite">
-          {courseMetaParts(course).map((part, index) => (
-            <Fragment key={part}>
-              {index > 0 && <span aria-hidden className="mx-2 h-3.5 w-px bg-line-strong" />}
-              {part}
-            </Fragment>
-          ))}
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-graphite">
+          <span className="rounded-full bg-accent-soft px-2.5 py-0.5 text-xs font-semibold text-accent">{code}</span>
+          {meta.length > 0 && <span>{meta.join(" · ")}</span>}
         </p>
-        <h2 className="mt-1.5 text-xl font-bold tracking-tight">
+        <h3 className="mt-2 text-lg font-bold tracking-tight">
           <Link to={base} className="text-ink hover:text-link hover:underline hover:underline-offset-4">
             {course.name}
           </Link>
-        </h2>
-        <p className="mt-1.5 text-base text-graphite">
-          {course.instructor_name && <>{course.instructor_name} &nbsp;/&nbsp; </>}
+        </h3>
+        <p className="mt-1 text-sm text-graphite">
+          {course.instructor_name && <>{course.instructor_name} · </>}
           {summary === undefined ? (
             <Skeleton className="inline-block h-3.5 w-32 align-middle" />
           ) : summary === null ? (
@@ -120,18 +124,20 @@ function CourseRow({ course, summary }: { course: Course; summary: MaterialSumma
           ) : summary.documents === 0 ? (
             "Henüz materyal yüklenmedi"
           ) : (
-            `${[`${summary.documents} doküman`, describeTotals(summary.totals)].filter(Boolean).join(", ")}`
+            [`${summary.documents} doküman`, describeTotals(summary.totals)].filter(Boolean).join(", ")
           )}
         </p>
       </div>
-      <div className="flex shrink-0 items-center gap-5 text-base">
-        <Link to={`${base}/materials`} className="link">
+      <div className="mt-auto flex flex-wrap items-center gap-2">
+        <Link to={`${base}/materials`} className={buttonClasses("secondary", "sm")}>
+          <FolderOpen size={14} aria-hidden />
           Materyaller
         </Link>
-        <Link to={`${base}/tutor`} className="link font-semibold">
+        <Link to={`${base}/tutor`} className={buttonClasses("primary", "sm")}>
+          <MessageSquareText size={14} aria-hidden />
           AI Tutor'a sor
         </Link>
       </div>
-    </div>
+    </Card>
   );
 }

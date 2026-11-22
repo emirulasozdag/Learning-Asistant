@@ -1,9 +1,29 @@
 <!doctype html>
-<html lang="tr">
+<html lang="tr" data-theme="dipnot" data-scheme="light">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Learning Assistant</title>
+    <title>Dipnot – Ankara Bilim Üniversitesi</title>
+    <meta
+      name="description"
+      content="Dipnot: ders materyaline dayanan, her cevabın kaynağını gösteren çalışma asistanı."
+    />
+    <meta name="theme-color" content="#ffffff" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <script>
+      // Kayıtlı temayı ilk boyamadan önce uygula (açılışta renk çakmasın). ThemeProvider aynı
+      // kuralı uygular; eski tema kimlikleri yeni temalara eşlenir.
+      (function () {
+        try {
+          var stored = localStorage.getItem("la.theme");
+          var dark = stored === "gece" || stored === "pastel-koyu";
+          var root = document.documentElement;
+          root.dataset.theme = dark ? "gece" : "dipnot";
+          root.dataset.scheme = dark ? "dark" : "light";
+          root.style.colorScheme = dark ? "dark" : "light";
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

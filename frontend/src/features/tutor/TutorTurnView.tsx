@@ -3,6 +3,7 @@ import { CircleAlert, Hand, HelpCircle, Info, Lightbulb, ShieldAlert } from "luc
 import type { ClarificationBlock, GeneralExplanationBlock, NoticeBlock, NoticeKind } from "../../api/types";
 import type { QuickAction } from "../../services/tutorService";
 import Button from "../../ui/Button";
+import Card from "../../ui/Card";
 import AnswerBlock from "./AnswerBlock";
 import PracticeChain from "./PracticeCard";
 import RichText from "./RichText";
@@ -109,35 +110,35 @@ function Extra({
 
 function GeneralExplanation({ block }: { block: GeneralExplanationBlock }) {
   return (
-    <section aria-label="Genel bilgi" className="rounded-panel border border-line bg-surface px-4 py-4 shadow-card">
+    <Card as="section" aria-label="Genel bilgi" padding="md">
       <GeneralBadge />
-      <div className="text-md leading-7 text-ink">
+      <div className="font-serif text-md text-ink">
         <RichText text={block.text} />
       </div>
       <p className="mt-3 text-sm text-graphite">
         {block.notice}
         {block.check === "unchecked" && " Bu açıklama henüz otomatik doğrulamadan geçmedi."}
       </p>
-    </section>
+    </Card>
   );
 }
 
 function GeneralDraft({ text }: { text: string }) {
   if (!text) return <Pending label="Genel bilgi açıklaması hazırlanıyor" />;
   return (
-    <section aria-busy="true" className="rounded-panel border border-line bg-surface px-4 py-4 shadow-card">
+    <Card as="section" aria-busy="true" padding="md">
       <GeneralBadge />
-      <div className="text-md leading-7 text-graphite opacity-80">
+      <div className="font-serif text-md text-graphite opacity-80">
         <RichText text={text} />
         <span aria-hidden className="ml-0.5 inline-block h-4 w-[7px] translate-y-0.5 animate-pulse bg-warning" />
       </div>
-    </section>
+    </Card>
   );
 }
 
 function GeneralBadge() {
   return (
-    <p className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-warning-soft px-2.5 py-1 font-mono text-xs font-medium text-warning">
+    <p className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-warning-soft px-2.5 py-1 text-sm font-medium text-warning">
       <Lightbulb size={13} aria-hidden />
       Genel bilgi · ders materyalinden değil
     </p>
@@ -155,7 +156,7 @@ function Clarification({
 }) {
   return (
     <div className="flex flex-col items-start gap-3">
-      <p className="flex items-start gap-2 text-md leading-7 text-ink">
+      <p className="flex items-start gap-2 font-serif text-md text-ink">
         <HelpCircle size={16} aria-hidden className="mt-1.5 shrink-0 text-accent" />
         {block.question}
       </p>
@@ -184,10 +185,10 @@ const NOTICE_ICON: Record<NoticeKind, typeof Info> = {
 function Notice({ block }: { block: NoticeBlock }) {
   const Icon = NOTICE_ICON[block.kind];
   return (
-    <p className="flex max-w-[46rem] items-start gap-2.5 rounded-panel border border-line bg-surface px-4 py-3 text-md leading-7 text-ink shadow-card">
-      <Icon size={16} aria-hidden className="mt-1.5 shrink-0 text-graphite" />
-      {block.text}
-    </p>
+    <Card variant="plain" padding="sm" className="flex max-w-[46rem] items-start gap-2.5">
+      <Icon size={16} aria-hidden className="mt-1 shrink-0 text-graphite" />
+      <p className="text-md text-ink">{block.text}</p>
+    </Card>
   );
 }
 

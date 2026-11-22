@@ -134,8 +134,9 @@ test("kaynak açılamazsa sade mesaj ve Tekrar dene; kaynak değişince eski hat
   await expect(panel.getByText(algorithms.documentTitle, { exact: true }).first()).toBeVisible();
   await expect(panel.getByRole("heading", { name: "Kaynak açılamadı" })).toHaveCount(0);
 
-  // Başka bir bölüm hata verir; sonra ilk kaynağa dönülünce eski hata görünmez. "Nasıl bulundu"
-  // geniş ekranda açık gelir.
+  // Başka bir bölüm hata verir; sonra ilk kaynağa dönülünce eski hata görünmez. "Nasıl bulundu?"
+  // kapalı gelir; açılınca bölümler listelenir.
+  await page.getByText("Nasıl bulundu?", { exact: true }).click();
   const hits = page.locator("details ol button");
   expect(await hits.count()).toBeGreaterThan(1);
   await page.route(sources, (route) => route.abort("failed"));

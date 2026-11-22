@@ -1,7 +1,7 @@
 import { FolderOpen, ServerOff } from "lucide-react";
 
 import { useCourseOutlet } from "../../features/courses/courseOutlet";
-import CourseDocumentTable from "../../features/materials/CourseDocumentTable";
+import CourseDocumentTable, { CourseVideoGrid } from "../../features/materials/CourseDocumentTable";
 import { sortByTitle } from "../../features/materials/sortByTitle";
 import { MATERIAL_LABELS, TYPE_ORDER } from "../../labels";
 import Button from "../../ui/Button";
@@ -9,9 +9,10 @@ import EmptyState from "../../ui/EmptyState";
 import PageTitle from "../../ui/PageTitle";
 import { SkeletonRows } from "../../ui/Skeleton";
 
-/** Öğrencinin ders materyalleri: türe göre gruplanmış tablolar (OCW "Lecture Notes" gibi). */
+/** Öğrencinin ders materyalleri: türe göre gruplar; videolar kart ızgarası, diğerleri tablo. */
 export default function CourseMaterialsPage() {
   const { course, documents, documentsFailed, reloadDocuments } = useCourseOutlet();
+  const tutorPath = `/student/courses/${course.id}/tutor`;
 
   return (
     <div>
@@ -43,10 +44,11 @@ export default function CourseMaterialsPage() {
             return (
               <section key={type}>
                 <h2 className="mb-3 text-lg font-bold text-ink">{MATERIAL_LABELS[type]}</h2>
-                <CourseDocumentTable
-                  documents={sortByTitle(ofType)}
-                  tutorPath={`/student/courses/${course.id}/tutor`}
-                />
+                {type === "video" ? (
+                  <CourseVideoGrid documents={sortByTitle(ofType)} tutorPath={tutorPath} />
+                ) : (
+                  <CourseDocumentTable documents={sortByTitle(ofType)} tutorPath={tutorPath} />
+                )}
               </section>
             );
           })}

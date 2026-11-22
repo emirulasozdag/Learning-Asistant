@@ -5,7 +5,10 @@ import { useNavigate } from "react-router";
 import { useAuth } from "../../auth/useAuth";
 import { authService } from "../../services/authService";
 import Button from "../../ui/Button";
+import Card from "../../ui/Card";
+import CheckboxCard from "../../ui/CheckboxCard";
 import Dialog from "../../ui/Dialog";
+import ErrorText from "../../ui/ErrorText";
 import { SectionHeader } from "../../ui/PageHeader";
 import PageTitle from "../../ui/PageTitle";
 import { useToast } from "../../ui/toast/context";
@@ -77,63 +80,56 @@ export default function AccountPage() {
   return (
     <div className="page">
       <div className="max-w-3xl">
-      <PageTitle title="Hesabım" description={`${user.name} · ${user.email} · ${ROLE_LABELS[user.role]}`} />
+        <PageTitle title="Hesabım" description={`${user.name} · ${user.email} · ${ROLE_LABELS[user.role]}`} />
 
-      <div className="flex flex-col gap-10">
-        <section>
-          <SectionHeader
-            title="Öğrenme kaydı ve araştırma"
-            description="Açıkken çözdüğün pratik soruları öğrenme kaydına yazılır ve takma adla, toplu olarak eğitmen analitiğine ve araştırmaya katılır."
-          />
-          <label className="flex cursor-pointer items-start gap-3 rounded-panel border border-line bg-surface px-4 py-3">
-            <input
-              type="checkbox"
+        <div className="flex flex-col gap-10">
+          <section>
+            <SectionHeader
+              title="Öğrenme kaydı ve araştırma"
+              description="Açıkken çözdüğün pratik soruları öğrenme kaydına yazılır ve takma adla, toplu olarak eğitmen analitiğine ve araştırmaya katılır."
+            />
+            <CheckboxCard
               checked={research}
               disabled={saving}
-              onChange={(event) => void toggleResearch(event.target.checked)}
-              className="mt-1 size-4 accent-accent"
+              onChange={(next) => void toggleResearch(next)}
+              label="Öğrenme kaydımı tut ve kullanımımın araştırmada takma adla kullanılmasına izin ver."
+              description="İsteğe bağlıdır; kapalıyken de platformu tam olarak kullanırsın. İstediğin zaman değiştirebilirsin."
             />
-            <span className="text-base text-ink">
-              Öğrenme kaydımı tut ve kullanımımın araştırmada takma adla kullanılmasına izin ver.
-              <span className="mt-1 block text-sm text-graphite">
-                İsteğe bağlıdır; kapalıyken de platformu tam olarak kullanırsın. İstediğin zaman değiştirebilirsin.
-              </span>
-            </span>
-          </label>
-        </section>
+          </section>
 
-        <section>
-          <SectionHeader title="Görünüm" description="Renk teması bütün sayfalarda geçerlidir." />
-          <ThemeSwitcher />
-        </section>
+          <section>
+            <SectionHeader title="Görünüm" description="Renk teması bütün sayfalarda geçerlidir." />
+            <ThemeSwitcher />
+          </section>
 
-        <section>
-          <SectionHeader title="Verilerim" />
-          <div className="flex flex-col divide-y divide-line rounded-panel border border-line bg-surface">
-            <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center">
-              <div className="flex-1">
-                <p className="text-base font-medium text-ink">Verilerimi sil</p>
-                <p className="text-sm text-graphite">
-                  Bütün sohbetlerin ve pratik cevapların (öğrenme kaydın) silinir. Hesabın ve ders üyeliklerin kalır.
-                </p>
+          <section>
+            <SectionHeader title="Verilerim" />
+            <Card padding="none" className="flex flex-col divide-y divide-line">
+              <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center">
+                <div className="flex-1">
+                  <p className="text-base font-semibold text-ink">Verilerimi sil</p>
+                  <p className="text-sm text-graphite">
+                    Bütün sohbetlerin ve pratik cevapların (öğrenme kaydın) silinir. Hesabın ve ders üyeliklerin kalır.
+                  </p>
+                </div>
+                <Button icon={Trash2} onClick={() => setPending("data")}>
+                  Verilerimi sil
+                </Button>
               </div>
-              <Button icon={Trash2} onClick={() => setPending("data")}>
-                Verilerimi sil
-              </Button>
-            </div>
-            <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center">
-              <div className="flex-1">
-                <p className="text-base font-medium text-ink">Hesabımı sil</p>
-                <p className="text-sm text-graphite">
-                  Hesabın ve ona bağlı bütün kişisel verin kalıcı olarak silinir; oturumun kapanır.
-                </p>
+              <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center">
+                <div className="flex-1">
+                  <p className="text-base font-semibold text-ink">Hesabımı sil</p>
+                  <p className="text-sm text-graphite">
+                    Hesabın ve ona bağlı bütün kişisel verin kalıcı olarak silinir; oturumun kapanır.
+                  </p>
+                </div>
+                <Button variant="danger" icon={UserX} onClick={() => setPending("account")}>
+                  Hesabımı sil
+                </Button>
               </div>
-              <Button variant="danger" icon={UserX} onClick={() => setPending("account")}>
-                Hesabımı sil
-              </Button>
-            </div>
-          </div>
-        </section>
+            </Card>
+          </section>
+        </div>
       </div>
 
       <Dialog
@@ -163,13 +159,8 @@ export default function AccountPage() {
             ? "Hesabın, sohbetlerin, pratik cevapların ve ders üyeliklerin silinir. Aynı e-postayla yeniden kayıt olabilirsin ama eski verilerin geri gelmez."
             : "Sohbetlerin ve pratik cevapların silinir; öğrenme kaydın boşalır. Hesabın ve derslerin kalır."}
         </p>
-        {error && (
-          <p role="alert" className="mt-3 text-base text-danger">
-            {error}
-          </p>
-        )}
+        {error && <ErrorText className="mt-3">{error}</ErrorText>}
       </Dialog>
-      </div>
     </div>
   );
 }

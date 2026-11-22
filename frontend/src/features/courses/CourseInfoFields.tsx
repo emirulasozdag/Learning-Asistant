@@ -3,6 +3,9 @@ import Field, { inputClasses } from "../../ui/Field";
 import { cx } from "../../ui/cx";
 import type { CourseInfoDraft } from "./courseInfoDraft";
 
+/** Çok satırlı alan: metin kutusuyla aynı görünüm, yüksekliği satır sayısından. */
+const textareaClasses = cx(inputClasses.replace(/(^|\s)h-10(?=\s|$)/, "$1").trim(), "py-2 leading-relaxed");
+
 /** Dersin tanıtım bilgileri: eğitmen, dönem, seviye, bölüm, açıklama (hepsi isteğe bağlı). */
 export default function CourseInfoFields({
   draft,
@@ -65,7 +68,7 @@ export default function CourseInfoFields({
           rows={4}
           maxLength={4000}
           placeholder="Dersin kapsamı, ön koşulları ve öğrencilerin kazanacakları."
-          className={cx(inputClasses, "h-auto py-2 leading-relaxed")}
+          className={textareaClasses}
         />
       </div>
     </div>

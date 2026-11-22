@@ -1,6 +1,7 @@
 import { ArrowUp, Square } from "lucide-react";
 import { useEffect, useRef, type FormEvent, type KeyboardEvent } from "react";
 
+import Button from "../../ui/Button";
 import { cx } from "../../ui/cx";
 import { isDesktopNow } from "./useIsDesktop";
 
@@ -63,9 +64,9 @@ export default function Composer({
     <form onSubmit={submit}>
       <div
         className={cx(
-          "rounded-panel border bg-surface shadow-card transition-[border-color,box-shadow]",
-          "focus-within:border-accent focus-within:ring-3 focus-within:ring-accent/10 focus-within:shadow-float",
-          disabled ? "border-line bg-subtle shadow-none" : "border-line-strong",
+          "rounded-panel border bg-surface transition-[border-color,box-shadow]",
+          "focus-within:border-accent focus-within:ring-3 focus-within:ring-accent/10",
+          disabled ? "border-line bg-subtle" : "border-line-strong",
         )}
       >
         <label htmlFor="tutor-question" className="sr-only">
@@ -91,24 +92,20 @@ export default function Composer({
             <kbd className="font-sans font-medium text-graphite">Shift + Enter</kbd> yeni satır
           </p>
           {busy && onStop ? (
-            <button
-              type="button"
-              onClick={onStop}
-              aria-label="Durdur"
-              title="Cevabı durdur"
-              className="ml-auto flex size-9 shrink-0 items-center justify-center rounded-full bg-ink text-surface transition-colors hover:bg-ink/85"
-            >
-              <Square size={13} fill="currentColor" aria-hidden />
-            </button>
+            <Button size="icon" variant="secondary" onClick={onStop} aria-label="Durdur" title="Cevabı durdur" className="ml-auto">
+              <Square size={14} fill="currentColor" aria-hidden />
+            </Button>
           ) : (
-            <button
+            <Button
               type="submit"
+              size="icon"
+              variant="primary"
+              icon={ArrowUp}
               disabled={!canSend}
               aria-label="Gönder"
-              className="ml-auto flex size-9 shrink-0 items-center justify-center rounded-full bg-accent text-on-accent transition-colors hover:bg-accent-hover disabled:bg-muted-bg disabled:text-faint"
-            >
-              <ArrowUp size={17} aria-hidden />
-            </button>
+              title="Gönder"
+              className="ml-auto"
+            />
           )}
         </div>
       </div>
