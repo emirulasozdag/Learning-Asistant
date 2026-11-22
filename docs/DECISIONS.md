@@ -448,7 +448,10 @@ kalıyordu; görsel yorumlama (VLM) için iş yoktu. Çöken işten kalan medya 
   yorumlama kapalıdır; sahte ya da demo betimleme üretilmez. Betimleme türetilmiştir, kanıt değildir.
 - **Saklama:** medya yalnızca onu okuyan iş bitene kadar; kareler dokümanla; eğitmen tek kareyi silebilir;
   çalıştırıcı sahipsiz dosyaları düzenli aralıkla siler (yeni dosyalara dokunmadan).
-- **Sınır:** medya ve altyazı süresi `MAX_MEDIA_DURATION_S` (varsayılan 4 saat).
+- **Sınır:** medya ve altyazı süresi `MAX_MEDIA_DURATION_S` (varsayılan 1 saat). *Not (#125, 2026-11-22): önce 4 saatti;
+  transkripsiyonun belleği süreyle büyüdüğü (~3,7 GB/saat, OPERATIONS.md) için 1 saate indirildi. Karar: ekip (Berke
+  Akçay, Nisanur İlhan); eğitmen 20 dakikalık kayıtları da kabul ediyor. Sistem iyi çalışırsa 2 saate çıkarılabilir;
+  sınırı kaldıran çözüm parçalı transkripsiyon (#127).*
 
 **Sonuçları.** Doküman kareleri beklemeden hazır olur; kare işinin durumu görünür. Medya kare işi bitene kadar biraz
 daha uzun diskte kalır. Kayıttaki kare kimliği kare silinince boşa düşer (bilerek: görüntü kayda kopyalanmaz).
