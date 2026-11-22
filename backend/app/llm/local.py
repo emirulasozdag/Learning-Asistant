@@ -8,7 +8,7 @@ from collections.abc import Iterator
 from pydantic import BaseModel
 
 from app.llm.base import ChatMessage, ContentPart
-from app.llm.openrouter import OpenRouterLLMClient
+from app.llm.chat_completions import ChatCompletionsClient
 from app.llm.routing import LocalRouteUnavailable
 
 NOT_CONFIGURED = (
@@ -25,7 +25,7 @@ class LocalLLMClient:
     def __init__(self, base_url: str = "", model: str = "") -> None:
         self.model = model or "local-unconfigured"
         self._client = (
-            OpenRouterLLMClient(api_key="local", model=model, base_url=base_url)
+            ChatCompletionsClient(name="local", api_key="local", model=model, base_url=base_url)
             if base_url and model
             else None
         )

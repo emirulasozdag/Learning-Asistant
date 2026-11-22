@@ -4,6 +4,8 @@ from typing import Annotated, Literal
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
+OPENAI_BASE_URL = "https://api.openai.com/v1"
+
 
 class Settings(BaseSettings):
     # backend/ içinden çalışınca kökteki .env de okunur.
@@ -20,14 +22,13 @@ class Settings(BaseSettings):
     public_api_prefix: str = "/api"
 
     # LLM: anahtar boşsa sistem LLM'siz çalışır (en ilgili parçayı alıntılar).
-    # gemini (doğrudan Gemini API) | openrouter | anthropic. Seçim: DECISIONS.md ADR-7.
-    llm_provider: str = "gemini"
+    llm_provider: Literal["gemini", "openai", "openrouter", "anthropic"] = "gemini"
     llm_api_key: str = ""
     # Öğretim içeriğini üreten model (cevap, açıklama; sonra pratik ve değerlendirme).
     # Boşsa sağlayıcının varsayılanı (`generator_model`). OpenRouter'da "anthropic/claude-…" gibi.
     llm_model: str = ""
     # Konuşmayı yöneten orkestratör: araç seçer, öğretim içeriği yazmaz; hızlı ve ucuz model yeter.
-    # Boşsa sağlayıcının varsayılanı. Araç çağırma şimdilik yalnızca gemini sağlayıcısında var.
+    # Boşsa sağlayıcının varsayılanı. Gemini ve OpenAI araç çağırmayı destekler.
     llm_orchestrator_model: str = ""
     # Gemini düşünme seviyesi: minimal | low | medium | high. Model desteklemiyorsa en yakın
     # desteklenen seviye kullanılır (`llm/catalog.py`). Düşünme token'ları çıktı olarak ücretlenir.
@@ -56,7 +57,7 @@ class Settings(BaseSettings):
     #   hata verirse cevap boş döner, outcome=verification_failure).
     # off: yalnızca alıntı doğrulaması (geliştirme; pilotta kullanılmaz).
     claim_check: str = "required"
-    # gemini | openrouter | anthropic | local. Boşsa judge yapılandırılmamıştır.
+    # gemini | openai | openrouter | anthropic | local. Boşsa judge yapılandırılmamıştır.
     judge_provider: str = ""
     judge_model: str = ""
     # Boşsa LLM_API_KEY (sağlayıcı aynıysa). Anahtar yalnızca .env'de tutulur.
@@ -172,6 +173,8 @@ class Settings(BaseSettings):
             return "https://generativelanguage.googleapis.com"
         if self.llm_provider == "anthropic":
             return "https://api.anthropic.com"
+        if self.llm_provider == "openai":
+            return OPENAI_BASE_URL
         return self.llm_base_url
 
 
@@ -179,6 +182,7 @@ class Settings(BaseSettings):
 # `llm/catalog.py`. Orkestratör boşsa o sağlayıcıda araç çağırma yok: tutor doğrudan akışa düşer.
 _DEFAULT_MODELS = {
     "gemini": ("gemini-3.8-flash", "gemini-3.5-flash-lite"),
+    "openai": ("gpt-5.4-mini", "gpt-5.4-mini"),
     "openrouter": ("anthropic/claude-opus-5.5", ""),
     "anthropic": ("claude-opus-5-5", ""),
 }

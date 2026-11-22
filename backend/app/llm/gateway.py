@@ -3,10 +3,10 @@ from enum import StrEnum
 
 from app.core.config import settings
 from app.llm.base import LLMClient, ToolCallingClient
+from app.llm.chat_completions import ChatCompletionsClient, OpenAIClient
 from app.llm.gemini import GeminiLLMClient
 from app.llm.hosted import AnthropicLLMClient
 from app.llm.local import LocalLLMClient
-from app.llm.openrouter import OpenRouterLLMClient
 from app.llm.routing import DataClass, route_for
 
 logger = logging.getLogger(__name__)
@@ -30,7 +30,7 @@ def select_client(
 ) -> LLMClient | None:
     """Kullanılacak LLM. Anahtar tanımlı değilse None: sistem LLM'siz modda çalışır.
 
-    LLM_PROVIDER: "gemini" (varsayılan; doğrudan Gemini API), "openrouter" ya da "anthropic".
+    LLM_PROVIDER: "gemini" (varsayılan), "openai", "openrouter" ya da "anthropic".
     `data`: yükün en hassas parçası (ADR-8). Yerele yönlenen veri için yerel istemci döner;
     yerel model yapılandırılmamışsa bu istemci açık bir hatayla durur, hosted'a düşmez.
     """
@@ -75,7 +75,7 @@ class JudgeConfigError(ValueError):
     """Judge ayarı geçersiz: bilinmeyen sağlayıcı ya da generator'la aynı model ailesi."""
 
 
-JUDGE_PROVIDERS = ("gemini", "openrouter", "anthropic", "local")
+JUDGE_PROVIDERS = ("gemini", "openai", "openrouter", "anthropic", "local")
 
 # Model adının başına göre aile (OpenRouter'da "sağlayıcı/model" biçimi de olur).
 _FAMILIES = (
@@ -95,7 +95,11 @@ def model_family(provider: str, model: str) -> str:
         return "gemini"
     if provider == "anthropic":
         return "claude"
+    if provider == "openai":
+        return "gpt"
     vendor, _, name = model.lower().rpartition("/")
+    if vendor == "openai":
+        return "gpt"
     for family, prefixes in _FAMILIES:
         if name.startswith(prefixes) or vendor.startswith(prefixes):
             return family
@@ -163,5 +167,12 @@ def _build_client(
         )
     if provider == "anthropic":
         return AnthropicLLMClient(api_key=api_key, model=model)
-    # Diğer her değer OpenAI uyumlu uç nokta (openrouter); generator için önceki davranış.
-    return OpenRouterLLMClient(api_key=api_key, model=model, base_url=base_url)
+    if provider == "openai":
+        return OpenAIClient(
+            api_key=api_key, model=model, purpose=purpose, timeout_s=settings.llm_timeout_s
+        )
+    if provider == "openrouter":
+        return ChatCompletionsClient(
+            name="openrouter", api_key=api_key, model=model, base_url=base_url, purpose=purpose
+        )
+    raise ValueError(f"Bilinmeyen LLM sağlayıcısı: {provider}")

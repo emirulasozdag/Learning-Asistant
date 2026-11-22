@@ -644,7 +644,7 @@ supports_images(client) -> bool;  ImageInputUnsupported(LLMError)
   çağrılmaz, taslak akmaz. Modelin `NETLEŞTİR:`den sonra yazdığı metin judge'dan geçmediği için (kontrol edilmemiş
   kare iddiası taşıyabilir) öğrenciye, tutor bloğuna ve kayda girmez. Judge kareli iddiaları `ambiguous` bulur ve
   kalan cevap kapsamaya yetmezse aynı sabit soru döner. Kare verilmeyen cevapta `NETLEŞTİR:` özel değildir.
-- **Sağlayıcılar ve rota.** Görüntü kabul edenler: Gemini, Anthropic, OpenRouter (model görüntü almıyorsa uç noktanın
+- **Sağlayıcılar ve rota.** Görüntü kabul edenler: Gemini, OpenAI, Anthropic, OpenRouter (model görüntü almıyorsa uç noktanın
   4xx yanıtı `ImageInputUnsupported` olur) ve yapılandırılmış yerel model; `ReleasingClient` (#88) aynı yeteneği
   taşır. Diğer istemciler görüntü almaz; kareli iddialar `unverifiable` olur. Kare görüntüsü onaylı ders materyalidir:
   yük `DataClass.COURSE_EVIDENCE`, judge'ın metin yüküyle aynı rota (ADR-5 A, ADR-8); kimlik ve öğrenci verisi
@@ -809,7 +809,7 @@ Frontend: [outcome.ts](../frontend/src/features/tutor/outcome.ts).
 
 | # | Eksik | Bugünkü etkisi |
 |---|---|---|
-| 1 | LLM anahtarı yok (`extractive`, `outcome="answered"`) ve LLM'e ulaşılamıyor (`provider_failure`) ayrılıyor, ama `provider_failure` anahtar geçersiz, kredi bitti, istek sınırı, ağ hatası ve kesilen cevabı tek kalıba sokuyor ([openrouter.py:82](../backend/app/llm/openrouter.py#L82)). LLM'siz alıntı `answered` sayıldığı için log/eval'de yanıltıcı. | Operasyonel neden görünmüyor; eval'de LLM'siz cevap gerçek cevap gibi sayılır |
+| 1 | LLM anahtarı yok (`extractive`, `outcome="answered"`) ve LLM'e ulaşılamıyor (`provider_failure`) ayrılıyor, ama `provider_failure` anahtar geçersiz, kredi bitti, istek sınırı, ağ hatası ve kesilen cevabı tek kalıba sokuyor ([chat_completions.py](../backend/app/llm/chat_completions.py)). LLM'siz alıntı `answered` sayıldığı için log/eval'de yanıltıcı. | Operasyonel neden görünmüyor; eval'de LLM'siz cevap gerçek cevap gibi sayılır |
 | 2 | SSE `error` olayında kod yok (`{detail}` tek alan); "Sohbet bulunamadı" da "geçici sorun" gösteriliyor ([TutorPage.tsx:147-149](../frontend/src/pages/student/TutorPage.tsx#L147-L149)). | Kalıcı ve geçici hata ayırt edilemiyor, yeniden dene yanlış yönlendirir |
 | 3 | `outcome.ts`, `decline_reason`'ı backend'in sabit `NOT_COVERED` cümlesiyle string karşılaştırıyor. | Backend metni değişirse sessizce bozulur |
 | 4 | `model_refusal` yanıtı `suggested_sources` döndürmüyor (diğer retler döndürüyor). | Tutarsız yönlendirme |

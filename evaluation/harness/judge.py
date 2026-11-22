@@ -285,7 +285,7 @@ class JudgeSettings(BaseSettings):
 def client_from_env() -> JudgeClient:
     """OpenRouter üzerinden judge. Model ya da anahtar yoksa JudgeError (sahte skor yok)."""
     from app.core.config import settings
-    from app.llm.openrouter import OpenRouterLLMClient
+    from app.llm.chat_completions import ChatCompletionsClient
 
     judge = JudgeSettings()
     if not judge.model:
@@ -299,7 +299,8 @@ def client_from_env() -> JudgeClient:
             "Judge için OpenRouter anahtarı yok (EVAL_JUDGE_API_KEY; LLM_PROVIDER=openrouter ise "
             "LLM_API_KEY)"
         )
-    return OpenRouterLLMClient(
+    return ChatCompletionsClient(
+        name="openrouter",
         api_key=api_key,
         model=judge.model,
         base_url=judge.base_url or settings.llm_base_url,

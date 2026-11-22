@@ -18,8 +18,8 @@ from app.db.models import Course, Message
 from app.generation.answer import stream_answer
 from app.llm import gateway
 from app.llm.base import LLMError
+from app.llm.chat_completions import ChatCompletionsClient
 from app.llm.local import LocalLLMClient
-from app.llm.openrouter import OpenRouterLLMClient
 from app.llm.routing import DataClass, LocalRouteUnavailable, RoutingConfigError, route_for
 from app.qa import service as qa_service
 from app.schemas.ask import AskResponse
@@ -251,13 +251,14 @@ def test_unchecked_generated_text_is_never_shown(judge, judge_error, status) -> 
 
 
 def test_truncated_judge_response_reports_the_output_limit_even_if_json_parses(monkeypatch) -> None:
-    judge = OpenRouterLLMClient(api_key="test", model="judge", base_url="https://test.invalid")
+    judge = ChatCompletionsClient(
+        name="openrouter", api_key="test", model="judge", base_url="https://test.invalid"
+    )
     choice = SimpleNamespace(
-        finish_reason="length", message=SimpleNamespace(content='{"verdicts": []}')
+        finish_reason="length", message=SimpleNamespace(content='{"verdicts": []}', refusal=None)
     )
-    monkeypatch.setattr(
-        judge._client.chat.completions, "create", lambda **kwargs: SimpleNamespace(choices=[choice])
-    )
+    response = SimpleNamespace(choices=[choice], usage=None)
+    monkeypatch.setattr(judge._client.chat.completions, "create", lambda **kwargs: response)
     with pytest.raises(LLMError, match="uzunluk sınırında kesildi"):
         judge.complete_json("s", "p", JudgeOutput)
 
