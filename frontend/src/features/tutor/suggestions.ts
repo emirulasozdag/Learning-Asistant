@@ -7,7 +7,8 @@ export interface Suggestion {
 }
 
 // Konu başlığı çıkarılacak türler (öncelik sırasıyla); ödev ve çözümler konu kaynağı değildir.
-const TOPIC_TYPES: MaterialType[] = ["notes", "slides", "textbook", "transcript"];
+// Ders notu olmayan derste (ör. 18.06) konular ders videolarının başlıklarındadır (#32).
+const TOPIC_TYPES: MaterialType[] = ["notes", "slides", "textbook", "transcript", "video"];
 
 /**
  * Boş sohbette önerilen sorular: dersin kendi materyal başlıklarından (uydurma örnek yok).
@@ -27,20 +28,25 @@ export function courseSuggestions(documents: DocumentOut[], count = 4): Suggesti
  * Algorithm"); dersin başından sonuna yayılarak en fazla `count` tane. Uydurma konu yoktur.
  */
 export function courseTopics(documents: DocumentOut[], count: number): string[] {
-  const type = TOPIC_TYPES.find((candidate) => documents.some((d) => d.material_type === candidate));
-  if (!type) return [];
-  const topics = [
-    ...new Set(
-      sortByTitle(documents.filter((d) => d.material_type === type))
-        .map((d) => topicOf(d.title))
-        .filter((topic): topic is string => topic !== null),
-    ),
-  ];
-  return spread(topics, count);
+  // Konu çıkan ilk tür kullanılır: kitap başlıkları ("Linear Algebra textbook") konu taşımazsa
+  // sıradaki türe geçilir.
+  for (const type of TOPIC_TYPES) {
+    const topics = [
+      ...new Set(
+        sortByTitle(documents.filter((d) => d.material_type === type))
+          .map((d) => topicOf(d.title))
+          .filter((topic): topic is string => topic !== null),
+      ),
+    ];
+    if (topics.length > 0) return spread(topics, count);
+  }
+  return [];
 }
 
-// Konu taşımayan başlıklar: "Recitation 5", "Lecture 3", "Hafta 2", "Giriş".
-const NO_TOPIC = /^(recitation|lecture|week|hafta|ders|bölüm|chapter|unit)\s*\d*$|^(introduction|intro|giriş)$/i;
+// Konu taşımayan başlıklar: "Recitation 5", "Lecture 3", "Hafta 2", "Giriş", sınav tekrarı
+// ("Quiz 2 review", "Final course review", "Exam 1 review").
+const NO_TOPIC =
+  /^(recitation|lecture|week|hafta|ders|bölüm|chapter|unit)\s*\d*$|^(introduction|intro|giriş)$|^(quiz|exam|midterm|final)(\s+\d+|\s+course|\s+exam)?\s+review$/i;
 
 /**
  * "Lecture 4: Hashing" → "Hashing"; "Hafta 3 – Sıralama" → "Sıralama";

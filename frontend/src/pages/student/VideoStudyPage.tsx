@@ -37,8 +37,11 @@ export default function VideoStudyPage() {
   // Liste, yüklendiği dersle birlikte tutulur: ders değişince eski dersin listesi (ve onunla
   // açılan sohbet) yeni dersin sayfasında bir an bile görünmez (#28).
   const [loaded, setLoaded] = useState<{ courseId: number; list: DocumentOut[] } | null>(null);
-  const [failed, setFailed] = useState(false);
+  // Hata da yüklenen derse aittir: bir dersin hatası başka derse geçince ekranda kalmaz (#32).
+  const [failedCourse, setFailedCourse] = useState<number | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const materials = loaded?.courseId === courseId ? loaded.list : null;
+  const failed = failedCourse === courseId;
 
   useEffect(() => {
     const controller = new AbortController();
@@ -48,10 +51,10 @@ export default function VideoStudyPage() {
         if (!controller.signal.aborted) setLoaded({ courseId, list });
       })
       .catch(() => {
-        if (!controller.signal.aborted) setFailed(true);
+        if (!controller.signal.aborted) setFailedCourse(courseId);
       });
     return () => controller.abort();
-  }, [courseId]);
+  }, [courseId, attempt]);
 
   const videos = useMemo(
     () =>
@@ -71,7 +74,16 @@ export default function VideoStudyPage() {
         tone="danger"
         title="Video açılamadı"
         description="Ders materyaline şu an ulaşılamıyor. Bağlantını kontrol edip tekrar dene."
-        action={<Button onClick={() => window.location.reload()}>Tekrar dene</Button>}
+        action={
+          <Button
+            onClick={() => {
+              setFailedCourse(null);
+              setAttempt((value) => value + 1);
+            }}
+          >
+            Tekrar dene
+          </Button>
+        }
         className="py-24"
       />
     );
@@ -100,17 +112,27 @@ export default function VideoStudyPage() {
   }
   // `key`: başka ders ya da video seçilince sohbet ve oynatıcı baştan kurulur (#28).
   return (
-    <StudySession key={`${courseId}-${video.id}`} courseId={courseId} video={video} videos={videos} back={back} />
+    <StudySession
+      key={`${courseId}-${video.id}`}
+      courseId={courseId}
+      language={course.language}
+      video={video}
+      videos={videos}
+      back={back}
+    />
   );
 }
 
 function StudySession({
   courseId,
+  language,
   video,
   videos,
   back,
 }: {
   courseId: number;
+  /** Dersin dili: altyazı bu dilde açılır (YouTube tarayıcının diline çevirmesin). */
+  language: "tr" | "en";
   video: DocumentOut;
   videos: DocumentOut[];
   back: string;
@@ -120,8 +142,6 @@ function StudySession({
   const [time, setTime] = useState(0);
   const [question, setQuestion] = useState("");
   const [drawerSource, setDrawerSource] = useState<string | null>(null);
-  // Her sorunun sorulduğu an (sohbette "15:24'te soruldu").
-  const [askedAt, setAskedAt] = useState<Record<string, number>>({});
   const conversation = useTutorTurns(courseId, `video-${video.id}`);
   const { turns, busy } = conversation;
   const chunks = useChunks(video.id);
@@ -165,9 +185,8 @@ function StudySession({
   async function ask(text: string) {
     const at = Math.floor(playerRef.current?.currentTime() ?? time);
     setQuestion("");
-    const id = `${Date.now()}`;
-    setAskedAt((map) => ({ ...map, [id]: at }));
-    await conversation.ask(text, { document_id: video.id, time_s: at }, id);
+    // Sorunun sorulduğu an turla birlikte saklanır (sohbette "· 15:24" ve o andaki kare).
+    await conversation.ask(text, { document_id: video.id, time_s: at });
   }
 
   function selectSource(sourceId: string) {
@@ -222,6 +241,7 @@ function StudySession({
               mediaUrl={video.media_url!}
               title={video.title}
               captionsUrl={video.file_url}
+              captionsLang={language}
             />
           </div>
           <div className="order-2 flex min-w-0 shrink-0 flex-col gap-3 lg:order-none">
@@ -263,7 +283,7 @@ function StudySession({
                   <StudyTurn
                     key={turn.id}
                     turn={turn}
-                    askedAt={askedAt[turn.id]}
+                    askedAt={turn.askedAt?.documentId === video.id ? turn.askedAt.seconds : undefined}
                     frames={frames}
                     video={video}
                     isLatest={index === turns.length - 1}
@@ -357,8 +377,18 @@ function Timeline({
           onSeek(((event.clientX - box.left) / box.width) * duration);
         }}
         onKeyDown={(event) => {
-          if (event.key === "ArrowRight") onSeek(Math.min(duration, time + 10));
-          if (event.key === "ArrowLeft") onSeek(Math.max(0, time - 10));
+          // Ok tuşları 10 sn, Home/End baş ve son; sayfa kaymasın diye varsayılan davranış durur.
+          const target: Record<string, number> = {
+            ArrowRight: Math.min(duration, time + 10),
+            ArrowUp: Math.min(duration, time + 10),
+            ArrowLeft: Math.max(0, time - 10),
+            ArrowDown: Math.max(0, time - 10),
+            Home: 0,
+            End: Math.max(0, duration - 1),
+          };
+          if (!(event.key in target)) return;
+          event.preventDefault();
+          onSeek(target[event.key]);
         }}
         className="relative h-2 cursor-pointer rounded-full bg-line"
       >

@@ -155,6 +155,17 @@ export function structureAnswer(answer: string): StructuredAnswer {
   };
 }
 
+/**
+ * Başlık cümlesi olmadan: bütün cümleler numaralı iddia. LLM'siz alıntıda ilk cümle cevabın özeti
+ * değildir; çoğu zaman bir transkript parçasının ortasından başlar ("'em all in, one to nine.") ve
+ * büyük başlık olarak yanlış görünür (#32).
+ */
+export function withoutLead(answer: StructuredAnswer): StructuredAnswer {
+  if (!answer.lead) return answer;
+  const rows = [answer.lead, ...answer.claims];
+  return { lead: null, claims: rows.map((row, index) => ({ ...row, number: index + 1 })) };
+}
+
 /** LLM'siz cevabın ilk satırı ("…en uygun kısım:") yalnızca bir giriştir; iddia değildir. */
 export function stripExtractiveIntro(answer: string): string {
   const [first, ...rest] = answer.split("\n\n");

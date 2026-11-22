@@ -31,7 +31,7 @@ const LecturePlayer = forwardRef<
 >(function LecturePlayer({ mediaUrl, title, start = 0, captionsUrl, captionsLang = "en" }, ref) {
   const id = youTubeId(mediaUrl);
   return id ? (
-    <YouTubePlayer ref={ref} videoId={id} title={title} start={start} />
+    <YouTubePlayer ref={ref} videoId={id} title={title} start={start} captionsLang={captionsLang} />
   ) : (
     <FilePlayer ref={ref} src={mediaUrl} title={title} start={start} captionsUrl={captionsUrl} captionsLang={captionsLang} />
   );
@@ -87,8 +87,8 @@ const FilePlayer = forwardRef<
  * YouTube gömülü oynatıcısı; konum ve atlama YouTube'un iframe mesajlarıyla (dış betik yüklenmez).
  * Çerezsiz alan adı kullanılır.
  */
-const YouTubePlayer = forwardRef<PlayerHandle, { videoId: string; title: string; start: number }>(
-  function YouTubePlayer({ videoId, title, start }, ref) {
+const YouTubePlayer = forwardRef<PlayerHandle, { videoId: string; title: string; start: number; captionsLang: string }>(
+  function YouTubePlayer({ videoId, title, start, captionsLang }, ref) {
     const frameRef = useRef<HTMLIFrameElement>(null);
     const time = useRef(start);
 
@@ -127,6 +127,8 @@ const YouTubePlayer = forwardRef<PlayerHandle, { videoId: string; title: string;
       rel: "0",
       origin: window.location.origin,
       start: String(Math.floor(start)),
+      // Altyazı dersin dilinde açılır; yoksa YouTube tarayıcının diline otomatik çevirebiliyor (#32).
+      cc_lang_pref: captionsLang,
     });
     return (
       <iframe
