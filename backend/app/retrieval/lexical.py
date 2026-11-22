@@ -13,6 +13,13 @@ from app.retrieval.types import RetrievedPassage
 # BM25'in terim frekansı olmayan hâli). "centralized" gibi ayırt edici bir kelime, her sayfada
 # geçen "version control"dan ağır basar. Kapsama = parçadaki IDF / sorudaki toplam IDF; derste
 # hiç geçmeyen kelimeler (ör. "quicksort") paydada kalır ve kapsamayı düşürür.
+#
+# Hız: "burayı anlamadım" sorusunda arama metni anın transkriptiyle büyür (50–150 kelime) ve
+# binlerce parça aday olur. Bu yüzden (1) (parça, kelime) eşleşmeleri bir kez bulunur; belge
+# sıklığı (IDF'nin n'i) da puan da bu listeden çıkar, kelime başına ikinci bir sayım yapılmaz;
+# (2) gruplama dar satırlarla yapılır (parçanın tsvector'ü gruplamaya ve sıralamaya taşınmaz);
+# (3) eşitlik bozucu ts_rank yalnızca k'ncı puana yetişen parçalarda hesaplanır. Sayım yine
+# dersin bütün parçaları üzerindedir (onay/durum süzgeci yalnızca sonuçlara uygulanır).
 _SEARCH = text(
     """
     WITH words AS (
@@ -22,30 +29,44 @@ _SEARCH = text(
           AND to_tsvector('english', d.token) <> ''::tsvector
           AND to_tsvector('turkish', d.token) <> ''::tsvector
     ),
-    weights AS (
-        SELECT t.q, ln(1 + (n.total - df.n + 0.5) / (df.n + 0.5)) AS idf
-        FROM (SELECT CAST(quote_literal(lexeme) AS tsquery) AS q FROM words) t
-        CROSS JOIN (SELECT count(*) AS total FROM chunks WHERE course_id = :course_id) n
-        CROSS JOIN LATERAL (
-            -- Doğrudan tablodan: GIN indeksi (search_vector) ve ders indeksi kullanılabilir.
-            SELECT count(*) AS n FROM chunks c
-            WHERE c.course_id = :course_id AND c.search_vector @@ t.q
-        ) df
+    any_word AS (
+        SELECT CAST(string_agg(CAST(CAST(quote_literal(lexeme) AS tsquery) AS text), ' | ')
+                    AS tsquery) AS q
+        FROM words
     ),
-    query_total AS (
-        SELECT sum(idf) AS idf,
-               CAST(string_agg(CAST(q AS text), ' | ') AS tsquery) AS any_word
-        FROM weights
+    matches AS MATERIALIZED (
+        -- Kelime başına GIN indeksi (search_vector) taraması; yalnızca dar sütunlar taşınır.
+        SELECT c.id, c.document_id, w.lexeme
+        FROM words w
+        JOIN chunks c ON c.search_vector @@ CAST(quote_literal(w.lexeme) AS tsquery)
+        WHERE c.course_id = :course_id
+    ),
+    weights AS (
+        SELECT w.lexeme,
+               ln(1 + (n.total - coalesce(df.n, 0) + 0.5) / (coalesce(df.n, 0) + 0.5)) AS idf
+        FROM words w
+        CROSS JOIN (SELECT count(*) AS total FROM chunks WHERE course_id = :course_id) n
+        LEFT JOIN (SELECT lexeme, count(*) AS n FROM matches GROUP BY lexeme) df
+            ON df.lexeme = w.lexeme
+    ),
+    scored AS (
+        SELECT m.id, sum(w.idf) AS score
+        FROM matches m
+        JOIN weights w ON w.lexeme = m.lexeme
+        JOIN documents doc ON doc.id = m.document_id AND doc.course_id = :course_id
+            AND doc.approved_at IS NOT NULL AND doc.status = 'ready'
+        GROUP BY m.id
+    ),
+    cutoff AS (
+        -- k'ncı en yüksek puan: eşitlik bozucu (ts_rank) yalnızca bu puana yetişenlerde hesaplanır.
+        SELECT min(score) AS score FROM (SELECT score FROM scored ORDER BY score DESC LIMIT :k) t
     )
-    SELECT c.id, sum(w.idf) AS score, sum(w.idf) / qt.idf AS coverage
-    FROM chunks c
-    JOIN documents doc ON doc.id = c.document_id AND doc.course_id = :course_id
-        AND doc.approved_at IS NOT NULL AND doc.status = 'ready'
-    JOIN weights w ON c.search_vector @@ w.q
-    CROSS JOIN query_total qt
-    WHERE c.course_id = :course_id
-    GROUP BY c.id, c.search_vector, qt.idf, qt.any_word
-    ORDER BY score DESC, ts_rank(c.search_vector, qt.any_word, 1) DESC, c.id
+    SELECT s.id, s.score, s.score / (SELECT sum(idf) FROM weights) AS coverage
+    FROM scored s
+    JOIN chunks c ON c.id = s.id
+    CROSS JOIN any_word a
+    WHERE s.score >= (SELECT score FROM cutoff)
+    ORDER BY s.score DESC, ts_rank(c.search_vector, a.q, 1) DESC, s.id
     LIMIT :k
     """
 )
