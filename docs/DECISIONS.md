@@ -18,7 +18,7 @@ hukuk birimi onayı alınmalıdır (bkz. ANALYSIS §13.1, "KVKK" riski).
 | 5 | Hosted modelle veri paylaşımı | Kabul edildi | 2026-10-20 | Nisanur İlhan (öneren), Emir Ulaş Özdağ (@emirulasozdag), Mehmet Akif Kurt (@saintpeterslibiri) |
 | 6 | Transkripsiyon: yerel faster-whisper | Önerildi | — | — |
 | 7 | AI Tutor mimarisi, köken politikası ve Gemini | **Önerildi** | — | Mehmet Akif Kurt (@saintpeterslibiri, öneren) |
-| 10 | Ders videosu kareleri: yerel çıkarma, yerel OCR ve ayrı indeks | Önerildi | — | Nisanur İlhan (öneren) |
+| 10 | Ders videosu kareleri: yerel çıkarma, yerel OCR ve ayrı indeks | Kabul edildi | 2026-11-17 | Nisanur İlhan (öneren), Ceyda Yıldız (@ceydayildizz, PR #98 onayı) |
 
 ---
 
@@ -396,10 +396,11 @@ aranamıyor; arama yalnızca transkripti görüyor. Kareden türetilen metin mod
 materyaliyle aynı güvende değildir. Ses gibi görüntü de sunucuda kalmalı (ADR-5, ADR-6). Ekipte ücretli görsel model
 erişimi herkeste yok.
 
-**Karar (öneri).**
+**Karar.**
 - **Kaynak:** kareler yalnızca yüklenen medya dosyasından, transkripsiyon işinin içinde, medya silinmeden önce
   çıkarılır. Yalnızca `.vtt` yüklenen videoda medya olmadığı için kare yoktur. `FRAME_EXTRACTION=off` (varsayılan)
-  ya da `ocr`.
+  ya da `ocr`. *Not: ADR-11 (#25) ile değişti. Kareler artık transkripsiyondan sonra ayrı bir `frames` işinde
+  çıkarılıyor; medya o iş bitene kadar saklanıyor. `.vtt` ile yüklenen videoya da kare medyası eklenebiliyor.*
 - **Kare seçimi:** video düzenli aralıkla örneklenir; görüntü bir süre sabit kalınca (slayt, duraklatılmış ekran) bir
   kare alınır ve ekranda kaldığı aralık (`t_start`–`t_end`) saklanır. Köşedeki küçük hareketli bölge (konuşmacı
   kamerası) karşılaştırmaya katılmaz; ekranın büyük kısmı hareketliyse (kamera görüntüsü) kare alınmaz. Video başına
@@ -421,7 +422,8 @@ erişimi herkeste yok.
 OCR diyagramdaki yazıyı okur ama okları, şekli ve yerleşimi yorumlamaz; diyagram anlamı görsel model gerektirir
 (#24 kriter 4 bu sınırla değerlendirilir). Kare seçim eşikleri gerçek ders videolarında kalibre edilmelidir.
 
-**Durum:** Önerildi · **Karar tarihi:** — · **Katılanlar:** Nisanur İlhan (öneren)
+**Durum:** Kabul edildi · **Karar tarihi:** 2026-11-17 · **Katılanlar:** Nisanur İlhan (öneren), Ceyda Yıldız
+(@ceydayildizz, PR #98 onayı)
 
 ---
 
