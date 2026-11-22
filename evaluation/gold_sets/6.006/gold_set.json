@@ -29,6 +29,207 @@
         "support": "mixed",
         "trap": null
       }
+    },
+    {
+      "id": "alg-r-01",
+      "split": "calibration",
+      "kind": "answerable",
+      "question": "Dynamic_Array_Seq sınıfında _compute_bounds upper ve lower sınırlarını nasıl hesaplıyor?",
+      "topic": "dynamic array resize bounds",
+      "reference_answer": "upper dizinin uzunluğudur (len(self.A)); lower ise len(self.A) // (self.r * self.r) olarak hesaplanır. r varsayılan olarak 2'dir; boyut bu sınırların dışına çıkınca _resize çağrılır.",
+      "evidence": [
+        {
+          "document_sha256": "d2d1de82e87343a7f6b25397914371267759628784c94333a58efa087eb1eb8c",
+          "page": 7
+        }
+      ],
+      "origin": "team_draft",
+      "notes": "Arama ölçümü taslağı (#29): kod terimi. Kanıt ve cevap Recitation 2'nin 7. sayfasındaki Python kodundan.",
+      "query_type": "code"
+    },
+    {
+      "id": "alg-r-02",
+      "split": "heldout",
+      "kind": "answerable",
+      "question": "radix_sort fonksiyonu tuple sort ve counting sort'u nasıl kullanıyor, neden doğrusal zamanda çalışıyor?",
+      "topic": "radix sort",
+      "reference_answer": "Her anahtar n tabanında c basamaklı bir demet olarak yazılır; demet sıralaması en az anlamlı basamaktan en anlamlıya doğru kararlı counting sort ile yapılır. Her basamak O(n) sürer, toplam O(cn); c sabitse (anahtarlar ≤ n^c) sıralama doğrusaldır.",
+      "evidence": [
+        {
+          "document_sha256": "21b2a6d0fb0a7f83da874e31d2da4a445b93d02fb1dbebab7fa5a7e1415fc010",
+          "page": 4
+        }
+      ],
+      "origin": "team_draft",
+      "notes": "Arama ölçümü taslağı (#29): kod terimi (radix_sort). Kaynak Lecture 5 notlarının 4. sayfası.",
+      "query_type": "code"
+    },
+    {
+      "id": "alg-r-03",
+      "split": "heldout",
+      "kind": "answerable",
+      "question": "Johnson algoritmasının adımları neler?",
+      "topic": "Johnson's algorithm",
+      "reference_answer": "G'ye her köşeye 0 ağırlıklı kenarla bağlı yeni bir x köşesi eklenir; Bellman-Ford ile δx(x, v) hesaplanır; −∞ varsa negatif döngü vardır ve durulur. Yoksa kenarlar yeniden ağırlıklandırılır, her u için Dijkstra çalıştırılır ve uzaklıklar geri dönüştürülür.",
+      "evidence": [
+        {
+          "document_sha256": "4da736373d0325dcadf2aaf858cbb55942f9a56bf5f9da1fa9e121efd3ab8992",
+          "page": 4
+        }
+      ],
+      "origin": "team_draft",
+      "notes": "Arama ölçümü taslağı (#29): özel ad (Johnson). Kaynak Lecture 14 notlarının 4. sayfası.",
+      "query_type": "lexical"
+    },
+    {
+      "id": "alg-r-04",
+      "split": "calibration",
+      "kind": "answerable",
+      "question": "Johnson algoritmasında kenar ağırlıkları hangi formülle yeniden hesaplanıyor?",
+      "topic": "Johnson reweighting",
+      "reference_answer": "w'(u, v) = w(u, v) + δx(x, u) − δx(x, v). Sonuçta δ(u, v) = δ'(u, v) − δx(x, u) + δx(x, v) ile gerçek uzaklık geri bulunur.",
+      "evidence": [
+        {
+          "document_sha256": "4da736373d0325dcadf2aaf858cbb55942f9a56bf5f9da1fa9e121efd3ab8992",
+          "page": 4
+        }
+      ],
+      "origin": "team_draft",
+      "notes": "Arama ölçümü taslağı (#29): formül. Kaynak Lecture 14 notlarının 4. sayfası.",
+      "query_type": "formula"
+    },
+    {
+      "id": "alg-r-05",
+      "split": "heldout",
+      "kind": "answerable",
+      "question": "AVL ağacında skew değeri 2 olan bir düğüm yerel olarak nasıl yeniden dengelenir?",
+      "topic": "AVL local rebalance",
+      "reference_answer": "Düğümün alt ağacındaki diğer düğümler dengeliyse bir ya da iki rotasyon yeter: sağ çocuğun skew'i 0 ya da 1 ise düğümde tek sola rotasyon yapılır; −1 ise önce sağ çocukta sağa, sonra düğümde sola rotasyon yapılır. Sonrasında yükseklik aynı kalır ya da bir azalır.",
+      "evidence": [
+        {
+          "document_sha256": "8c0248bb206ffb4556cc346167e18a6fc93d41ad1bdc630ee28d30e51caba9d6",
+          "page": 3
+        }
+      ],
+      "origin": "team_draft",
+      "notes": "Arama ölçümü taslağı (#29): kavram (sayfada metin içi ağaç çizimi var). Kaynak Lecture 7 notlarının 3. sayfası.",
+      "query_type": "concept"
+    },
+    {
+      "id": "alg-r-06",
+      "split": "calibration",
+      "kind": "answerable",
+      "question": "Dinamik diziden eleman silerken alanın boşa gitmemesi için ne yapılıyor?",
+      "topic": "dynamic array deletion",
+      "reference_answer": "Sondan silme Θ(1)'dir ama alan boşa gidebilir. Doluluk oranı rd'nin altına inince dizi ri oranına yeniden boyutlandırılır (rd < ri, ör. rd = 1/4, ri = 1/2); böylece bir sonraki pahalı yeniden boyutlandırmadan önce Θ(n) ucuz işlem gerekir.",
+      "evidence": [
+        {
+          "document_sha256": "8a4659725b3f91ace2590603449a656fdc7b66bd344f1aaaf8004f8be550cb50",
+          "page": 4
+        }
+      ],
+      "origin": "team_draft",
+      "notes": "Arama ölçümü taslağı (#29): kavram. Kaynak Lecture 2 notlarının 4. sayfası.",
+      "query_type": "concept"
+    },
+    {
+      "id": "alg-r-07",
+      "split": "heldout",
+      "kind": "answerable",
+      "question": "Yönsüz bir grafta negatif ağırlıklı döngü olup olmadığını doğrusal zamanda nasıl anlarız?",
+      "topic": "negative cycle undirected",
+      "reference_answer": "Yönsüz grafta negatif ağırlıklı her kenar tek başına negatif bir döngüdür; her kenarı kontrol etmek yeter. Negatif kenar yoksa ağırlıklar negatif değildir ve Dijkstra kullanılabilir; Bellman-Ford yalnızca yönlü graflarda gerekir.",
+      "evidence": [
+        {
+          "document_sha256": "75712f5df8d566d81a677b0d39c0d04a24d66f4c2191c6ebf1c9177f758554b2",
+          "t_start": 550,
+          "t_end": 610
+        }
+      ],
+      "origin": "team_draft",
+      "notes": "Arama ölçümü taslağı (#29): kavram, video transkripti. Aynı fikir Lecture 12 videosunun başında da geçer (tek kanıt seçildi).",
+      "query_type": "concept"
+    },
+    {
+      "id": "alg-v-02",
+      "split": "heldout",
+      "kind": "answerable",
+      "question": "Bu tablodaki öncelik kuyruğu seçenekleri Dijkstra'nın çalışma süresini nasıl etkiliyor?",
+      "topic": "Dijkstra priority queue table",
+      "reference_answer": "Tablo öncelik kuyruğunu dizi, ikili yığın (binary heap) ve Fibonacci yığınıyla karşılaştırır. Dizide decrease key sabit ama delete min doğrusaldır; bu Dijkstra'ya O(V²) verir, yoğun graflarda bu doğrusal sayılır.",
+      "evidence": [
+        {
+          "document_sha256": "4fb1bd33943ce1bbed373cca09d8236321c2fb0d3c9e868e0d258837b3b960d8",
+          "t_start": 3150,
+          "t_end": 3190
+        }
+      ],
+      "origin": "team_draft",
+      "notes": "Görsel/arama taslağı (#29): basılı slayt tablosu (kare OCR'ı okunabilir, 3159–3184 sn). Referans cevap transkriptten.",
+      "playback": {
+        "document_sha256": "4fb1bd33943ce1bbed373cca09d8236321c2fb0d3c9e868e0d258837b3b960d8",
+        "time_s": 3170
+      },
+      "visual": {
+        "frame_kind": "diagram",
+        "expected": "answer",
+        "support": "mixed",
+        "trap": null
+      }
+    },
+    {
+      "id": "alg-v-03",
+      "split": "calibration",
+      "kind": "answerable",
+      "question": "Ekrandaki tabloda tek kaynaklı en kısa yol algoritmaları hangi kısıtlarla kullanılıyor?",
+      "topic": "SSSP algorithms table",
+      "reference_answer": "Ağırlıksız (ya da küçük pozitif ağırlıklı, kenarları bölünebilen) graflarda BFS; DAG'lerde her ağırlıkla DAG relaxation; genel graflarda her ağırlıkla Bellman-Ford. Bu dersin konusu Dijkstra: genel graflarda negatif olmayan ağırlıklar için.",
+      "evidence": [
+        {
+          "document_sha256": "4fb1bd33943ce1bbed373cca09d8236321c2fb0d3c9e868e0d258837b3b960d8",
+          "t_start": 40,
+          "t_end": 60
+        }
+      ],
+      "origin": "team_draft",
+      "notes": "Görsel/arama taslağı (#29): basılı slayt tablosu (kareler 44–55 sn). Referans cevap transkript ve slayttan.",
+      "playback": {
+        "document_sha256": "4fb1bd33943ce1bbed373cca09d8236321c2fb0d3c9e868e0d258837b3b960d8",
+        "time_s": 50
+      },
+      "visual": {
+        "frame_kind": "diagram",
+        "expected": "answer",
+        "support": "mixed",
+        "trap": null
+      }
+    },
+    {
+      "id": "alg-v-04",
+      "split": "heldout",
+      "kind": "answerable",
+      "question": "Bu tablodaki dinamik dizi satırında hangi işlemler sabit zamanda?",
+      "topic": "sequence interface table",
+      "reference_answer": "Dinamik dizide get_at ve set_at sabit zamandadır (A[i] = x_i değişmezi korunur); insert_last ve delete_last amortize sabit zamandır. Diğer işlemler (baştan ya da ortadan ekleme/silme) doğrusaldır.",
+      "evidence": [
+        {
+          "document_sha256": "c4a0e69b758e50040df83ea28372ac776adf4c0a9f6408c0cb9f9cc59c519713",
+          "t_start": 2925,
+          "t_end": 2960
+        }
+      ],
+      "origin": "team_draft",
+      "notes": "Görsel/arama taslağı (#29): basılı slayt tablosu (kareler 2929–2959 sn). Referans cevap transkriptten.",
+      "playback": {
+        "document_sha256": "c4a0e69b758e50040df83ea28372ac776adf4c0a9f6408c0cb9f9cc59c519713",
+        "time_s": 2940
+      },
+      "visual": {
+        "frame_kind": "diagram",
+        "expected": "answer",
+        "support": "mixed",
+        "trap": null
+      }
     }
   ]
 }

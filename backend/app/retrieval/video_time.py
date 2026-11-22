@@ -25,6 +25,7 @@ def video_neighbors(
             Chunk.document_id == video.document_id,
             Chunk.course_id == course.id,
             Document.course_id == course.id,
+            Document.approved_at.is_not(None),
             Document.status == "ready",
             Chunk.t_start.is_not(None),
             Chunk.t_end.is_not(None),
@@ -124,6 +125,7 @@ def video_window(
             Chunk.document_id == video.document_id,
             Chunk.course_id == course.id,
             Document.course_id == course.id,
+            Document.approved_at.is_not(None),
             Document.status == "ready",
             Chunk.t_start.is_not(None),
             Chunk.t_end.is_not(None),
@@ -149,8 +151,10 @@ def video_window(
     return sorted(passages, key=lambda passage: passage.t_start or 0.0)
 
 
-def window_frame_text(db: Session, document_id: int, t_start: float, t_end: float) -> str:
-    """Pencerede ekranda olan slaytların OCR metni (#24/#100). Yalnızca aramayı yönlendirmek
-    için kullanılır; cevapta kanıt olmaz (ADR-10, görsel kanıt #26'nın işi)."""
-    frames = frames_overlapping(db, document_id, t_start, t_end)
+def window_frame_text(
+    db: Session, course: Course, document_id: int, t_start: float, t_end: float
+) -> str:
+    """Pencerede ekranda olan slaytların OCR metni (#24/#100), yalnızca dersin karelerinden.
+    Yalnızca aramayı yönlendirmek için kullanılır; cevapta kanıt olmaz (ADR-10)."""
+    frames = frames_overlapping(db, document_id, t_start, t_end, course_id=course.id)
     return "\n".join(frame.text for frame in frames if frame.text)

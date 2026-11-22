@@ -6,7 +6,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.db.models import Chunk, Course, Document, VideoFrame
-from harness.fingerprint import file_sha256
+from harness.fingerprint import file_sha256, text_sha256
 from harness.schemas import CorpusDocument, CorpusManifest, CorpusSnapshot, SourceLocator
 
 
@@ -65,6 +65,19 @@ class Locator:
         if sha is None:
             return None
         return SourceLocator(document_sha256=sha, t_start=frame.t_start, t_end=frame.t_end)
+
+
+def corpus_fingerprint(corpus: CorpusSnapshot) -> str:
+    """İndeksteki derlemin kimliği (#29): dokümanların içerik parmak izi, türü ve parça sayısı.
+
+    Doküman kimliklerinden ve başlıklardan bağımsızdır; ders silinip aynı dosyalarla aynı
+    parçalama ayarıyla yeniden yüklenirse değişmez. Dosyası bulunamayan doküman da girer
+    (`missing`), böylece eksik dosya fark edilir.
+    """
+    entries = sorted(
+        f"{d.sha256 or 'missing'}|{d.material_type}|{d.chunk_count}" for d in corpus.documents
+    )
+    return text_sha256("\n".join(entries))
 
 
 def find_course(db: Session, course_code: str) -> Course:

@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.db.models import Chunk, Course
+from app.db.models import Chunk, Course, VideoFrame
 
 
 @dataclass
@@ -57,6 +57,89 @@ def inventory(db: Session, course_id: int | None = None) -> IndexInventory:
         entries.append(f"{language}|{page}|{t_start}|{t_end}|{text_hash}|{vector_of}")
     digest = hashlib.sha256("\n".join(sorted(entries)).encode("utf-8")).hexdigest()
     return IndexInventory(chunks, by_embedding, without_vector, digest)
+
+
+@dataclass
+class FrameInventory:
+    """Kare (görsel çıkarım) indeksinin kimliği (#29).
+
+    Parmak izi karelerin zamanından, durumundan, OCR metninden, çıkarıcı kimliğinden
+    (`extractor`: araç, dil, örnekleme), embedder kimliğinden ve yorumlayıcı kimliği + yorum
+    metninden oluşur. Kare/doküman kimliklerinden ve görüntü yolundan bağımsızdır: aynı video
+    aynı ayarlarla yeniden çıkarılırsa değişmez; çıkarıcı ya da model değişince değişir.
+    """
+
+    frames: int
+    by_status: dict[str, int]
+    extractors: list[str]
+    by_embedding: dict[str | None, int]
+    interpreters: list[str]
+    fingerprint: str
+
+
+def frame_inventory(db: Session, course_id: int | None = None) -> FrameInventory:
+    query = select(
+        VideoFrame.t_start,
+        VideoFrame.t_end,
+        VideoFrame.status,
+        VideoFrame.text,
+        VideoFrame.extractor,
+        VideoFrame.embedding_model,
+        VideoFrame.embedding.is_not(None),
+        VideoFrame.description,
+        VideoFrame.description_model,
+    )
+    if course_id is not None:
+        query = query.where(VideoFrame.course_id == course_id)
+    by_status: dict[str, int] = {}
+    by_embedding: dict[str | None, int] = {}
+    extractors: set[str] = set()
+    interpreters: set[str] = set()
+    entries: list[str] = []
+    for (
+        t_start,
+        t_end,
+        status,
+        text,
+        extractor,
+        model,
+        has_vector,
+        description,
+        described_by,
+    ) in db.execute(query):
+        by_status[status] = by_status.get(status, 0) + 1
+        vector_of = model if has_vector else None
+        by_embedding[vector_of] = by_embedding.get(vector_of, 0) + 1
+        extractors.add(extractor)
+        if described_by:
+            interpreters.add(described_by)
+        entries.append(
+            "|".join(
+                (
+                    f"{t_start:.3f}",
+                    f"{t_end:.3f}",
+                    status,
+                    _hash(text),
+                    extractor,
+                    vector_of or "-",
+                    described_by or "-",
+                    _hash(description),
+                )
+            )
+        )
+    digest = hashlib.sha256("\n".join(sorted(entries)).encode("utf-8")).hexdigest()
+    return FrameInventory(
+        frames=len(entries),
+        by_status=by_status,
+        extractors=sorted(extractors),
+        by_embedding=by_embedding,
+        interpreters=sorted(interpreters),
+        fingerprint=digest,
+    )
+
+
+def _hash(text: str | None) -> str:
+    return "-" if text is None else hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 def stale_chunk_count(db: Session, identity: str, course_id: int | None = None) -> int:

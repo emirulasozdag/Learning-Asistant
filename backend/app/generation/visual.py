@@ -180,7 +180,9 @@ class StoredFrameSource:
                 frames = [frame] if frame is not None and frame.document_id == document.id else []
             else:
                 assert locator.time_s is not None
-                frames = frames_overlapping(self._db, document.id, locator.time_s, locator.time_s)
+                frames = frames_overlapping(
+                    self._db, document.id, locator.time_s, locator.time_s, course_id=self._course.id
+                )
             for frame in frames:
                 if frame.id not in seen and len(evidence) < MAX_FRAMES:
                     seen.add(frame.id)
@@ -205,7 +207,9 @@ class StoredFrameSource:
         if document is None:
             return VisualContext(focus=video)
         start = max(video.time_s - before_s, 0.0)
-        frames = frames_overlapping(self._db, document.id, start, video.time_s + after_s)
+        frames = frames_overlapping(
+            self._db, document.id, start, video.time_s + after_s, course_id=self._course.id
+        )
         selected = self._db.get(VideoFrame, frame_id) if frame_id is not None else None
         focus = video
         if selected is not None and selected.document_id == document.id:

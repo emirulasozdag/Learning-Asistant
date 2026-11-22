@@ -181,6 +181,95 @@ geçebilir; taslak takip denemelerinde gerçek takip soruları da bu aralıkta (
 kimliği model adını içerir, model revizyonunu (ağırlık sürümü) içermez; aynı ad altında ağırlık
 değişirse `--all` ile yeniden üretmek gerekir.
 
+## Çok dersli arama ölçümü (#29)
+
+```bash
+# İki (ya da daha çok) ders, LLM yok. Taslak sorular yalnızca --include-unreviewed ile koşulur.
+python -m harness.course_retrieval \
+    --gold gold_sets/6.006/gold_set.json gold_sets/18.06/gold_set.json \
+    --split all --files-root .. --out runs/ --include-unreviewed
+```
+
+Her ders için ([`harness/course_retrieval.py`](harness/course_retrieval.py)):
+
+- **Envanter ve parmak izleri:** onaysız doküman indeksteyse ölçüm yapılmaz. Kayda derlem (indeksteki dosyaların
+  SHA-256'sı, türü, parça sayısı), embedder kimliği, metin indeksi ve **kare indeksi** parmak izi yazılır. Kare
+  parmak izi kare zamanı, durumu, OCR metni, çıkarıcı (`tesseract/<sürüm>/<dil>`), embedder ve yorumlayıcıdan
+  oluşur; kimliklerden ve dosya yollarından bağımsızdır. `harness.run` koşu kaydı da `corpus_fingerprint` ve
+  `frame_fingerprint` tutar; koşul karşılaştırması kare parmak izi farklıysa geçersiz sayılır.
+- **Dallar:** `hybrid` (üretim), `dense`, `lexical`, `hybrid_playback` (oynatma konumlu sorular), `frames` (kare
+  araması; yalnızca kanıtı karesi çıkarılmış videoda olan sorular). Ders filtreli Recall@5, ilk doğru sonucun sırası
+  ve soru türüne göre kırılım. Tür `query_type` alanından (`concept`, `lexical`, `code`, `diagram`, `formula`),
+  yoksa görsel etiketin kare türünden gelir.
+- **Ders filtresi:** her dalın her sonucu dersin dokümanı mı; ayrıca her soru öteki derste de sorulur (sonuç orada
+  kalmalı). Sızıntı varsa rapor "DERS FİLTRESİ İHLALİ" yazar.
+- **Kusur dedektörleri:** kısa sonuç listesi (aday kıtlığı), ilk 5'te tekrar (aynı metin, aynı sayfa ya da kısa
+  aralığın yarısından fazlası ortak), kapıdan geçemeyen cevaplanabilir soru, kare hizası (sıfır uzunluklu ya da süre
+  dışı kare, çakışan komşu, transkriptsiz kare).
+- **Değişkeler:** aday sayısı (10/20/30/50) ve doküman başına sınır (`max_per_document`, yok/2/3); split başına
+  Recall@5 ve iki dersin ağırlıklı ortalaması.
+- **Sorgu planları:** dalların gönderdiği SELECT'ler yakalanır ve `EXPLAIN (ANALYZE, BUFFERS)` ile yeniden çalıştırılır;
+  HNSW'ye kayan plan işaretlenir.
+
+### Ölçüm (2026-11-22, e5-base, LLM yok)
+
+**Taslak set, eğitmen onayı yok:** 6.006'da 11, 18.06'da 14 cevaplanabilir soru (`origin: team_draft`; kanıt ve
+referans cevap dersin materyalinden). Sayılar kabul kanıtı değildir; kusurları bulmak için kullanıldı. Kareler
+6.006 Lecture 2, 6, 13 ve 18.06 Lecture 1–3 videolarından (487 → yeniden kurulumdan sonra 484 kare).
+
+| Dal (Recall@5) | 6.006 | 18.06 |
+|---|---|---|
+| hibrit (üretim) | 0,36 (11) | 0,43 (14) |
+| yalnız anlamsal | 0,36 | 0,43 |
+| yalnız kelime | 0,27 | 0,21 |
+| hibrit + oynatma konumu | 1,00 (4) | 1,00 (5) |
+| kare araması | 0,75 (4) | 0,00 (5) |
+
+- **Türe göre (hibrit):** kod 1,00 / 0,33, özel ad 0,00 / 0,67, kavram 0,67 / 0,00, diyagram 0,00 / 0,67, formül
+  0,00 / 0,33 (6.006 / 18.06; her hücrede 1–4 soru). "Burada çizdiği…" gibi görsel sorular oynatma konumu olmadan
+  bulunamıyor; konumla hepsi bulunuyor.
+- **Ders filtresi:** 25 soru öteki derste de soruldu (64 dal sonuç döndü), ders dışı sonuç 0. Her dalda ders dışı
+  sonuç 0.
+- **Sorgu planları:** anlamsal arama ders filtresinden sonra kesin arama (CTE + Seq Scan, ~16–18 ms, 3 000 parça);
+  hiçbir plan HNSW kullanmadı. Kelime araması GIN (`ix_chunks_search_vector`) ve ders indeksiyle (~25–350 ms).
+  Kare sorguları < 1 ms.
+- **Değişkeler (iki ders, kalibrasyon / held-out):** üretim 0,44 / 0,38; aday 20: 0,44 / 0,31; aday 30–50: 0,33 /
+  0,38; doküman ≤2: 0,56 / 0,38. Aday sayısını artırmak yardımcı olmadı; doküman sınırı kalibrasyonda yalnızca bir
+  soru kazandırdı, held-out'u değiştirmedi. Bu örneklemle üretim ayarı değiştirilmedi; `max_per_document`
+  kapalı bir seçenek olarak kaldı (gerçek gold set gelince yeniden ölçülecek).
+
+### Bulunan ve düzeltilen kusurlar
+
+1. **Kare–transkript hizası:** mp4, altyazının bittiği andan uzunsa (OCW kapanış ekranı), süreden sonra başlayan
+   kare `[süre, süre]` gibi sıfır uzunlukta bir aralığa sıkışıyordu. Bu kare hiçbir ana ve transkripte denk gelmiyor
+   ama aranabilir kalıyordu (kare çıkarılan 6 videonun hepsinde son kare). Artık alınmıyor (`lecture_frames.py`);
+   6.006'nın eski 3 karesi, video yeniden çıkarılınca gider.
+2. **Ders/onay filtresi:** durdurulan an ve video komşuları videonun onaylı olup olmadığına bakmıyordu. Kare ve
+   transkript yardımcıları (`frames_overlapping`, anın slayt yazısı, karenin transkripti ve komşu kareleri) dersi hiç
+   süzmüyor, çağıranın doğru dokümanı vermesine güveniyordu. Artık hepsi dersle süzülüyor.
+
+### Tekrarlanabilir yeniden kurulum
+
+18.06 silinip aynı paketten yeniden içe aktarıldı ve aynı üç videonun kareleri yeniden çıkarıldı. Derlem
+(`bde302618aabef37…`) ve metin indeksi (`d543921fa24d44f8…`) parmak izleri aynı, Recall@5 değerleri aynı. Kare kümesi
+eski kümeden yalnızca üç sıfır uzunluklu kare çıkarılmış hâliyle birebir aynı (265 kare; OCR metni, zaman, durum,
+embedder). Kare parmak izi bu düzeltme yüzünden değişti (`09597942…` → `8a210525…`); düzeltmeden sonraki kurulumlar
+aynı parmak izini verir.
+
+### Açık kalanlar (bu işte düzeltilmedi)
+
+- **Tahta kareleri okunamıyor:** el yazısı tahtada Tesseract anlamsız metin veriyor ("Clam? forall ack end"). 18.06'da
+  kare araması 0,00, aranabilir karelerin çoğu `partial`. Görsel anlam için #119 (görsel yorumlayıcı) gerekir.
+- **Bozuk PDF metni:** "Gram-Schmidt in 9 lines of MATLAB" okumasının metni çıkarımda anlamsız karakterlere dönüyor
+  (font kodlaması); MATLAB Tutorial'da `\`, `(`, `)` gibi semboller kayboluyor. Bu sayfalar indekste ama aranamıyor.
+  Bozuk metni tanıyıp sayfayı OCR'a düşürecek bir kontrol ayrı bir iş.
+- **Kelime araması gecikmesi:** "burayı anlamadım" gibi soruda arama metni anın transkriptiyle büyüdüğü için kelime
+  araması 1,4–1,8 sn sürüyor (her kelime için ayrı belge sayımı). Kısa sorularda 25–350 ms.
+- **Etiket sınırı:** her soruda tek kanıt var. Aynı bilgi başka bir derste de geçiyorsa (ör. Markov hem
+  ZoomNotes'ta hem Lecture 24'te) bulunan diğer kaynak "kaçırıldı" sayılır.
+- **Gold set:** her derste ≥ 30 eğitmen/TA incelemeli görsel soru ve bağımsız etiket yok (envanterde
+  `missing_inputs`).
+
 ## İnsan etiketleri ve judge (#13)
 
 Doğruluk ve hallucination etiket ister. Judge'a, insanlarla uyumu ölçülmeden güvenilmez. Kalibrasyon yalnızca

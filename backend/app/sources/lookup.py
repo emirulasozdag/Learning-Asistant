@@ -97,7 +97,9 @@ def source_detail(db: Session, chunk: Chunk) -> SourceDetail:
         frames=(
             [
                 to_frame_ref(frame)
-                for frame in frames_overlapping(db, document.id, chunk.t_start, chunk.t_end)
+                for frame in frames_overlapping(
+                    db, document.id, chunk.t_start, chunk.t_end, course_id=document.course_id
+                )
             ]
             if chunk.t_start is not None and chunk.t_end is not None
             else []

@@ -249,6 +249,9 @@ OCW paketinden derse özel kod olmadan içe aktarılır (`app/scripts/import_ocw
   bağımsız etiket gerekir. Durum `manifest.json` → `missing_inputs`'ta.
 - **Ayrışma:** iki ders aynı veritabanında; arama, kare, video anı ve kaynak her zaman yalnızca kendi dersinden döner
   (backend ayrışma testleri, Playwright'ta ders değişimi).
+- **Çok dersli arama ölçümü (#29):** `harness.course_retrieval` iki derste dal başına filtreli Recall@5, soru türü
+  kırılımı, çapraz ders sızıntısı, sorgu planları ve parmak izleri yazar. Taslak setle ilk ölçüm, düzeltilen kusurlar
+  ve açık kalanlar: [evaluation/README](../evaluation/README.md#çok-dersli-arama-ölçümü-29).
 
 **Literatür dayanağı:** RAG [1] · ALCE alıntı recall/precision [8] · RAGAs geliştirme-zamanı regresyon [9] · FActScore atomik iddia [10] · RAGTruth etiketleme şeması [11] · LLM-as-a-Judge yanlılıkları [16].
 

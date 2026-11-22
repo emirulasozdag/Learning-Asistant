@@ -71,10 +71,17 @@ def render_comparison(records: Sequence[RunRecord]) -> str:
         f"- Split: `{first.split.value if first.split else 'all'}` · soru: {len(records[0].items)}",
         f"- LLM: {first.llm_provider} `{first.llm_model or 'kapalı'}`",
         f"- Embedding: `{first.embedding_identity or first.embedding_model}` · indeks: "
-        f"`{(first.index_fingerprint or '?')[:16]}…`",
+        f"`{(first.index_fingerprint or '?')[:16]}…` · kareler: "
+        f"`{(first.frame_fingerprint or '?')[:16]}…`",
         f"- Gold set: `{first.gold_set_sha256[:16]}…` · commit: `{first.git_commit or '?'}`",
     ]
-    controlled = ("llm_model", "index_fingerprint", "gold_set_sha256", "embedding_identity")
+    controlled = (
+        "llm_model",
+        "index_fingerprint",
+        "frame_fingerprint",
+        "gold_set_sha256",
+        "embedding_identity",
+    )
     mismatched = [
         field for field in controlled if len({getattr(r.config, field) for r in records}) > 1
     ]

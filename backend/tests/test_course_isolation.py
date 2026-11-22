@@ -17,11 +17,18 @@ from sqlalchemy.orm import Session
 
 from app.db.models import Chunk, Course, Document, ProcessingJob, VideoFrame
 from app.embeddings.fake import FakeEmbedder
+from app.generation.visual import FrameLocator, StoredFrameSource
 from app.retrieval.dense import dense_search
-from app.retrieval.frames import frame_search
+from app.retrieval.frames import (
+    frame_search,
+    frames_overlapping,
+    neighbor_frames,
+    transcript_during,
+)
 from app.retrieval.hybrid import retrieve
 from app.retrieval.lexical import lexical_search
 from app.retrieval.types import VideoPosition
+from app.retrieval.video_time import video_neighbors, window_frame_text
 from tests import test_frames_db
 from tests.conftest import SAMPLE_PAGES, enroll, make_pdf, make_user
 from tests.test_answer import FakeLLM
@@ -190,6 +197,47 @@ def test_frame_search_stays_in_the_course_with_its_context(
             assert hit.frame.id in mine.frames and hit.frame.document_id == video.id
             assert {chunk.id for chunk in hit.transcript} <= mine.raw_chunks
             assert {frame.id for frame in hit.neighbors} <= mine.frames
+
+
+def test_frame_and_moment_helpers_filter_by_course(db: Session, world: SimpleNamespace) -> None:
+    """#29: kare ve an yardımcıları dersle ayrıca süzülür. A'nın arama dalına B'nin video
+    kimliği gelse bile (ör. hatalı çağıran) B'nin karesi, slayt yazısı ya da kanıtı dönmez."""
+    for mine, own_video, other_video in (
+        (world.a, world.video_a, world.video_b),
+        (world.b, world.video_b, world.video_a),
+    ):
+        assert frames_overlapping(db, other_video.id, 0, 1000, course_id=mine.id) == []
+        own = frames_overlapping(db, own_video.id, 0, 1000, course_id=mine.id)
+        assert {frame.id for frame in own} <= _ids(db, mine).frames and own
+        assert window_frame_text(db, mine, other_video.id, 0, 1000) == ""
+        assert "Dijkstra" in window_frame_text(db, mine, own_video.id, 0, 1000)
+
+        source = StoredFrameSource(db, mine)
+        assert source.moment(VideoPosition(other_video.id, 210)).frames == []
+        assert source.load([FrameLocator(document_id=other_video.id, time_s=210)]) == []
+        assert source.moment(VideoPosition(own_video.id, 210)).frames
+        for frame in own:
+            assert {c.course_id for c in transcript_during(db, frame)} <= {mine.id}
+            assert {f.course_id for f in neighbor_frames(db, frame)} <= {mine.id}
+
+
+def test_unapproved_video_is_not_used_as_the_paused_moment(
+    db: Session, world: SimpleNamespace
+) -> None:
+    """#29: durdurulan an ve video komşuları da onaysız videoyu kullanmaz (anlamsal ve kelime
+    araması zaten süzüyordu; an ve komşu dalı süzmüyordu)."""
+    embedder = FakeEmbedder()
+    video = world.video_a
+    paused = VideoPosition(video.id, 210)
+    assert retrieve(db, world.a, "burayı anlamadım", paused, embedder=embedder).video_moment
+
+    video.approved_at = None
+    db.commit()
+
+    result = retrieve(db, world.a, "burayı anlamadım", paused, k=20, embedder=embedder)
+    assert result.video_moment is None and result.deictic is False
+    assert video.id not in {p.document_id for p in result.passages}
+    assert video_neighbors(db, world.a, paused, 120.0, 10) == []
 
 
 # --- soru-cevap (/ask) -----------------------------------------------------------------------

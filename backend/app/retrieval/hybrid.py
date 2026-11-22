@@ -41,6 +41,9 @@ class RetrievalParams:
     moment_before_s: float = 90.0
     moment_after_s: float = 20.0
     moment_chunks: int = 3
+    # İlk k sonuçta bir dokümandan en çok bu kadar parça (#29); fazlası listenin sonuna iner,
+    # elenmez. None = sınır yok. Durdurulan anın sabitlenen bölümü sayılmaz.
+    max_per_document: int | None = None
     min_similarity: float | None = None
     min_keyword_coverage: float | None = None
     follow_up_min_similarity: float | None = None
@@ -124,7 +127,7 @@ def retrieve(
         # "Burayı anlamadım": konu sözcüklerde değil, o anda anlatılandadır. Arama o bölümün
         # transkripti (ve varsa slayt yazısı) ile yapılır; ilgili doküman sayfaları da bulunur.
         assert moment is not None
-        frame_text = window_frame_text(db, moment.document_id, moment.t_start, moment.t_end)
+        frame_text = window_frame_text(db, course, moment.document_id, moment.t_start, moment.t_end)
         search_text = "\n".join(
             part for part in (query, _moment_text(moment.passages), frame_text) if part
         )
@@ -156,7 +159,7 @@ def retrieve(
     fused = reciprocal_rank_fusion(rankings, k=params.rrf_k, weights=weights)
     if moment is None:
         return RetrievalResult(
-            passages=fused[:k],
+            passages=diversify(fused, params.max_per_document, k)[:k],
             relevant=relevant,
             best_similarity=current.best_similarity,
             keyword_coverage=current.keyword_coverage,
@@ -164,7 +167,11 @@ def retrieve(
         )
     # Durdurulan andaki bölüm cevabın ilk kaynaklarıdır; diğer dokümanlar ardından gelir.
     pinned_ids = {passage.source_id for passage in moment.passages}
-    rest = [passage for passage in fused if passage.source_id not in pinned_ids][:k]
+    rest = diversify(
+        [passage for passage in fused if passage.source_id not in pinned_ids],
+        params.max_per_document,
+        k,
+    )[:k]
     return RetrievalResult(
         passages=moment.passages + rest,
         # O anı işaret eden soru, o bölüm kanıt olduğu için kapıdan geçer.
@@ -181,6 +188,30 @@ def retrieve(
         ),
         deictic=deictic,
     )
+
+
+def diversify(
+    passages: list[RetrievedPassage], max_per_document: int | None, k: int
+) -> list[RetrievedPassage]:
+    """İlk `k` sırada bir dokümandan en çok `max_per_document` parça; sıra korunur.
+
+    Sınırı aşan parçalar elenmez, ilk k'nın arkasına (kendi sıralarıyla) iner: aday azsa liste
+    yine dolar. Bir videonun üst üste binen ardışık parçalarının ilk sonuçları doldurup başka
+    dokümandaki kanıtı (ders notu, okuma) dışarıda bırakmasını önler (#29).
+    """
+    if max_per_document is None:
+        return passages
+    head: list[RetrievedPassage] = []
+    tail: list[RetrievedPassage] = []
+    per_document: dict[int, int] = {}
+    for passage in passages:
+        count = per_document.get(passage.document_id, 0)
+        if len(head) < k and count < max_per_document:
+            head.append(passage)
+            per_document[passage.document_id] = count + 1
+        else:
+            tail.append(passage)
+    return head + tail
 
 
 @dataclass
