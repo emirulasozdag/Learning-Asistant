@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "course_code": "18.06",
+  "manifest": "manifest.json",
+  "items": [
+    {
+      "id": "la-v-01",
+      "split": "heldout",
+      "kind": "answerable",
+      "question": "Burada tahtaya çizdiği satır resmi (row picture) neyi gösteriyor?",
+      "topic": "row picture",
+      "reference_answer": "Satır resmi denklemleri tek tek ele alır: xy düzleminde her denklemi sağlayan noktalar bir doğru oluşturur (ör. 2x − y = 0 doğrusu (0,0) ve (1,2)'den geçer); iki doğrunun kesiştiği nokta sistemin çözümüdür.",
+      "evidence": [
+        {
+          "document_sha256": "9fa6200af463b9e099735faf930e08ff55d4f9e13e09e107be19fe870d6e3d93",
+          "t_start": 260,
+          "t_end": 340
+        }
+      ],
+      "origin": "team_draft",
+      "notes": "Görsel soru (#28): tahtadaki çizime dayanır. Referans cevap dersin transkriptinden alınmıştır; altın kare = playback anındaki kare. Koşullar: transcript_only = full_video_time; visual = #26.",
+      "playback": {
+        "document_sha256": "9fa6200af463b9e099735faf930e08ff55d4f9e13e09e107be19fe870d6e3d93",
+        "time_s": 290
+      }
+    },
+    {
+      "id": "la-v-02",
+      "split": "heldout",
+      "kind": "answerable",
+      "question": "Şu an tahtadaki sütun resmini (column picture) anlamadım, ne anlatıyor?",
+      "topic": "column picture",
+      "reference_answer": "Sütun resmi matrisin sütunlarını vektör olarak alır: x çarpı birinci sütun artı y çarpı ikinci sütun, sağ taraftaki b vektörünü vermelidir. Bu sütunların doğrusal birleşimidir (linear combination) ve dersin en temel işlemidir.",
+      "evidence": [
+        {
+          "document_sha256": "9fa6200af463b9e099735faf930e08ff55d4f9e13e09e107be19fe870d6e3d93",
+          "t_start": 519,
+          "t_end": 600
+        }
+      ],
+      "origin": "team_draft",
+      "notes": "Görsel soru (#28): tahtadaki çizime dayanır. Referans cevap dersin transkriptinden alınmıştır; altın kare = playback anındaki kare. Koşullar: transcript_only = full_video_time; visual = #26.",
+      "playback": {
+        "document_sha256": "9fa6200af463b9e099735faf930e08ff55d4f9e13e09e107be19fe870d6e3d93",
+        "time_s": 545
+      }
+    },
+    {
+      "id": "la-v-03",
+      "split": "calibration",
+      "kind": "answerable",
+      "question": "Burada hangi durumda her b için çözüm olmadığını söylüyor?",
+      "topic": "singular matrix",
+      "reference_answer": "Üç sütun aynı düzlemde kalırsa (ör. üçüncü sütun ilk ikisinin toplamıysa) bütün birleşimleri de o düzlemde kalır; düzlem dışındaki b'lere ulaşılamaz. Bu tekil (singular) durumdur: matris tersinir değildir ve her b için çözüm yoktur.",
+      "evidence": [
+        {
+          "document_sha256": "9fa6200af463b9e099735faf930e08ff55d4f9e13e09e107be19fe870d6e3d93",
+          "t_start": 1830,
+          "t_end": 1945
+        }
+      ],
+      "origin": "team_draft",
+      "notes": "Görsel soru (#28): tahtadaki çizime dayanır. Referans cevap dersin transkriptinden alınmıştır; altın kare = playback anındaki kare. Koşullar: transcript_only = full_video_time; visual = #26.",
+      "playback": {
+        "document_sha256": "9fa6200af463b9e099735faf930e08ff55d4f9e13e09e107be19fe870d6e3d93",
+        "time_s": 1900
+      }
+    }
+  ]
+}

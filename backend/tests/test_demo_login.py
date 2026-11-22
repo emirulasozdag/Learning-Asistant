@@ -88,3 +88,35 @@ def test_imported_course_is_given_to_the_dev_instructor_only_when_dev_accounts_a
         )
     )
     assert role == "instructor"
+
+
+def test_demo_course_can_be_turned_off(monkeypatch: pytest.MonkeyPatch, db: Session) -> None:
+    """SEED_DEMO_COURSE=false: silinen demo dersi geri gelmez; hesaplar derssiz oluşturulur."""
+    from app.auth.passwords import MIN_PASSWORD_LENGTH
+    from app.scripts.seed_demo import DEMO_COURSE, demo_course, seed_dev_accounts
+
+    def demo_courses() -> int:
+        return len(db.scalars(select(Course).where(Course.code == DEMO_COURSE["code"])).all())
+
+    before = demo_courses()
+    monkeypatch.setattr(settings, "seed_demo_course", False)
+    monkeypatch.setattr(settings, "dev_instructor_email", "seed-egitmen@example.com")
+    monkeypatch.setattr(settings, "dev_instructor_password", "e" * MIN_PASSWORD_LENGTH)
+    monkeypatch.setattr(settings, "dev_student_email", "seed-ogrenci@example.com")
+    monkeypatch.setattr(settings, "dev_student_password", "o" * MIN_PASSWORD_LENGTH)
+
+    assert demo_course(db) is None
+    seed_dev_accounts(db, None)
+
+    assert demo_courses() == before
+    users = db.scalars(
+        select(User).where(User.email.in_(["seed-egitmen@example.com", "seed-ogrenci@example.com"]))
+    ).all()
+    assert len(users) == 2
+    assert not db.scalars(
+        select(Enrollment).where(Enrollment.user_id.in_([u.id for u in users]))
+    ).all()
+
+    monkeypatch.setattr(settings, "seed_demo_course", True)
+    course = demo_course(db)
+    assert course is not None and course.code == DEMO_COURSE["code"]

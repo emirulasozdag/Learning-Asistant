@@ -68,6 +68,8 @@ services:
       # ve DEMO_LOGIN=false olmalı. .env'deki değerler bu varsayılanların önüne geçer.
       SEED_DEV_ACCOUNTS: ${SEED_DEV_ACCOUNTS:-true}
       DEMO_LOGIN: ${DEMO_LOGIN:-true}
+      # false = demo dersi (BLM2512) açılışta oluşturulmaz; silinmişse geri gelmez.
+      SEED_DEMO_COURSE: ${SEED_DEMO_COURSE:-true}
       DEV_INSTRUCTOR_EMAIL: ${DEV_INSTRUCTOR_EMAIL:-ayse.demir@universite.edu.tr}
       DEV_INSTRUCTOR_PASSWORD: ${DEV_INSTRUCTOR_PASSWORD:-demo-egitmen-2026}
       DEV_INSTRUCTOR_NAME: ${DEV_INSTRUCTOR_NAME:-Dr. Ayşe Demir}

@@ -9,6 +9,10 @@ etiketinden gelir. Pilot dersin (BLM2512) gerçek girdileri henüz yok; eksikler
 [`gold_sets/BLM2512/manifest.json`](gold_sets/BLM2512/manifest.json) içinde `missing_inputs` olarak, #13'ün
 yapılamayan kısımları aşağıda [Açık boşluklar](#açık-boşluklar) altında.
 
+**İki ders (#28):** `gold_sets/6.006/` ve `gold_sets/18.06/` MIT OCW paketlerinden içe aktarılan derslerin
+envanteri (dosya parmak izleri, CC BY-NC-SA izin kaydı) ve görsel soru taslaklarıdır (`origin: team_draft`,
+`playback` = durdurulan an). Eğitmen/TA incelemesi olmadan koşulmazlar; protokol [ANALYSIS §9](../docs/ANALYSIS.md).
+
 ## Klasörler
 
 | Klasör | İçerik | Git'e girer mi? |

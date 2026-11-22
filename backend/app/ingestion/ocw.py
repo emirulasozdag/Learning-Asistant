@@ -21,6 +21,8 @@ SECTION_TYPES: dict[str, MaterialType] = {
     "Recitations": MaterialType.NOTES,
     "Lecture Slides": MaterialType.SLIDES,
     "Readings": MaterialType.TEXTBOOK,
+    # Ek okumalar (ör. 18.06'da ZoomNotes ve kısa notlar); dersin kendi ders notu yoksa tek kaynak.
+    "Related Resources": MaterialType.TEXTBOOK,
     "Quizzes": MaterialType.PAST_EXAM,
     "Exams": MaterialType.PAST_EXAM,
     "Assignments": MaterialType.ASSIGNMENT,
@@ -56,6 +58,24 @@ class OcwFile:
     material_type: MaterialType
     path: Path
     filename: str
+
+
+@dataclass(frozen=True)
+class OcwVideo:
+    """Paketteki ders videosu: altyazısı (VTT, pakette), YouTube kimliği ve mp4 adresi.
+
+    Video dosyası pakette değildir; `archive_url` yalnızca kareler istenirse indirilir (#27, #28).
+    """
+
+    title: str
+    captions: Path
+    filename: str
+    youtube_id: str | None
+    archive_url: str | None
+
+    @property
+    def media_url(self) -> str | None:
+        return f"https://www.youtube.com/watch?v={self.youtube_id}" if self.youtube_id else None
 
 
 @dataclass(frozen=True)
@@ -108,6 +128,45 @@ def list_files(root: Path) -> list[OcwFile]:
         filename = re.sub(r"^[0-9a-f]{32}_", "", stored)
         files[title] = OcwFile(title, material_type, path, filename)
     return sorted(files.values(), key=lambda f: (f.material_type.value, natural_key(f.title)))
+
+
+def list_videos(root: Path, language: str = "en") -> tuple[list[OcwVideo], list[str]]:
+    """Paketteki ders videoları (altyazısıyla) ve altyazısı olmadığı için atlananların başlıkları.
+
+    Altyazı, dersin dilindeki ya da yoksa ilk altyazıdır; dosya pakette (`static_resources`) yoksa
+    video atlanır. Derse özel bir kural yoktur: her OCW paketi aynı alanları taşır (#28).
+    """
+    videos: dict[str, OcwVideo] = {}
+    skipped: list[str] = []
+    for meta_path in sorted((root / "resources").glob("*/data.json")):
+        meta = _load(meta_path)
+        if meta.get("resourcetype") != "Video":
+            continue
+        title = (meta.get("title") or "").strip()
+        if not title or title in videos:
+            continue
+        files = meta.get("video_files") or {}
+        captions = [c for c in files.get("video_captions_resources") or [] if c.get("file")]
+        chosen = next((c for c in captions if c.get("language") == language), None) or next(
+            iter(captions), None
+        )
+        path = root / "static_resources" / Path(chosen["file"]).name if chosen else None
+        if path is None or path.suffix.lower() != ".vtt" or not path.is_file():
+            skipped.append(title)
+            continue
+        archive = (files.get("archive_url") or "").strip()
+        # Eski paketler http:// verir (ör. archive.org); yalnızca https ile indirilir.
+        if archive.startswith("http://"):
+            archive = "https://" + archive.removeprefix("http://")
+        videos[title] = OcwVideo(
+            title=title,
+            captions=path,
+            # Dokümanın dosya adı kaynağın klasör adıdır: "lecture-6-binary-trees-part-1.vtt".
+            filename=f"{meta_path.parent.name}.vtt",
+            youtube_id=(meta.get("video_metadata") or {}).get("youtube_id") or None,
+            archive_url=archive if archive.startswith("https://") else None,
+        )
+    return sorted(videos.values(), key=lambda v: natural_key(v.title)), sorted(skipped)
 
 
 def _material_type(meta: dict[str, Any]) -> MaterialType | None:

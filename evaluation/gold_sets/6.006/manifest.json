@@ -1,0 +1,845 @@
+{
+  "schema_version": 1,
+  "course_code": "6.006",
+  "approved_by": null,
+  "documents": [
+    {
+      "sha256": "7784301c645c2d1ae868d66c54c33ae409d2151121cde4adbb1def20f4f90e6d",
+      "title": "Problem Set 0",
+      "material_type": "assignment",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "57900c2d6383f8cdca2607ffff514c51acafa2218b05a7e90969673368ffd6f3",
+      "title": "Problem Set 0 Solutions",
+      "material_type": "assignment",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "6fc5ba3190ca5d8b20bbb5e091005b0d8a6e33eeec727d0911f8d770c1355217",
+      "title": "Problem Set 1",
+      "material_type": "assignment",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "74d2c19ebd6686413808d323d67819d5e9371a1bcdc96b353f708b1b1f66ae9d",
+      "title": "Problem Set 1 Solutions",
+      "material_type": "assignment",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "878cd27ce210e0eeb5315fe4357a2c22fffb54671dbbcf758ac007f1b84904e5",
+      "title": "Problem Set 2",
+      "material_type": "assignment",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "1bc0619a61a0b8803bab356f63ab74efa9d8c9adff5523bd29a5c094b9000cb1",
+      "title": "Problem Set 2 Solutions",
+      "material_type": "assignment",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "94e9a542acaa16c6b233a151aaff5d4c898e567a82e3f85c02a8626611512e17",
+      "title": "Problem Set 3",
+      "material_type": "assignment",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "31d4089a638122d775c084fcef81d1df3f763bbb8202d266550b6652f70d4f20",
+      "title": "Problem Set 3 Solutions",
+      "material_type": "assignment",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "d11e8f837bdacb43d1b2d34ea2f34873e8e51d4b975cd4caf2a73890f1b0a6bb",
+      "title": "Problem Set 4",
+      "material_type": "assignment",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "74cdf6ca66ebf3dcbb7aad34c95f4549ff84360089348f0437a9357c554c0f66",
+      "title": "Problem Set 4 Solutions",
+      "material_type": "assignment",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "a096b3d93f2b20bdb77bf80736bbf5db41f0a35c722f4bcd213fb7b73e8d898a",
+      "title": "Problem Set 5",
+      "material_type": "assignment",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "93afaba0f49d824d7d16e1092f38754c3458732b8ce4b173168ce3425b9ef063",
+      "title": "Problem Set 5 Solutions",
+      "material_type": "assignment",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "013b65c079dcc1fcdbd124e9210bf97f2fda8649928f1875d5081cc3c609d22c",
+      "title": "Problem Set 6",
+      "material_type": "assignment",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "4a0ae3524e334654aa12c8d6c37d1fb20e7e25ca18704ebbf910b90429143302",
+      "title": "Problem Set 6 Solutions",
+      "material_type": "assignment",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "a4073a882f1cb0c9796b50bc23f06a36db29c355e76b29e5ea13878ed84bd133",
+      "title": "Problem Set 7",
+      "material_type": "assignment",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "6dd8b6cc7df6e8ff7e885068d28eb149a4387df10da311f01ed4a10af454a7bd",
+      "title": "Problem Set 7 Solutions",
+      "material_type": "assignment",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "6f7f78ce0a49c8cd162bc65cb9bbe8f24d17c51cb2aac98f4ffa1cdbcb3fd59a",
+      "title": "Problem Set 8",
+      "material_type": "assignment",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "cd48344b7dfbdf5fa9f3ce0b7debb977337b4c66b24121d8004f6cce14a4cc93",
+      "title": "Problem Set 8 Solutions",
+      "material_type": "assignment",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "8f2f9c1ce1b63313344c86491870e487da796de71b3312ea05b681a00a5b2de5",
+      "title": "Lecture 1: Introduction",
+      "material_type": "notes",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "8a4659725b3f91ace2590603449a656fdc7b66bd344f1aaaf8004f8be550cb50",
+      "title": "Lecture 2: Data Structures",
+      "material_type": "notes",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "d1286329a3781b909c8ed481a5527a12c5f6cc3de76f303fe64d858aa1c91e40",
+      "title": "Lecture 3: Sorting",
+      "material_type": "notes",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "cbc9a669f00c7554520c667853f4bc95f041348fea7ce76fd8a37246c94dc564",
+      "title": "Lecture 4: Hashing",
+      "material_type": "notes",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "21b2a6d0fb0a7f83da874e31d2da4a445b93d02fb1dbebab7fa5a7e1415fc010",
+      "title": "Lecture 5: Linear Sorting",
+      "material_type": "notes",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "b296cb999a106c0de56f2fda725162c8adf12bce06ae849d97842f87c272ad2d",
+      "title": "Lecture 6: Binary Trees, Part 1",
+      "material_type": "notes",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "8c0248bb206ffb4556cc346167e18a6fc93d41ad1bdc630ee28d30e51caba9d6",
+      "title": "Lecture 7: Binary Trees, Part 2: AVL",
+      "material_type": "notes",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "e9a6cdd3ec699a757c4d2c0973cef38dfa3a2aa5da0404dcfdf910197cb92fa3",
+      "title": "Lecture 8: Binary Heaps",
+      "material_type": "notes",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "db45282ccf191109d6725ebaead32ca8c8477abda594f45c1ac83bb78fee17bd",
+      "title": "Lecture 9: Breadth-First Search",
+      "material_type": "notes",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "1130b0c7e033a7232c591b497d8fbafca25840f61492bda9875fdecb39dc2c78",
+      "title": "Lecture 10: Depth-First Search",
+      "material_type": "notes",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "f5420032ed55791f358044569c6d191530afd30ea2e18caeaa654778468ec567",
+      "title": "Lecture 11: Weighted Shortest Paths",
+      "material_type": "notes",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "90235febb335919afa2f36666a74ab9d087dea4cab8db3b7232fa66b5c00f35f",
+      "title": "Lecture 12: Bellman-Ford",
+      "material_type": "notes",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "1ab30bcc723f73f3cedb1c49266cc3bb6d8dbfc53dcf46e1d232df6d5c76a9b5",
+      "title": "Lecture 13: Dijkstra's Algorithm",
+      "material_type": "notes",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "4da736373d0325dcadf2aaf858cbb55942f9a56bf5f9da1fa9e121efd3ab8992",
+      "title": "Lecture 14: Johnson's Algorithm",
+      "material_type": "notes",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "4ffd3740ecac3df26f3b03651a9295a44858f3e3e90da1129d605305b1dc4a1c",
+      "title": "Lecture 15: Recursive Algorithms",
+      "material_type": "notes",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "cda406f918364a6f8d713a18e0ac8773975ebdb23b54a22612ae11f014092fbe",
+      "title": "Lecture 16: Dynamic Programming Subproblems",
+      "material_type": "notes",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "b6e8920c63f7607ef8dcf4f67c9a8659ef6912bbca46ae30a29c2cb62916c76f",
+      "title": "Lecture 17: Dynamic Programming, Part 3",
+      "material_type": "notes",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "bc6a8d82890d24257cb5ccaa50bf76171145c5b3e532f468b546cb1fc7119e08",
+      "title": "Lecture 18: Pseudopolynomial",
+      "material_type": "notes",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "be7e7b80c799bd2e521a94829ee3d5b9c9089f1f7067be21cd4170a6029976c6",
+      "title": "Lecture 19: Complexity",
+      "material_type": "notes",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "8f762641b3b9f470d8f9019d3b279448dfe071480a56aa7bb9dd60cd6ce55ff5",
+      "title": "Lecture 20: Course Review",
+      "material_type": "notes",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "0c1395e3cfbb005b0026dd92ea022d1dabd1a88fddaffe68be2f2b678b141c98",
+      "title": "Recitation 1",
+      "material_type": "notes",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "d2d1de82e87343a7f6b25397914371267759628784c94333a58efa087eb1eb8c",
+      "title": "Recitation 2",
+      "material_type": "notes",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "2e767e65d662c880020f5df083b79c845d539f443b9724b3e3f7fd24cc304341",
+      "title": "Recitation 3",
+      "material_type": "notes",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "0f8a70c58da09b855ea149ff73ef57ebbda1e9dd94b73acc98df3e4b89c39ee1",
+      "title": "Recitation 4",
+      "material_type": "notes",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "d20e8f1664ebfb04c081c2589584e345080957252b0ba949f64abee858094e04",
+      "title": "Recitation 5",
+      "material_type": "notes",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "6edc3510c48c52bd3a8bd4eae3ab9a5ef1656eb4ee08f1bc577b85cc89649596",
+      "title": "Recitation 6",
+      "material_type": "notes",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "ce306d568dcdd0e150793d4a874a47ca990973a0fab860acb00fd394d51a4cf3",
+      "title": "Recitation 7",
+      "material_type": "notes",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "22e08dfecc0a71720f21c5c6365f190d619d47f349989847968cfd943b8066bb",
+      "title": "Recitation 8",
+      "material_type": "notes",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "6e1f5365299d4db6d2513bed78c8029aca33d781f92e7217c06d58c250960c82",
+      "title": "Recitation 9",
+      "material_type": "notes",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "5d2ef32872c60d537c21f75b3d107fa3d9a10003f41a9b48ad51a22a91a0b6ef",
+      "title": "Recitation 10",
+      "material_type": "notes",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "8f779f44a1c2aa711878a7e0dcb35d349d439728f707060a8c94ab8692c3385c",
+      "title": "Recitation 11",
+      "material_type": "notes",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "da13e58d66ce620494f8a5cc9b864f506f2f4fbc1f169c84dd6918d9934d4fa8",
+      "title": "Recitation 12",
+      "material_type": "notes",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "634bb72b0ac5751c9bd49e6cca7a3aa5b0dfd07fdd93ecb989794fa27411390c",
+      "title": "Recitation 13",
+      "material_type": "notes",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "51f06b1e38f5808a12e842219d9c9c7e4368f36bd6aa2739b5a67d0123cfd718",
+      "title": "Recitation 14",
+      "material_type": "notes",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "3ceffe97f97749af68c0f03fd1e8f8eff60960700701f8ec1a8771cc9017eb47",
+      "title": "Recitation 15",
+      "material_type": "notes",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "20b0853e7f19594dd2e21317cb244a81d82ae868462b327854e33e63a42a1e7d",
+      "title": "Recitation 16",
+      "material_type": "notes",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "797c91dad88b0c1c7162c33242b3d31b0e574b1a5c1f3446b5f0037d747667fb",
+      "title": "Recitation 17",
+      "material_type": "notes",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "656c164095e3c2d0068bfbd22f97d0a22212edbaf3a5aad582aab36ef35e39c8",
+      "title": "Recitation 18",
+      "material_type": "notes",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "ecb898389f7fd5a6abff3bd2d1590420fd57ea7f05af5d12f44bdbb3ccbc6588",
+      "title": "Recitation 19",
+      "material_type": "notes",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "91d236a292cb136f029963f0392530d192bc47ffa46de7b419d19bf270ca64d6",
+      "title": "Final Exam",
+      "material_type": "past_exam",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "246d3ca77282a58e08e4b17110f577d524c4f617f088bce08320436c51b96e95",
+      "title": "Final Exam Solutions",
+      "material_type": "past_exam",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "471032a16408319ebfa8a7f97669bcfd41cc95ea313502253329fff6563f274f",
+      "title": "Quiz 1",
+      "material_type": "past_exam",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "1d6d5b03a6d7356e05a6721e5a125535f0501c36efbf7be2f638b9dd35b21883",
+      "title": "Quiz 1 Review",
+      "material_type": "past_exam",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "faed9aef267393371c2460fc09e26a39c82f6395de22bbe3aa1c4763f6694e38",
+      "title": "Quiz 1 Review Solutions",
+      "material_type": "past_exam",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "24b849b78d48bbaf1a9e41df9ac9cb0ba25fe49ec0803d89162eb5213d603968",
+      "title": "Quiz 1 Solutions",
+      "material_type": "past_exam",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "7c1c9556129d08a02de5fa9be2c57aa709eb4f7409648478cfeed9ac4656e5d2",
+      "title": "Quiz 2",
+      "material_type": "past_exam",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "80987eb64686b0b15040d6cae3c0da1683ad42c0bd55a6e600a1c7be74d9e083",
+      "title": "Quiz 2 Review",
+      "material_type": "past_exam",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "9f1ce467e07a3aef878e480484d0d0e9be0847420946069bc8ccf2070f9d7b89",
+      "title": "Quiz 2 Review Solutions",
+      "material_type": "past_exam",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "946535cb4850d29110ef89b98a184197fd6b1bfe8127943ce32ea20ed276b858",
+      "title": "Quiz 2 Solutions",
+      "material_type": "past_exam",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "d8fc8dcb97e1ac21c67cae16d6bf317df0aad43cdad6a700f151cd520ca512d9",
+      "title": "Quiz 3",
+      "material_type": "past_exam",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "4d54eeb3ab2abb8655dd160214ac1af45936c1706c2fd4b6ff7d7e40026371ed",
+      "title": "Quiz 3 Review",
+      "material_type": "past_exam",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "7d155a037ea36a8600fca18a235a005a03d23ffb2c7dc07e4e8a81f73d3c1459",
+      "title": "Quiz 3 Review Solutions",
+      "material_type": "past_exam",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "7553fc1522ab8352513d3d04f3822600bdb9ad7da421b4cdab1da6a13c98ea0b",
+      "title": "Quiz 3 Solutions",
+      "material_type": "past_exam",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "e93ac2e86ce4ce8ec3f04f70fede755f729add27a2987ac5685d0a6657b90c87",
+      "title": "Problem Session 1",
+      "material_type": "practice_problem",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "b418d0e4795d3762fced7bbe8e09c7f105d4cf45a878fdf455151369dd860c5d",
+      "title": "Problem Session 1 Solutions",
+      "material_type": "practice_problem",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "855f6ec62242c60991f4c6f720f098de94e343d9fbdbfb28a140408d1a54472d",
+      "title": "Problem Session 2",
+      "material_type": "practice_problem",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "e1a82b219cc9c9e25bf00e517a8944769eec73861b2d760e7e908bc14d79d76e",
+      "title": "Problem Session 2 Solutions",
+      "material_type": "practice_problem",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "0c61841dcfce293f5496cd5c0c531be8f44f337e02df307839987f21f6324858",
+      "title": "Problem Session 3",
+      "material_type": "practice_problem",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "e395e2e33d3dcf525411a7de21ccdd4cd0367640c92b7e1fd3b153bff7135117",
+      "title": "Problem Session 3 Solutions",
+      "material_type": "practice_problem",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "d64fdeace3be9cede2560fdfc0203d01fa1dbb2c98a4750f1461d9f20889ad03",
+      "title": "Problem Session 4",
+      "material_type": "practice_problem",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "92a69a25b4ebd727755082fef5118dafd470b0d085a1deb5fe74e7080a6c1572",
+      "title": "Problem Session 4 Solutions",
+      "material_type": "practice_problem",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "e02a4f853d40d9c6088f7ab0defb29a1677f4d5af969f4caa8eac25134a4b396",
+      "title": "Problem Session 5",
+      "material_type": "practice_problem",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "7b8a469a6fea49d6369b3650c25efbf32bcab3231069afc0217e8f80b09cdb94",
+      "title": "Problem Session 5 Solutions",
+      "material_type": "practice_problem",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "a074644d6dba9b1b10d3d344faa5de819697492b020ab94331ee7a16513b0249",
+      "title": "Problem Session 6",
+      "material_type": "practice_problem",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "bde04affbc8d4d9a060b3e842beb1d5e29d726ac7c7bce04b2c342a9a68399e9",
+      "title": "Problem Session 6 Solutions",
+      "material_type": "practice_problem",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "5b34bdb976cf0c5ca83c5e854c406b2fe494419e2e337f5255b3b13ed0951328",
+      "title": "Problem Session 7",
+      "material_type": "practice_problem",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "f9ebaf2c92199a20bbc8e0eb2a7f2e6978efef3e47803742ec51fc6bcdf5b823",
+      "title": "Problem Session 7 Solutions",
+      "material_type": "practice_problem",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "0deb6248157012bc9607c02f9652d7e7c2576abdb6fc4f74acf38375d39a0d42",
+      "title": "Problem Session 8",
+      "material_type": "practice_problem",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "fed31f860e589f4fadce556ca90780ee788af9b4e33b0f6040b3a99307029afe",
+      "title": "Problem Session 8 Solutions",
+      "material_type": "practice_problem",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "e874f6c6306d14f483e79291d5ddda4561c606115bba55b4465bbb0da0d0dab8",
+      "title": "Problem Session 9",
+      "material_type": "practice_problem",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "3a75d0be09b45aef7bfe77310776c043098dd3daec0c8807b92adf067a132b85",
+      "title": "Problem Session 9 Solutions",
+      "material_type": "practice_problem",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "d2aba65d36acb3ad61ea8af6197e420a94105dc8f1bd1a05c5a551192b318f2d",
+      "title": "Lecture 1: Algorithms and Computation",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "c4a0e69b758e50040df83ea28372ac776adf4c0a9f6408c0cb9f9cc59c519713",
+      "title": "Lecture 2: Data Structures and Dynamic Arrays",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "685461025a0488c1f8ec1fbffd2d93fac97027535709104b761b50317f9b92d0",
+      "title": "Lecture 3: Sets and Sorting",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "d3e88955fdb3215b973333ac5c593d1be7e1313edac535d3ddd0acba9c6ece41",
+      "title": "Lecture 4: Hashing",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "c26eca6672f5735f5b8704374094fa02d8a2edb1022d38f7f58906f23c5d0bcc",
+      "title": "Lecture 5: Linear Sorting",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "a19c6ae66b4b243b7a8cff782bc0a38d2f7b0b94e0a8188d286dd623a33040f1",
+      "title": "Lecture 6: Binary Trees, Part 1",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "a7b6421fc65df99c4c513b40d40cc9c28bb6431a8955d5bb4b616f5c5f07ff95",
+      "title": "Lecture 7: Binary Trees, Part 2: AVL",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "402b2a9d39574fe24cd7cccbb0e364fc10f4e84275c63f2dca8daa6264e230fb",
+      "title": "Lecture 8: Binary Heaps",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "9760d4bb57f8e36d618881f2b59d32769005893376ea87c005ccfd46949b7b7c",
+      "title": "Lecture 9: Breadth-First Search",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "c81b9dc1a736e46dbf8584b25cf26537d13aee9df561b669e86685e2012e730b",
+      "title": "Lecture 10: Depth-First Search",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "331dc523b756be73dcdcda2c9e5c29775489f606d2afda158c9bd94c3aad21f3",
+      "title": "Lecture 11: Weighted Shortest Paths",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "36697e8d6ed88ded2729efddf3d631c8385bf6183a372efda6a148f51363a67c",
+      "title": "Lecture 12: Bellman-Ford",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "4fb1bd33943ce1bbed373cca09d8236321c2fb0d3c9e868e0d258837b3b960d8",
+      "title": "Lecture 13: Dijkstra",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "75712f5df8d566d81a677b0d39c0d04a24d66f4c2191c6ebf1c9177f758554b2",
+      "title": "Lecture 14: APSP and Johnson",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "34852663c7d5cc3150655c8d65b35ce4de51bfb5f642e2ce71b37ef39b516aac",
+      "title": "Lecture 15: Dynamic Programming, Part 1: SRTBOT, Fib, DAGs, Bowling",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "1df809c44fc16b1e01509ac2f16de3e55b6c51ae4f43be4995547e0b7c824bf8",
+      "title": "Lecture 16: Dynamic Programming, Part 2: LCS, LIS, Coins",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "8fb97ea2b0909b79d995132bf508312061d363e66cd21d077be39edf4d420c2b",
+      "title": "Lecture 17: Dynamic Programming, Part 3: APSP, Parens, Piano",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "c5d93885efe120ffd3a6c8f893bed95014547d0f13f1c84fe6aa7eca9c5a7579",
+      "title": "Lecture 18: Dynamic Programming, Part 4: Rods, Subset Sum, Pseudopolynomial",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "911eb995889a5082dfc186740bcc0af086da01892dac4d83588a390867c84da2",
+      "title": "Lecture 19: Complexity",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "eb5d2e4afc336e3109bea11b884393360286bee98ec934b3d721b2f27c005f48",
+      "title": "Lecture 20: Course Review",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "82ee21222a1f1df58d2b45833937b087a14b542c51e96320d3a867f1a84fd7e5",
+      "title": "Lecture 21: Algorithms—Next Steps",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "ba33901ac1c389e1f4cc956676a05b04f894d712f6636e7e851ed07262d8b1f9",
+      "title": "Problem Session 1",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "a66dea4b0f5e9695967e258e2658fc7606f9ca809b71f359c02e66ec6b701bac",
+      "title": "Problem Session 2",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "2320fe17f592163fff8973be33a16a1fddf7e8ac5daabe487e6ee569511e42b3",
+      "title": "Problem Session 5",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "8e42414f77f9f17b942b981c7b635bb7d9dd3f3a02748206169a237c83a4c334",
+      "title": "Quiz 1 Review",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "bcd193e9ffd7cf726a7449ea03a478d6a5a3582d05ccae7b5593c5df288d8cc2",
+      "title": "Quiz 2 Review",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    },
+    {
+      "sha256": "06c98a6d67b44428f22988ef9aeddb77b8d21333cdc194df6d7bbb5ad5fc243b",
+      "title": "Quiz 3 Review",
+      "material_type": "video",
+      "status": "approved",
+      "permission": "MIT OpenCourseWare, CC BY-NC-SA 4.0 (https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/); ekip kaydı 2026-11-18"
+    }
+  ],
+  "missing_inputs": [
+    {
+      "what": "Görsel soruların ve referans cevapların eğitmen/TA incelemesi (review); ekip taslakları onaysız koşulmaz",
+      "owner": "Ekip → eğitmen/TA",
+      "blocking": [
+        "#28",
+        "#33"
+      ]
+    },
+    {
+      "what": "Ayrılmış görsel soru setinin tamamı (her derste en az 30 soru, altın kare zamanıyla) ve bağımsız etiketler",
+      "owner": "Ekip + eğitmen/TA",
+      "blocking": [
+        "#28",
+        "#29",
+        "#33"
+      ]
+    },
+    {
+      "what": "Görsel koşulun (karelerin cevaba kanıt olması) uygulaması; o zamana kadar yalnızca transkript koşulu koşulur",
+      "owner": "#26",
+      "blocking": [
+        "#33"
+      ]
+    }
+  ]
+}
