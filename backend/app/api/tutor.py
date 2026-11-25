@@ -2,12 +2,13 @@ import json
 import logging
 from collections.abc import Iterator
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
 from app.api.deps import DbSession, SessionFactory, checked_video, get_course_for
 from app.auth.dependencies import AuthUser, CurrentUser, not_found_error, require_consent
 from app.db.models import Course, User
+from app.llm.deadline import DEADLINE_ERROR_DETAIL, TutorTurnDeadlineExceeded
 from app.llm.gateway import LLMRole, select_client, select_orchestrator
 from app.qa.service import ConversationNotFound, get_conversation
 from app.schemas.tutor import TutorTurnRequest, TutorTurnResponse
@@ -36,6 +37,8 @@ def turn(request: TutorTurnRequest, user: AuthUser, db: DbSession) -> TutorTurnR
         )
     except ConversationNotFound as exc:
         raise not_found_error("conversation_not_found") from exc
+    except TutorTurnDeadlineExceeded as exc:
+        raise HTTPException(status_code=504, detail=DEADLINE_ERROR_DETAIL) from exc
 
 
 @router.post("/turn/stream")
@@ -76,6 +79,8 @@ def turn_stream(
                     yield _event(event)
             except ConversationNotFound:
                 yield _sse("error", {"detail": "Sohbet bulunamadı"})
+            except TutorTurnDeadlineExceeded:
+                yield _sse("error", {"detail": DEADLINE_ERROR_DETAIL})
             except Exception:
                 logger.exception("Tutor turu başarısız")
                 stream_db.rollback()

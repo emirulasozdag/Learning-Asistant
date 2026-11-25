@@ -35,7 +35,11 @@ def select_client(
     yerel model yapılandırılmamışsa bu istemci açık bir hatayla durur, hosted'a düşmez.
     """
     if route_for(data) == "local":
-        return LocalLLMClient(settings.llm_local_base_url, settings.llm_local_model)
+        return LocalLLMClient(
+            settings.llm_local_base_url,
+            settings.llm_local_model,
+            timeout_s=settings.llm_timeout_s,
+        )
     if not settings.llm_api_key:
         return None
     model, thinking = {
@@ -128,7 +132,7 @@ def select_judge_client() -> LLMClient | None:
             "farklı bir aile seçin (JUDGE_PROVIDER, JUDGE_MODEL)."
         )
     if provider == "local":
-        return LocalLLMClient(settings.llm_local_base_url, model)
+        return LocalLLMClient(settings.llm_local_base_url, model, timeout_s=settings.llm_timeout_s)
     api_key = settings.judge_api_key or (
         settings.llm_api_key if provider == settings.llm_provider else ""
     )
@@ -166,13 +170,18 @@ def _build_client(
             timeout_s=settings.llm_timeout_s,
         )
     if provider == "anthropic":
-        return AnthropicLLMClient(api_key=api_key, model=model)
+        return AnthropicLLMClient(api_key=api_key, model=model, timeout_s=settings.llm_timeout_s)
     if provider == "openai":
         return OpenAIClient(
             api_key=api_key, model=model, purpose=purpose, timeout_s=settings.llm_timeout_s
         )
     if provider == "openrouter":
         return ChatCompletionsClient(
-            name="openrouter", api_key=api_key, model=model, base_url=base_url, purpose=purpose
+            name="openrouter",
+            api_key=api_key,
+            model=model,
+            base_url=base_url,
+            purpose=purpose,
+            timeout_s=settings.llm_timeout_s,
         )
     raise ValueError(f"Bilinmeyen LLM sağlayıcısı: {provider}")

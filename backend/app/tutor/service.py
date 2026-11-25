@@ -11,6 +11,7 @@ yazılır.
 
 from collections.abc import Iterator
 from dataclasses import dataclass
+from time import monotonic
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -19,6 +20,7 @@ from app.core.config import settings
 from app.db.models import Conversation, Course, Message, User
 from app.embeddings.base import Embedder
 from app.llm.base import LLMClient, ToolCallingClient
+from app.llm.deadline import check_tutor_turn_deadline, use_tutor_turn_deadline
 from app.llm.release import releasing
 from app.qa.service import (
     answer_meta,
@@ -59,13 +61,50 @@ def turn_stream(
     checker: LLMClient | None = None,
     reranker: LLMClient | None = None,
 ) -> Iterator[TutorEvent | TurnDoneEvent]:
+    deadline_at = monotonic() + settings.tutor_turn_deadline_s
+    stream = _turn_stream(
+        db,
+        course,
+        request,
+        orchestrator,
+        generator,
+        user,
+        embedder,
+        checker,
+        reranker,
+    )
+    try:
+        while True:
+            with use_tutor_turn_deadline(deadline_at):
+                try:
+                    event = next(stream)
+                except StopIteration:
+                    return
+            yield event
+    finally:
+        with use_tutor_turn_deadline(deadline_at):
+            stream.close()
+
+
+def _turn_stream(
+    db: Session,
+    course: Course,
+    request: TutorTurnRequest,
+    orchestrator: ToolCallingClient | None,
+    generator: LLMClient | None,
+    user: User | None = None,
+    embedder: Embedder | None = None,
+    checker: LLMClient | None = None,
+    reranker: LLMClient | None = None,
+) -> Iterator[TutorEvent | TurnDoneEvent]:
     user_id = user.id if user else None
     conversation = get_conversation(db, course, request.conversation_id, user_id)
     created = request.conversation_id is None
     # Yeni sohbetin kimliği akıştaki bloklara girer: kısa bir işlemle hemen yazılır, tur
     # başarısız olursa silinir. Model çağrıları açık işlem içinde beklemez.
-    db.commit()
     try:
+        check_tutor_turn_deadline()
+        db.commit()
         ctx = TurnContext(
             db=db,
             course=course,
@@ -82,6 +121,7 @@ def turn_stream(
             general_enabled=settings.tutor_general_knowledge,
         )
         trace = yield from run_turn(ctx, releasing(orchestrator, db.commit))
+        check_tutor_turn_deadline()
         # Sohbet tur sürerken silindiyse ConversationNotFound (mesaj yazılmaz).
         get_conversation(db, course, conversation.id, user_id)
         response = TutorTurnResponse(

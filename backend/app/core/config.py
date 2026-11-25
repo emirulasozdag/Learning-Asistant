@@ -1,3 +1,4 @@
+import math
 from pathlib import Path
 from typing import Annotated, Literal
 
@@ -66,6 +67,7 @@ class Settings(BaseSettings):
 
     # AI Tutor (orkestratör, `app/tutor/`). Bir turda en fazla bu kadar araç adımı.
     tutor_max_steps: int = 4
+    tutor_turn_deadline_s: float = 180.0
     # Kaynaklı cevapta yeniden sıralama (`retrieval/rerank.py`): aramanın bu kadar adayı hızlı
     # modelle puanlanır, en iyi `keep` parça üreticiye gider. 0 = kapalı (aramanın ilk 5'i).
     tutor_rerank_candidates: int = 20
@@ -157,6 +159,13 @@ class Settings(BaseSettings):
     def split_origins(cls, value: str | list[str]) -> list[str]:
         if isinstance(value, str):
             return [origin.strip() for origin in value.split(",") if origin.strip()]
+        return value
+
+    @field_validator("llm_timeout_s", "tutor_turn_deadline_s")
+    @classmethod
+    def positive_timeouts(cls, value: float) -> float:
+        if not math.isfinite(value) or value <= 0:
+            raise ValueError("timeout values must be finite and greater than zero")
         return value
 
     @property

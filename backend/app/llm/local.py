@@ -22,10 +22,16 @@ class LocalLLMClient:
 
     name = "local"
 
-    def __init__(self, base_url: str = "", model: str = "") -> None:
+    def __init__(self, base_url: str = "", model: str = "", timeout_s: float = 90.0) -> None:
         self.model = model or "local-unconfigured"
         self._client = (
-            ChatCompletionsClient(name="local", api_key="local", model=model, base_url=base_url)
+            ChatCompletionsClient(
+                name="local",
+                api_key="local",
+                model=model,
+                base_url=base_url,
+                timeout_s=timeout_s,
+            )
             if base_url and model
             else None
         )

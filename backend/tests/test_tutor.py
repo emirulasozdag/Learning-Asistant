@@ -4,6 +4,7 @@ Orkestratör ve üretici sahtedir: orkestratör önceden yazılmış araç çağ
 `client` dersin eğitmeni olarak oturum açmıştır (conftest).
 """
 
+import time
 from pathlib import Path
 
 import pytest
@@ -12,7 +13,7 @@ from sqlalchemy import select
 
 from app.api import tutor as tutor_api
 from app.core.config import settings
-from app.db.models import Course, Message
+from app.db.models import Conversation, Course, Message
 from app.llm.base import ChatMessage, LLMError, LLMUsage, ToolCall, ToolSpec
 from app.llm.gateway import LLMRole
 from app.qa import service as qa_service
@@ -29,6 +30,8 @@ class FakeConversation:
         self.owner = owner
 
     def step(self) -> list[ToolCall]:
+        if self.owner.delay_s:
+            time.sleep(self.owner.delay_s)
         if self.owner.error:
             raise self.owner.error
         return self.owner.script.pop(0)
@@ -41,9 +44,15 @@ class FakeOrchestrator:
     name = "fake"
     model = "fake-orchestrator"
 
-    def __init__(self, *steps: list[ToolCall], error: Exception | None = None) -> None:
+    def __init__(
+        self,
+        *steps: list[ToolCall],
+        error: Exception | None = None,
+        delay_s: float = 0.0,
+    ) -> None:
         self.script = list(steps)
         self.error = error
+        self.delay_s = delay_s
         self.usage: list[LLMUsage] = [
             LLMUsage("gemini-3.5-flash-lite", "orchestrator", 1000, 50, cached_tokens=800)
         ]
@@ -376,6 +385,65 @@ def test_turn_requires_membership_consent_and_own_conversation(
     assert outsider.status_code == 404
     assert no_consent.status_code == 403 and no_consent.json()["code"] == "consent_required"
     assert foreign.status_code == 404 and foreign.json()["code"] == "conversation_not_found"
+
+
+def test_turn_deadline_returns_retryable_error_and_discards_new_conversation(
+    client: TestClient,
+    db,
+    course: Course,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "tutor_turn_deadline_s", 0.5, raising=False)
+    use(
+        monkeypatch,
+        FakeOrchestrator([call("reply_notice", kind="greeting")], delay_s=0.75),
+        FakeLLM([]),
+    )
+
+    response = client.post(
+        "/tutor/turn/stream", json={"course_id": course.id, "message": "merhaba"}
+    )
+
+    events = parse_sse(response.text)
+    assert response.status_code == 200
+    assert [name for name, _ in events] == ["error"]
+    assert db.scalars(select(Conversation)).all() == []
+    assert db.scalars(select(Message)).all() == []
+
+
+def test_turn_deadline_preserves_existing_conversation_messages(
+    client: TestClient,
+    db,
+    course: Course,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    use(monkeypatch, FakeOrchestrator([call("reply_notice", kind="greeting")]), FakeLLM([]))
+    original = turn(client, course, "merhaba")
+    original_messages = db.scalars(select(Message).order_by(Message.id)).all()
+    assert len(original_messages) == 2
+
+    monkeypatch.setattr(settings, "tutor_turn_deadline_s", 0.5, raising=False)
+    use(
+        monkeypatch,
+        FakeOrchestrator([call("reply_notice", kind="greeting")], delay_s=0.75),
+        FakeLLM([]),
+    )
+    response = client.post(
+        "/tutor/turn/stream",
+        json={
+            "course_id": course.id,
+            "conversation_id": original["conversation_id"],
+            "message": "tesekkurler",
+        },
+    )
+
+    events = parse_sse(response.text)
+    assert response.status_code == 200
+    assert [name for name, _ in events] == ["error"]
+    db.expire_all()
+    saved = db.scalars(select(Message).order_by(Message.id)).all()
+    assert len(saved) == 2
+    assert [message.content for message in saved] == [m.content for m in original_messages]
 
 
 def test_paused_video_and_vague_question_go_straight_to_the_sourced_answer(
