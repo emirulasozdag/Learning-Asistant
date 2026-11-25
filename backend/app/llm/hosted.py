@@ -1,12 +1,19 @@
 import base64
 import logging
 from collections.abc import Iterator
+from time import monotonic
 from typing import Any
 
 import anthropic
 from pydantic import BaseModel
 
 from app.llm.base import ChatMessage, ContentPart, ImagePart, LLMError, LLMRefusal
+from app.llm.deadline import (
+    TutorTurnDeadlineExceeded,
+    check_tutor_turn_deadline,
+    request_timed_out_at_deadline,
+    request_timeout,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -18,14 +25,24 @@ class AnthropicLLMClient:
     # Anthropic modelleri görüntü girdisi kabul eder (#26).
     accepts_images = True
 
-    def __init__(self, api_key: str, model: str, effort: str = "medium") -> None:
-        self._client = anthropic.Anthropic(api_key=api_key, timeout=60.0, max_retries=2)
+    def __init__(
+        self, api_key: str, model: str, effort: str = "medium", timeout_s: float = 60.0
+    ) -> None:
+        self.timeout_s = timeout_s
+        self._client = anthropic.Anthropic(api_key=api_key, timeout=timeout_s, max_retries=2)
         self.model = model
         self.effort = effort
 
+    def _request_client(self) -> anthropic.Anthropic:
+        timeout_s, deadline_active = request_timeout(self.timeout_s)
+        if deadline_active:
+            return self._client.with_options(timeout=timeout_s, max_retries=0)
+        return self._client
+
     def stream_text(self, system: str, messages: list[ChatMessage]) -> Iterator[str]:
+        request_started_at = monotonic()
         try:
-            with self._client.beta.messages.stream(
+            with self._request_client().beta.messages.stream(
                 model=self.model,
                 max_tokens=16000,
                 system=system,
@@ -34,10 +51,18 @@ class AnthropicLLMClient:
                 betas=["server-side-fallback-2026-07-01"],
                 fallbacks="default",
             ) as stream:
-                yield from stream.text_stream
+                for text in stream.text_stream:
+                    check_tutor_turn_deadline()
+                    yield text
                 final = stream.get_final_message()
         except anthropic.APIError as exc:
+            if isinstance(exc, anthropic.APITimeoutError) and request_timed_out_at_deadline(
+                self.timeout_s, request_started_at
+            ):
+                raise TutorTurnDeadlineExceeded from exc
+            check_tutor_turn_deadline()
             raise _to_llm_error(exc) from exc
+        check_tutor_turn_deadline()
         if final.stop_reason == "refusal":
             raise LLMRefusal("Model bu soruyu yanıtlamadı.")
         if final.stop_reason == "max_tokens":
@@ -53,8 +78,9 @@ class AnthropicLLMClient:
         return self._parse(system, [_block(part) for part in parts], schema)
 
     def _parse[T: BaseModel](self, system: str, content: Any, schema: type[T]) -> T:
+        request_started_at = monotonic()
         try:
-            response = self._client.beta.messages.parse(
+            response = self._request_client().beta.messages.parse(
                 model=self.model,
                 max_tokens=16000,
                 system=system,
@@ -66,7 +92,13 @@ class AnthropicLLMClient:
                 fallbacks="default",
             )
         except anthropic.APIError as exc:
+            if isinstance(exc, anthropic.APITimeoutError) and request_timed_out_at_deadline(
+                self.timeout_s, request_started_at
+            ):
+                raise TutorTurnDeadlineExceeded from exc
+            check_tutor_turn_deadline()
             raise _to_llm_error(exc) from exc
+        check_tutor_turn_deadline()
 
         if response.stop_reason == "refusal":
             raise LLMRefusal("Model bu soruyu yanıtlamadı.")

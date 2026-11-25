@@ -14,6 +14,8 @@ Aracı (OpenRouter) yok: ders materyali ve sorular yalnızca Google'a gider (ADR
 
 import logging
 from collections.abc import Iterator
+from contextlib import contextmanager
+from time import monotonic
 from typing import Any
 
 import httpx
@@ -32,6 +34,12 @@ from app.llm.base import (
     ToolSpec,
 )
 from app.llm.catalog import thinking_level_for
+from app.llm.deadline import (
+    TutorTurnDeadlineExceeded,
+    check_tutor_turn_deadline,
+    request_timed_out_at_deadline,
+    request_timeout,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +70,9 @@ class GeminiLLMClient:
         timeout_s: float = 90.0,
         client: Any = None,
     ) -> None:
+        self._api_key = api_key
+        self._owns_client = client is None
+        self.timeout_s = timeout_s
         self._client = client or genai.Client(
             api_key=api_key,
             http_options=types.HttpOptions(timeout=int(timeout_s * 1000), retry_options=_RETRY),
@@ -72,28 +83,57 @@ class GeminiLLMClient:
         self.max_output_tokens = max_output_tokens
         self.usage: list[LLMUsage] = []
 
+    @contextmanager
+    def _request_client(self) -> Iterator[Any]:
+        timeout_s, deadline_active = request_timeout(self.timeout_s)
+        if not deadline_active or not self._owns_client:
+            yield self._client
+            return
+        client = genai.Client(
+            api_key=self._api_key,
+            http_options=types.HttpOptions(
+                timeout=max(1, int(timeout_s * 1000)),
+                retry_options=types.HttpRetryOptions(attempts=1),
+            ),
+        )
+        try:
+            yield client
+        finally:
+            client.close()
+
     def stream_text(self, system: str, messages: list[ChatMessage]) -> Iterator[str]:
         finish: types.FinishReason | None = None
         usage = None
+        request_started_at = monotonic()
         try:
-            stream = self._client.models.generate_content_stream(
-                model=self.model, contents=_contents(messages), config=self._config(system)
-            )
-            for chunk in stream:
-                _raise_if_prompt_blocked(chunk)
-                usage = chunk.usage_metadata or usage
-                candidate = chunk.candidates[0] if chunk.candidates else None
-                if candidate is None:
-                    continue
-                finish = candidate.finish_reason or finish
-                if text := _text(candidate):
-                    yield text
+            with self._request_client() as client:
+                stream = client.models.generate_content_stream(
+                    model=self.model, contents=_contents(messages), config=self._config(system)
+                )
+                for chunk in stream:
+                    check_tutor_turn_deadline()
+                    _raise_if_prompt_blocked(chunk)
+                    usage = chunk.usage_metadata or usage
+                    candidate = chunk.candidates[0] if chunk.candidates else None
+                    if candidate is None:
+                        continue
+                    finish = candidate.finish_reason or finish
+                    if text := _text(candidate):
+                        yield text
         except errors.APIError as exc:
+            check_tutor_turn_deadline()
             raise _to_llm_error(exc) from exc
+        except httpx.TimeoutException as exc:
+            if request_timed_out_at_deadline(self.timeout_s, request_started_at):
+                raise TutorTurnDeadlineExceeded from exc
+            check_tutor_turn_deadline()
+            raise LLMError("LLM servisine bağlanılamadı.") from exc
         except httpx.HTTPError as exc:
+            check_tutor_turn_deadline()
             raise LLMError("LLM servisine bağlanılamadı.") from exc
         finally:
             self._record(usage)
+        check_tutor_turn_deadline()
         _check_finish(finish)
 
     def complete_json[T: BaseModel](self, system: str, prompt: str, schema: type[T]) -> T:
@@ -163,13 +203,23 @@ class GeminiLLMClient:
     def _generate(
         self, contents: list[types.Content], config: types.GenerateContentConfig
     ) -> types.GenerateContentResponse:
+        request_started_at = monotonic()
         try:
-            response = self._client.models.generate_content(
-                model=self.model, contents=contents, config=config
-            )
+            with self._request_client() as client:
+                response = client.models.generate_content(
+                    model=self.model, contents=contents, config=config
+                )
+                check_tutor_turn_deadline()
         except errors.APIError as exc:
+            check_tutor_turn_deadline()
             raise _to_llm_error(exc) from exc
+        except httpx.TimeoutException as exc:
+            if request_timed_out_at_deadline(self.timeout_s, request_started_at):
+                raise TutorTurnDeadlineExceeded from exc
+            check_tutor_turn_deadline()
+            raise LLMError("LLM servisine bağlanılamadı.") from exc
         except httpx.HTTPError as exc:
+            check_tutor_turn_deadline()
             raise LLMError("LLM servisine bağlanılamadı.") from exc
         self._record(response.usage_metadata)
         _raise_if_prompt_blocked(response)

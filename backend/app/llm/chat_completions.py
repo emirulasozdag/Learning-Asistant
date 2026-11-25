@@ -4,6 +4,7 @@ import base64
 import json
 import logging
 from collections.abc import Iterator
+from time import monotonic
 from typing import Any
 
 import openai
@@ -22,6 +23,12 @@ from app.llm.base import (
     LLMUsage,
     ToolCall,
     ToolSpec,
+)
+from app.llm.deadline import (
+    TutorTurnDeadlineExceeded,
+    check_tutor_turn_deadline,
+    request_timed_out_at_deadline,
+    request_timeout,
 )
 
 logger = logging.getLogger(__name__)
@@ -45,6 +52,7 @@ class ChatCompletionsClient:
     ) -> None:
         self.name = name
         self.purpose = purpose
+        self.timeout_s = timeout_s
         self.usage: list[LLMUsage] = []
         self._client = openai.OpenAI(
             api_key=api_key,
@@ -63,9 +71,16 @@ class ChatCompletionsClient:
             else {"max_tokens": 4000}
         )
 
+    def _request_client(self) -> openai.OpenAI:
+        timeout_s, deadline_active = request_timeout(self.timeout_s)
+        if deadline_active:
+            return self._client.with_options(timeout=timeout_s, max_retries=0)
+        return self._client
+
     def stream_text(self, system: str, messages: list[ChatMessage]) -> Iterator[str]:
+        request_started_at = monotonic()
         try:
-            with self._client.chat.completions.create(
+            with self._request_client().chat.completions.create(
                 model=self.model,
                 **self._options,
                 **({"stream_options": {"include_usage": True}} if self.name == "openai" else {}),
@@ -74,6 +89,7 @@ class ChatCompletionsClient:
             ) as stream:
                 finish_reason = None
                 for chunk in stream:
+                    check_tutor_turn_deadline()
                     self._record_usage(chunk.usage)
                     if not chunk.choices:
                         continue
@@ -85,7 +101,13 @@ class ChatCompletionsClient:
                         if choice.delta.content:
                             yield choice.delta.content
         except openai.APIError as exc:
+            if isinstance(exc, openai.APITimeoutError) and request_timed_out_at_deadline(
+                self.timeout_s, request_started_at
+            ):
+                raise TutorTurnDeadlineExceeded from exc
+            check_tutor_turn_deadline()
             raise _to_llm_error(exc) from exc
+        check_tutor_turn_deadline()
         _check_finish(finish_reason)
 
     def complete_json[T: BaseModel](self, system: str, prompt: str, schema: type[T]) -> T:
@@ -120,6 +142,7 @@ class ChatCompletionsClient:
                 },
             )
         except openai.APIError as exc:
+            check_tutor_turn_deadline()
             if images and _rejects_images(exc):
                 raise ImageInputUnsupported(
                     f"{self.model} görüntü girdisi kabul etmiyor; görsel iddia kontrol edilemedi."
@@ -131,7 +154,19 @@ class ChatCompletionsClient:
             raise LLMError("LLM cevabı şemaya uymuyor.") from exc
 
     def _complete(self, **kwargs: Any) -> ChatCompletion:
-        response = self._client.chat.completions.create(model=self.model, **self._options, **kwargs)
+        request_started_at = monotonic()
+        try:
+            response = self._request_client().chat.completions.create(
+                model=self.model, **self._options, **kwargs
+            )
+        except openai.APIError as exc:
+            if isinstance(exc, openai.APITimeoutError) and request_timed_out_at_deadline(
+                self.timeout_s, request_started_at
+            ):
+                raise TutorTurnDeadlineExceeded from exc
+            check_tutor_turn_deadline()
+            raise
+        check_tutor_turn_deadline()
         self._record_usage(response.usage)
         if not response.choices:
             raise LLMError("Model cevap döndürmedi.")

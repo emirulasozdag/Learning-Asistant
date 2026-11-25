@@ -16,6 +16,7 @@ from pydantic import ValidationError
 
 from app.core.config import settings
 from app.llm.base import LLMError, LLMUsage, ToolCallingClient
+from app.llm.deadline import check_tutor_turn_deadline
 from app.retrieval.video_time import is_deictic
 from app.schemas.tutor import (
     ClarificationBlock,
@@ -92,6 +93,7 @@ def run_turn(
     ctx: TurnContext, orchestrator: ToolCallingClient | None
 ) -> Generator[TutorEvent, None, TurnTrace]:
     """Turu yürütür; olayları akıtır, bitince izini (trace) döndürür. Bloklar `ctx.blocks`'ta."""
+    check_tutor_turn_deadline()
     if orchestrator is None:
         trace = TurnTrace(mode="direct", fallback_reason="no_orchestrator")
         yield from _direct(ctx)
@@ -113,6 +115,7 @@ def run_turn(
             trace.fallback_reason = trace.fallback_reason or "no_content"
             ctx.finished = False
             yield from _direct(ctx)
+    check_tutor_turn_deadline()
     trace.steps = list(ctx.steps)
     trace.usage = _usage(orchestrator, ctx)
     known = [u.cost_usd for u in trace.usage if u.cost_usd is not None]
@@ -134,8 +137,12 @@ def _orchestrated(
         [tool.spec() for tool in tools.values()],
     )
     for _ in range(settings.tutor_max_steps):
+        check_tutor_turn_deadline()
         results = []
-        for call in conversation.step():
+        calls = conversation.step()
+        check_tutor_turn_deadline()
+        for call in calls:
+            check_tutor_turn_deadline()
             if ctx.finished:
                 results.append((call, {"status": "ignored", "reason": "Tur bitti."}))
                 continue
@@ -147,6 +154,7 @@ def _orchestrated(
                 outcome = ToolOutcome("rejected", {"reason": f"Bilinmeyen araç: {call.name}"})
             else:
                 outcome = yield from _call(ctx, tool, call.args)
+                check_tutor_turn_deadline()
             results.append((call, outcome.as_result()))
         if ctx.finished:
             return
